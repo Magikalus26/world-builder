@@ -170,6 +170,10 @@ export function generateRoguelikeConfig() {
 
   const totalBlocks = blueprint.layers.reduce((sum, l) => sum + l.cells.length, 0);
   const rewardCoins = Math.round((50 + totalBlocks * 2.5) * modifier.goldMult);
+  // Exclusive Roguelike currency: +25 to +50 Éclats d'Architecte scaled by monument complexity
+  const blockRatio = Math.max(0, Math.min(1, (totalBlocks - 18) / (45 - 18)));
+  const bonusTokens = modifier.id === 'gold_rush' ? 4 : 0;
+  const rewardTokens = Math.min(50, Math.max(25, Math.round(25 + blockRatio * 23 + bonusTokens)));
 
   return {
     hudLabel: blueprint.name,
@@ -185,6 +189,7 @@ export function generateRoguelikeConfig() {
     quarryMaxHits: modifier.quarryMaxHits,
     sledSpeedMult: modifier.sledSpeedMult,
     rewardCoins,
+    rewardTokens,
   };
 }
 

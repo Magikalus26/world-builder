@@ -25,6 +25,8 @@ export class TouchInteractionEngine {
     this.audio = audio;
 
     this.level = null;
+    this.decorationSystem = null;
+    this.activeDecorEntry = null;
     this.enabled = true;
 
     this.raycaster = new THREE.Raycaster();
@@ -34,7 +36,7 @@ export class TouchInteractionEngine {
 
     // Active pointer tracking for multi-touch pinch & twist
     this.pointers = new Map();
-    this.mode = 'IDLE'; // IDLE | PAN | ROTATE | MULTI | DRAG_BLOCK | DRAG_SLED | QUARRY_HOLD | WORKBENCH_CARVE
+    this.mode = 'IDLE'; // IDLE | PAN | ROTATE | MULTI | DRAG_BLOCK | DRAG_SLED | QUARRY_HOLD | WORKBENCH_CARVE | DECOR_DRAG | DECOR_PAN
 
     // Single-pointer gesture state
     this.primaryId = null;
@@ -105,6 +107,11 @@ export class TouchInteractionEngine {
     this.level = level;
   }
 
+  setDecorationSystem(deco) {
+    this.cancelActiveInteraction();
+    this.decorationSystem = deco;
+  }
+
   setEnabled(flag) {
     this.enabled = flag;
     if (!flag) {
@@ -113,7 +120,7 @@ export class TouchInteractionEngine {
   }
 
   isCameraGestureActive() {
-    return this.mode === 'PAN' || this.mode === 'ROTATE' || this.mode === 'MULTI';
+    return this.mode === 'PAN' || this.mode === 'DECOR_PAN' || this.mode === 'ROTATE' || this.mode === 'MULTI';
   }
 
   cancelActiveInteraction() {
@@ -122,6 +129,12 @@ export class TouchInteractionEngine {
       this.level.clearDropHighlights();
     } else if (this.mode === 'DRAG_SLED' && this.activeSled && this.level) {
       this.level.onSledDragEnd(this.activeSled);
+    } else if (this.mode === 'DECOR_DRAG' && this.activeDecorEntry && this.decorationSystem) {
+      this.decorationSystem.endPropDrag(
+        this.activeDecorEntry,
+        this.activeDecorEntry.x,
+        this.activeDecorEntry.z
+      );
     }
 
     this.mode = 'IDLE';
@@ -130,6 +143,7 @@ export class TouchInteractionEngine {
     this.activeSnapZone = null;
     this.activeSled = null;
     this.activeQuarryNode = null;
+    this.activeDecorEntry = null;
     this.quarryHoldAccum = 0;
     this.dropIndicator.visible = false;
   }
@@ -250,6 +264,28 @@ export class TouchInteractionEngine {
     // If level is complete / in victory orbit, don't intercept gameplay objects
     if (this.cameraController.isVictoryOrbit) {
       this.mode = 'IDLE';
+      return;
+    }
+
+    // Decoration Mode intercepts terrain taps (to place) and placed furniture props (to select/drag)
+    if (this.decorationSystem && this.decorationSystem.isActive()) {
+      const decorTargets = this.decorationSystem.getHitTargets();
+      if (decorTargets.length > 0) {
+        this._screenToRay(e.clientX, e.clientY, 0);
+        const hits = this.raycaster.intersectObjects(decorTargets, true);
+        for (let i = 0; i < hits.length; i++) {
+          let obj = hits[i].object;
+          while (obj) {
+            if (obj.userData && obj.userData.interact && obj.userData.interact.type === 'decor-prop') {
+              this.mode = 'DECOR_DRAG';
+              this.activeDecorEntry = obj.userData.interact.entry;
+              return;
+            }
+            obj = obj.parent;
+          }
+        }
+      }
+      this.mode = 'DECOR_PAN';
       return;
     }
 
@@ -379,8 +415,15 @@ export class TouchInteractionEngine {
     this.lastY = e.clientY;
     this.movedDist += Math.hypot(dx, dy);
 
-    if (this.mode === 'PAN') {
+    if (this.mode === 'PAN' || this.mode === 'DECOR_PAN') {
       this.cameraController.panByScreenDelta(dx, dy, dt);
+      return;
+    }
+
+    if (this.mode === 'DECOR_DRAG' && this.activeDecorEntry && this.decorationSystem) {
+      if (this.movedDist > 8 && this._raycastGroundPlane(e.clientX, e.clientY, 0.25, 0)) {
+        this.decorationSystem.updatePropDrag(this.activeDecorEntry, this.planeHit.x, this.planeHit.z);
+      }
       return;
     }
 
@@ -455,7 +498,24 @@ export class TouchInteractionEngine {
 
     if (e.pointerId !== this.primaryId) return;
 
-    if (this.mode === 'DRAG_BLOCK' && this.dragBlock && this.level) {
+    if (this.mode === 'DECOR_DRAG' && this.activeDecorEntry && this.decorationSystem) {
+      if (this.movedDist <= 10) {
+        this.decorationSystem.selectPlacedProp(this.activeDecorEntry);
+      } else if (this._raycastGroundPlane(e.clientX, e.clientY, 0.25, 0)) {
+        this.decorationSystem.endPropDrag(this.activeDecorEntry, this.planeHit.x, this.planeHit.z);
+      } else {
+        this.decorationSystem.endPropDrag(
+          this.activeDecorEntry,
+          this.activeDecorEntry.x,
+          this.activeDecorEntry.z
+        );
+      }
+      this.activeDecorEntry = null;
+    } else if (this.mode === 'DECOR_PAN' && this.decorationSystem) {
+      if (this.movedDist < 12 && this._raycastGroundPlane(e.clientX, e.clientY, 0.15, 0)) {
+        this.decorationSystem.tryPlaceSelectedAt(this.planeHit.x, this.planeHit.z);
+      }
+    } else if (this.mode === 'DRAG_BLOCK' && this.dragBlock && this.level) {
       const block = this.dragBlock;
       const snap = this.activeSnapZone;
       this.level.clearDropHighlights();

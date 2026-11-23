@@ -2097,9 +2097,11 @@ export class Level1Pyramid {
       const baseReward = (this.runConfig && this.runConfig.rewardCoins) || 150;
       const goldMult = this.upgrades.royal_gold_stone ? 1.25 : 1.0;
       const rewardCoins = Math.round(baseReward * goldMult);
+      const rewardTokens = (this.runConfig && this.runConfig.rewardTokens) || 0;
       this.onComplete({
         focusPoint: new THREE.Vector3(this.pyramidCenter.x, FOUNDATION_Y + 1.85, this.pyramidCenter.z),
         rewardCoins,
+        rewardTokens,
       });
     }
   }

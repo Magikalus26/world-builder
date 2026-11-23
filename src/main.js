@@ -1,8 +1,10 @@
 /**
- * Workd Builder — Application Bootstrap, Main Menu, 3D World Map, Campaign & Roguelike Orchestrator
+ * Workd Builder — Application Bootstrap, Main Menu, 3D World Map, Shop,
+ * Decoration System, Campaign & Roguelike Orchestrator
  * Manages Three.js WebGLRenderer, procedural PMREM environment & lighting, 512x512 PBR textures,
- * procedural Web Audio SFX, localStorage save system, 3-tab Main Menu, Shop modal,
- * 3D World Map selector, Level 1, and procedural Roguelike random levels.
+ * procedural Web Audio SFX, dual-currency localStorage save system, 3-tab Main Menu,
+ * 3-tab Furniture & Loot Box Boutique, In-Level 3D Decoration System, smooth camera/sand-wipe
+ * transitions, 3D World Map selector, Level 1, and procedural Roguelike random levels.
  */
 
 import * as THREE from 'three';
@@ -11,7 +13,10 @@ import { createTextureLibrary } from './textures.js';
 import { DioramaCameraController } from './camera.js';
 import { TouchInteractionEngine } from './dragDrop.js';
 import { WorldMapScene } from './worldMap.js';
-import { SaveManager, MainMenuController } from './mainMenu.js';
+import { SaveManager } from './saveManager.js';
+import { ShopController } from './shop.js';
+import { MainMenuController } from './mainMenu.js';
+import { DecorationSystem } from './decorationSystem.js';
 import { Level1Pyramid } from './levels/level1_pyramid.js';
 import { RoguelikeLevel, generateRoguelikeConfig } from './levels/roguelike_level.js';
 
@@ -43,11 +48,17 @@ class WorkdBuilderApp {
     this.restartBtn = document.getElementById('restart-btn');
     this.completionMapBtn = document.getElementById('completion-map-btn');
 
+    // Warm golden-sand transition wipe overlay
+    this.transitionWipe = document.getElementById('scene-transition-wipe');
+    this.isTransitioning = false;
+    this.transitionTimers = [];
+
     this.mode = 'menu'; // 'menu' | 'worldmap' | 'level' | 'roguelike'
     this.currentLevelIndex = 0;
     this.pendingLevelIndex = 0;
     this.worldMap = null;
     this.currentLevel = null;
+    this.decorationSystem = null;
     this.hudBumpTimer = null;
     this.lockedPillTimer = null;
 
@@ -65,11 +76,21 @@ class WorkdBuilderApp {
       audio: this.audio,
     });
 
+    this.shop = new ShopController({
+      audio: this.audio,
+      save: this.save,
+      onBalanceChange: () => {
+        if (this.mainMenu) this.mainMenu.refreshBalances();
+        if (this.decorationSystem) this.decorationSystem.renderDock();
+      },
+    });
+
     this.mainMenu = new MainMenuController({
       audio: this.audio,
       save: this.save,
+      shop: this.shop,
       onOpenWorldMap: () => this.openWorldMap(false),
-      onStartRoguelike: () => this.startRoguelikeRun(true),
+      onStartRoguelike: () => this._transitionIntoRoguelike(),
     });
 
     this._bindUI();
@@ -191,22 +212,28 @@ class WorkdBuilderApp {
     // Top-left "← Menu" on World Map
     this.mapBackMenuBtn.addEventListener('click', () => {
       this.audio.unlock();
-      this.audio.playWoodCardTap();
+      this.audio.playTabBounce();
+      this.audio.playCameraWhoosh();
       this.openMainMenu(false);
     });
 
-    // Top-left "← Menu" inside Level 1 or Roguelike
+    // Top-left "← Carte" (Level 1) or "← Menu" (Roguelike) with smooth reverse zoom-out transition
     this.gameBackMenuBtn.addEventListener('click', () => {
       this.audio.unlock();
-      this.audio.playWoodCardTap();
-      this.openMainMenu(true);
+      this.audio.playTabBounce();
+      this.audio.playCameraWhoosh();
+      if (this.mode === 'level') {
+        this._transitionExitTo('worldmap');
+      } else {
+        this._transitionExitTo('menu');
+      }
     });
 
-    // Launch selected level from 3D World Map card
+    // Launch selected level from 3D World Map card with camera swoop dive + golden-sand wipe
     this.playLevelBtn.addEventListener('click', () => {
       this.audio.unlock();
       this.audio.playStartChime();
-      this.loadLevel(this.pendingLevelIndex, true);
+      this._transitionIntoLevel(this.pendingLevelIndex);
     });
 
     // Completion primary button (Recommencer Level 1 OR Nouveau Run Roguelike)
@@ -214,7 +241,7 @@ class WorkdBuilderApp {
       this.audio.unlock();
       if (this.mode === 'roguelike') {
         this.audio.playDiceChime();
-        this.startRoguelikeRun(true);
+        this._transitionIntoRoguelike();
       } else {
         this.audio.playLeverFlip();
         this.restartCurrentLevel();
@@ -226,10 +253,100 @@ class WorkdBuilderApp {
       this.audio.unlock();
       this.audio.playCameraWhoosh();
       if (this.mode === 'roguelike') {
-        this.openMainMenu(true);
+        this._transitionExitTo('menu');
       } else {
-        this.openWorldMap(true);
+        this._transitionExitTo('worldmap');
       }
+    });
+  }
+
+  /* ============================================================================
+   * SMOOTH CAMERA SWOOP / ZOOM DIVE + WARM GOLDEN-SAND WIPE TRANSITIONS
+   * ========================================================================== */
+  _clearTransitionTimers() {
+    this.transitionTimers.forEach((id) => clearTimeout(id));
+    this.transitionTimers = [];
+  }
+
+  _runSceneTransition({ direction = 'in', onMidpoint }) {
+    if (this.isTransitioning) return;
+    this.isTransitioning = true;
+    this._clearTransitionTimers();
+    this.interaction.cancelActiveInteraction();
+
+    // Camera swoop dive (entering a level) or reverse zoom-out lift (exiting a level)
+    if (direction === 'in') {
+      this.cameraController.desiredDistance = Math.max(
+        this.cameraController.minDistance,
+        this.cameraController.distance * 0.56
+      );
+      this.cameraController.desiredElevation = Math.max(0.42, this.cameraController.elevation - 0.22);
+    } else {
+      this.cameraController.desiredDistance = Math.min(
+        this.cameraController.maxDistance,
+        this.cameraController.distance * 1.42
+      );
+      this.cameraController.desiredElevation = Math.min(1.18, this.cameraController.elevation + 0.18);
+    }
+
+    if (this.transitionWipe) {
+      this.transitionWipe.classList.remove('is-revealing');
+      this.transitionWipe.classList.add('is-covering');
+    }
+
+    const t1 = setTimeout(() => {
+      if (onMidpoint) onMidpoint();
+      if (this.transitionWipe) {
+        this.transitionWipe.classList.remove('is-covering');
+        this.transitionWipe.classList.add('is-revealing');
+      }
+    }, 220);
+
+    const t2 = setTimeout(() => {
+      if (this.transitionWipe) {
+        this.transitionWipe.classList.remove('is-revealing');
+      }
+      this.isTransitioning = false;
+    }, 500);
+
+    this.transitionTimers.push(t1, t2);
+  }
+
+  _transitionIntoLevel(index) {
+    this._runSceneTransition({
+      direction: 'in',
+      onMidpoint: () => {
+        this.loadLevel(index, true);
+        // Gentle settle-in glide from slightly elevated framing
+        this.cameraController.distance = this.cameraController.desiredDistance * 1.16;
+        this.cameraController.elevation = this.cameraController.desiredElevation + 0.08;
+      },
+    });
+  }
+
+  _transitionIntoRoguelike() {
+    this._runSceneTransition({
+      direction: 'in',
+      onMidpoint: () => {
+        this.startRoguelikeRun(true);
+        this.cameraController.distance = this.cameraController.desiredDistance * 1.16;
+        this.cameraController.elevation = this.cameraController.desiredElevation + 0.08;
+      },
+    });
+  }
+
+  _transitionExitTo(dest) {
+    this._runSceneTransition({
+      direction: 'out',
+      onMidpoint: () => {
+        if (dest === 'worldmap') {
+          this.openWorldMap(true);
+          this.cameraController.distance = this.cameraController.desiredDistance * 0.86;
+        } else {
+          this.openMainMenu(true);
+          this.cameraController.distance = this.cameraController.desiredDistance * 0.88;
+        }
+      },
     });
   }
 
@@ -250,6 +367,11 @@ class WorkdBuilderApp {
   }
 
   _disposeActiveLevel() {
+    if (this.decorationSystem) {
+      this.interaction.setDecorationSystem(null);
+      this.decorationSystem.dispose();
+      this.decorationSystem = null;
+    }
     if (this.currentLevel) {
       this.interaction.setLevel(null);
       this.currentLevel.dispose();
@@ -295,6 +417,7 @@ class WorkdBuilderApp {
 
     this._ensureWorldMapMounted();
     this.interaction.setLevel(null);
+    this.interaction.setDecorationSystem(null);
     this.interaction.setEnabled(false);
 
     // Gentle elevated framing showcasing the live 3D archipelago behind the menu dock
@@ -325,7 +448,7 @@ class WorkdBuilderApp {
 
     this.hudMapTop.hidden = false;
     this.hudGameTop.hidden = true;
-    this.mainMenu.refreshCoins();
+    this.mainMenu.refreshBalances();
 
     this._ensureWorldMapMounted();
     this.worldMap.selectedNode = null;
@@ -341,6 +464,7 @@ class WorkdBuilderApp {
     });
 
     this.interaction.setLevel(this.worldMap);
+    this.interaction.setDecorationSystem(null);
     this.interaction.setEnabled(true);
     this.cameraController.resetView(immediateCamera);
   }
@@ -371,6 +495,19 @@ class WorkdBuilderApp {
     }
   }
 
+  _mountDecorations(levelKey) {
+    this.decorationSystem = new DecorationSystem({
+      scene: this.scene,
+      level: this.currentLevel,
+      levelKey,
+      textures: this.textures,
+      audio: this.audio,
+      save: this.save,
+      onOpenShop: () => this.shop.open('meubles'),
+    });
+    this.interaction.setDecorationSystem(this.decorationSystem);
+  }
+
   /**
    * Launches a Campaign Level (e.g. Level 1 — La Petite Pyramide).
    */
@@ -390,6 +527,7 @@ class WorkdBuilderApp {
 
     this.hudMapTop.hidden = true;
     this.hudGameTop.hidden = false;
+    this.gameBackMenuBtn.textContent = '← Carte';
     this.restartBtn.textContent = 'Recommencer';
     this.completionMapBtn.textContent = 'Retour à la Carte';
     this._updateHUD(0, LevelClass.meta.totalGoal, LevelClass.meta.hudLabel, false);
@@ -417,6 +555,7 @@ class WorkdBuilderApp {
       },
     });
 
+    this._mountDecorations(LevelClass.meta.id || 'level1_pyramid');
     this.interaction.setLevel(this.currentLevel);
     this.interaction.setEnabled(true);
     this.cameraController.resetView(immediateCamera);
@@ -440,12 +579,13 @@ class WorkdBuilderApp {
 
     this.hudMapTop.hidden = true;
     this.hudGameTop.hidden = false;
+    this.gameBackMenuBtn.textContent = '← Menu';
     this.restartBtn.textContent = 'Nouveau Niveau';
     this.completionMapBtn.textContent = 'Retour au Menu';
     this._updateHUD(0, cfg.totalGoal, cfg.hudLabel, false);
 
-    // Show crisp Roguelike run modifier pill beneath top bar
-    this.rogueModPill.textContent = `🎲 ${cfg.modifierLabel} • ${cfg.biomeName} • +${cfg.rewardCoins} Or`;
+    // Show crisp Roguelike run modifier + dual rewards pill beneath top bar
+    this.rogueModPill.textContent = `🎲 ${cfg.modifierLabel} • +${cfg.rewardTokens} Éclats • +${cfg.rewardCoins} Or`;
     this.rogueModWrap.hidden = false;
 
     this.cameraController.configurePreset({
@@ -472,6 +612,7 @@ class WorkdBuilderApp {
       },
     });
 
+    this._mountDecorations('roguelike');
     this.interaction.setLevel(this.currentLevel);
     this.interaction.setEnabled(true);
     this.cameraController.resetView(immediateCamera);
@@ -482,7 +623,7 @@ class WorkdBuilderApp {
   }
 
   _updateHUD(count, total, label = 'Pyramide', animate = false) {
-    this.hudCounter.textContent = `${label} : ${count} / ${total} blocs`;
+    this.hudCounter.textContent = `${label} : ${count} / ${total}`;
 
     if (animate) {
       this.hudPill.classList.remove('is-bumped');
@@ -495,16 +636,28 @@ class WorkdBuilderApp {
     }
   }
 
-  _handleLevelComplete({ focusPoint, rewardCoins = 150 }) {
+  _handleLevelComplete({ focusPoint, rewardCoins = 150, rewardTokens = 0 }) {
+    if (this.decorationSystem && this.decorationSystem.isActive()) {
+      this.decorationSystem.setActive(false);
+    }
     this.hudPill.classList.add('is-complete');
     this.interaction.cancelActiveInteraction();
     this.cameraController.startVictoryOrbit(focusPoint);
 
-    // Award persistent gold coins and play coin clink
+    // Award persistent Gold Coins + exclusive Roguelike Éclats d'Architecte
+    const parts = [];
+    if (this.mode === 'roguelike' && rewardTokens > 0) {
+      this.save.addRoguelikeTokens(rewardTokens);
+      parts.push(`💠 +${rewardTokens} Éclats`);
+    }
     if (rewardCoins > 0) {
       this.save.addCoins(rewardCoins, this.mode);
-      this.mainMenu.refreshCoins();
-      this.rewardPill.textContent = `🪙 +${rewardCoins} Or gagnés !`;
+      parts.push(`🪙 +${rewardCoins} Or`);
+    }
+
+    if (parts.length > 0) {
+      this.shop.refreshBalances();
+      this.rewardPill.textContent = `${parts.join('  •  ')} gagnés !`;
       this.rewardPill.hidden = false;
       setTimeout(() => this.audio.playCoinClink(), 380);
     }
@@ -532,6 +685,9 @@ class WorkdBuilderApp {
       this.worldMap.update(dt, this.elapsed);
     } else if ((this.mode === 'level' || this.mode === 'roguelike') && this.currentLevel) {
       this.currentLevel.update(dt, this.elapsed);
+      if (this.decorationSystem) {
+        this.decorationSystem.update(dt, this.elapsed);
+      }
     }
 
     this.cameraController.update(dt, this.interaction.isCameraGestureActive());

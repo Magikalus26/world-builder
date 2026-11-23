@@ -47,11 +47,17 @@
         />
       </div>
 
-      <!-- Top-right player gold coin balance -->
+      <!-- Top-right dual currency bar (Éclats d'Architecte + Pièces d'Or) -->
       <div class="menu-top-bar">
-        <div class="coin-pill" aria-live="polite">
-          <span class="coin-icon" aria-hidden="true">🪙</span>
-          <span id="menu-coins-val">100 Or</span>
+        <div class="currency-group" aria-live="polite">
+          <div class="token-pill" title="Éclats d'Architecte (Roguelike)">
+            <span class="coin-icon" aria-hidden="true">💠</span>
+            <span id="menu-tokens-val">45 Éclats</span>
+          </div>
+          <div class="coin-pill" title="Pièces d'Or">
+            <span class="coin-icon" aria-hidden="true">🪙</span>
+            <span id="menu-coins-val">100 Or</span>
+          </div>
         </div>
       </div>
 
@@ -92,25 +98,74 @@
       </nav>
     </section>
 
-    <!-- TACTILE SHOP MODAL -->
+    <!-- OVERHAULED BOUTIQUE MODAL (3 Sub-Tabs: Meubles • Améliorations • Trésors) -->
     <div id="shop-modal" class="shop-modal" hidden role="dialog" aria-modal="true" aria-labelledby="shop-title">
       <div id="shop-backdrop" class="shop-backdrop"></div>
       <div class="shop-panel">
         <div class="shop-header">
-          <h1 id="shop-title" class="shop-title">Boutique</h1>
-          <div class="shop-header-right">
+          <div class="shop-header-top">
+            <h1 id="shop-title" class="shop-title">Boutique</h1>
+            <button id="shop-close-btn" class="shop-close-btn" type="button" aria-label="Fermer la boutique">✕</button>
+          </div>
+          <div class="shop-currencies">
+            <div class="token-pill coin-pill--sm">
+              <span class="coin-icon" aria-hidden="true">💠</span>
+              <span id="shop-tokens-val">45 Éclats</span>
+            </div>
             <div class="coin-pill coin-pill--sm">
               <span class="coin-icon" aria-hidden="true">🪙</span>
               <span id="shop-coins-val">100 Or</span>
             </div>
-            <button id="shop-close-btn" class="shop-close-btn" type="button" aria-label="Fermer la boutique">✕</button>
+          </div>
+          <div class="shop-tabs" role="tablist" aria-label="Catégories de la boutique">
+            <button
+              type="button"
+              class="shop-tab-btn is-active"
+              role="tab"
+              aria-selected="true"
+              data-shop-tab="meubles"
+            >
+              🪑 Meubles
+            </button>
+            <button
+              type="button"
+              class="shop-tab-btn"
+              role="tab"
+              aria-selected="false"
+              data-shop-tab="ameliorations"
+            >
+              ⛏️ Améliorations
+            </button>
+            <button
+              type="button"
+              class="shop-tab-btn"
+              role="tab"
+              aria-selected="false"
+              data-shop-tab="tresors"
+            >
+              🏺 Trésors • Bientôt
+            </button>
           </div>
         </div>
-        <div id="shop-items-list" class="shop-items-list"></div>
+        <div id="shop-tab-content" class="shop-tab-content"></div>
       </div>
     </div>
 
-    <!-- 3D WORLD MAP TOP HUD (← Menu + Title + Coins) -->
+    <!-- FULL-SCREEN ANIMATED LOOT BOX OPENING STAGE -->
+    <div id="lootbox-stage" class="lootbox-stage" hidden role="dialog" aria-modal="true" aria-label="Ouverture de coffre">
+      <div class="lootbox-stage-bg"></div>
+      <div id="lootbox-stage-card" class="lootbox-stage-card">
+        <h2 id="lootbox-stage-title" class="lootbox-stage-title">Coffre Classique</h2>
+        <div id="lootbox-arena" class="lootbox-arena"></div>
+        <div id="lootbox-rewards" class="lootbox-rewards"></div>
+        <div id="lootbox-coins-badge" class="lootbox-coins-badge" hidden></div>
+        <button id="lootbox-claim-btn" class="play-btn lootbox-claim-btn" type="button" hidden>
+          Récupérer
+        </button>
+      </div>
+    </div>
+
+    <!-- 3D WORLD MAP TOP HUD (← Menu + Title + Dual Currencies) -->
     <header id="hud-map-top" class="hud-top hud-map-top" hidden>
       <button id="map-back-menu-btn" class="hud-back-btn" type="button" aria-label="Retour au menu">
         ← Menu
@@ -118,26 +173,58 @@
       <div id="hud-map-badge" class="hud-pill hud-map-badge">
         <span class="hud-brand">Workd Builder</span>
       </div>
-      <div class="coin-pill coin-pill--hud" aria-live="polite">
-        <span class="coin-icon" aria-hidden="true">🪙</span>
-        <span id="map-coins-val">100 Or</span>
+      <div class="currency-group currency-group--compact" aria-live="polite">
+        <div class="token-pill coin-pill--hud" title="Éclats d'Architecte">
+          <span class="coin-icon" aria-hidden="true">💠</span>
+          <span id="map-tokens-val">45</span>
+        </div>
+        <div class="coin-pill coin-pill--hud" title="Pièces d'Or">
+          <span class="coin-icon" aria-hidden="true">🪙</span>
+          <span id="map-coins-val">100</span>
+        </div>
       </div>
     </header>
 
-    <!-- IN-GAME TOP HUD BAR (← Menu + Block Counter) -->
+    <!-- IN-GAME TOP HUD BAR (← Carte/Menu + Block Counter + 🪑 Décorer) -->
     <header id="hud-game-top" class="hud-top hud-game-top" hidden>
-      <button id="game-back-menu-btn" class="hud-back-btn" type="button" aria-label="Retour au menu">
-        ← Menu
+      <button id="game-back-menu-btn" class="hud-back-btn" type="button" aria-label="Retour">
+        ← Carte
       </button>
       <div id="hud-pill" class="hud-pill" role="status" aria-live="polite">
         <span id="hud-counter" class="hud-counter">Pyramide : 0 / 55 blocs</span>
       </div>
+      <button
+        id="decorate-toggle-btn"
+        class="hud-decor-btn"
+        type="button"
+        aria-pressed="false"
+        aria-label="Décorer le niveau"
+      >
+        🪑 Décorer
+      </button>
     </header>
 
     <!-- ROGUELIKE RUN MODIFIER PILL -->
     <div id="roguelike-modifier-wrap" class="roguelike-modifier-wrap" hidden>
       <div id="roguelike-modifier-pill" class="roguelike-modifier-pill"></div>
     </div>
+
+    <!-- IN-LEVEL FURNITURE DECORATION DOCK -->
+    <section id="decorate-dock" class="decorate-dock" hidden aria-label="Mode décoration">
+      <div id="decorate-prop-actions" class="decorate-prop-actions" hidden>
+        <button id="decorate-rotate-btn" class="decor-action-btn" type="button">↻ 90°</button>
+        <button id="decorate-remove-btn" class="decor-action-btn decor-action-btn--danger" type="button">✕ Retirer</button>
+      </div>
+      <div class="decorate-dock-panel">
+        <div class="decorate-dock-header">
+          <span id="decorate-dock-hint" class="decorate-dock-hint">
+            Touchez le sable libre pour poser un meuble
+          </span>
+          <button id="decorate-done-btn" class="decorate-done-btn" type="button">OK</button>
+        </div>
+        <div id="decorate-dock-list" class="decorate-dock-list"></div>
+      </div>
+    </section>
 
     <!-- WORLD MAP BOTTOM FLOATING CARD (Level 1 Unlocked) -->
     <section id="map-level-card" class="map-bottom-wrap" hidden aria-live="polite">
@@ -164,6 +251,9 @@
         </button>
       </div>
     </div>
+
+    <!-- WARM GOLDEN-SAND SCENE TRANSITION WIPE CURTAIN -->
+    <div id="scene-transition-wipe" class="scene-transition-wipe" aria-hidden="true"></div>
   </main>
 
   <script type="module" src="./src/main.js"></script>

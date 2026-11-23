@@ -620,6 +620,280 @@ export class SoundEngine {
     });
   }
 
+  /**
+   * Snappy tactile wooden-gold bounce click for Main Menu cards and Shop sub-tabs.
+   */
+  playTabBounce() {
+    if (!this._ready()) return;
+    const now = this.ctx.currentTime;
+
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(340, now);
+    osc.frequency.exponentialRampToValueAtTime(590, now + 0.055);
+    osc.frequency.exponentialRampToValueAtTime(480, now + 0.095);
+
+    gain.gain.setValueAtTime(0.18, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.11);
+
+    osc.connect(gain);
+    gain.connect(this.master);
+    osc.start(now);
+    osc.stop(now + 0.12);
+  }
+
+  /**
+   * Heavy weighted chest drop impact (scaled by tier: 'classic' | 'royal' | 'legendary').
+   */
+  playLootDrop(tier = 'classic') {
+    if (!this._ready()) return;
+    const now = this.ctx.currentTime;
+    const heavy = tier === 'legendary' ? 1.35 : tier === 'royal' ? 1.12 : 1.0;
+
+    // Low bass thud
+    const sub = this.ctx.createOscillator();
+    const subGain = this.ctx.createGain();
+    sub.type = 'sine';
+    sub.frequency.setValueAtTime(145 / (heavy * 0.9), now);
+    sub.frequency.exponentialRampToValueAtTime(38, now + 0.22 * heavy);
+
+    subGain.gain.setValueAtTime(0.36 * Math.min(heavy, 1.25), now);
+    subGain.gain.exponentialRampToValueAtTime(0.001, now + 0.26 * heavy);
+    sub.connect(subGain);
+    subGain.connect(this.master);
+    sub.start(now);
+    sub.stop(now + 0.28 * heavy);
+
+    // Filtered dust crunch noise
+    if (this.noiseBuffer) {
+      const noise = this.ctx.createBufferSource();
+      noise.buffer = this.noiseBuffer;
+      const filter = this.ctx.createBiquadFilter();
+      filter.type = 'bandpass';
+      filter.frequency.setValueAtTime(tier === 'legendary' ? 520 : 880, now);
+      filter.Q.value = 1.4;
+
+      const nGain = this.ctx.createGain();
+      nGain.gain.setValueAtTime(0.22, now);
+      nGain.gain.exponentialRampToValueAtTime(0.001, now + 0.14);
+
+      noise.connect(filter);
+      filter.connect(nGain);
+      nGain.connect(this.master);
+      noise.start(now);
+      noise.stop(now + 0.16);
+    }
+  }
+
+  /**
+   * Tactile wooden chest rattle or metallic lock snap during Loot Box anticipation.
+   */
+  playLootShake(metallic = false) {
+    if (!this._ready()) return;
+    const now = this.ctx.currentTime;
+
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    osc.type = metallic ? 'sine' : 'triangle';
+
+    if (metallic) {
+      osc.frequency.setValueAtTime(1380, now);
+      osc.frequency.exponentialRampToValueAtTime(2180, now + 0.045);
+      gain.gain.setValueAtTime(0.18, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.16);
+    } else {
+      osc.frequency.setValueAtTime(260, now);
+      osc.frequency.exponentialRampToValueAtTime(140, now + 0.075);
+      gain.gain.setValueAtTime(0.22, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.09);
+    }
+
+    osc.connect(gain);
+    gain.connect(this.master);
+    osc.start(now);
+    osc.stop(now + (metallic ? 0.18 : 0.1));
+  }
+
+  /**
+   * Distinct multi-stage Loot Box reveal fanfare for 'classic', 'royal', and 'legendary' chests.
+   */
+  playLootOpen(tier = 'classic') {
+    if (!this._ready()) return;
+    const now = this.ctx.currentTime;
+
+    if (tier === 'classic') {
+      // Wooden latch pop + warm golden coin triad
+      const latch = this.ctx.createOscillator();
+      const lGain = this.ctx.createGain();
+      latch.type = 'triangle';
+      latch.frequency.setValueAtTime(310, now);
+      latch.frequency.exponentialRampToValueAtTime(640, now + 0.06);
+      lGain.gain.setValueAtTime(0.24, now);
+      lGain.gain.exponentialRampToValueAtTime(0.001, now + 0.09);
+      latch.connect(lGain);
+      lGain.connect(this.master);
+      latch.start(now);
+      latch.stop(now + 0.1);
+
+      [523.25, 659.25, 783.99, 1046.5].forEach((freq, i) => {
+        const t = now + 0.07 + i * 0.065;
+        const osc = this.ctx.createOscillator();
+        const g = this.ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, t);
+        g.gain.setValueAtTime(0.001, t);
+        g.gain.linearRampToValueAtTime(0.16, t + 0.015);
+        g.gain.exponentialRampToValueAtTime(0.0008, t + 0.34);
+        osc.connect(g);
+        g.connect(this.master);
+        osc.start(t);
+        osc.stop(t + 0.36);
+      });
+      return;
+    }
+
+    if (tier === 'royal') {
+      // Swirling wind burst + shimmering sapphire-gold royal arpeggio
+      if (this.noiseBuffer) {
+        const wind = this.ctx.createBufferSource();
+        wind.buffer = this.noiseBuffer;
+        const filter = this.ctx.createBiquadFilter();
+        filter.type = 'bandpass';
+        filter.frequency.setValueAtTime(480, now);
+        filter.frequency.exponentialRampToValueAtTime(1950, now + 0.24);
+        filter.Q.value = 2.6;
+        const wGain = this.ctx.createGain();
+        wGain.gain.setValueAtTime(0.001, now);
+        wGain.gain.linearRampToValueAtTime(0.2, now + 0.06);
+        wGain.gain.exponentialRampToValueAtTime(0.001, now + 0.34);
+        wind.connect(filter);
+        filter.connect(wGain);
+        wGain.connect(this.master);
+        wind.start(now);
+        wind.stop(now + 0.36);
+      }
+
+      const notes = [440.0, 554.37, 659.25, 880.0, 1108.73, 1318.51];
+      notes.forEach((freq, i) => {
+        const t = now + 0.05 + i * 0.055;
+        const osc = this.ctx.createOscillator();
+        const g = this.ctx.createGain();
+        osc.type = i % 2 === 0 ? 'triangle' : 'sine';
+        osc.frequency.setValueAtTime(freq, t);
+        g.gain.setValueAtTime(0.001, t);
+        g.gain.linearRampToValueAtTime(0.17, t + 0.02);
+        g.gain.exponentialRampToValueAtTime(0.0008, t + 0.52);
+        osc.connect(g);
+        g.connect(this.master);
+        osc.start(t);
+        osc.stop(t + 0.55);
+      });
+      return;
+    }
+
+    // 'legendary': Epic sun-temple brass/harp starburst fanfare
+    const sub = this.ctx.createOscillator();
+    const sGain = this.ctx.createGain();
+    sub.type = 'sawtooth';
+    const subFilter = this.ctx.createBiquadFilter();
+    subFilter.type = 'lowpass';
+    subFilter.frequency.setValueAtTime(420, now);
+    subFilter.frequency.exponentialRampToValueAtTime(1800, now + 0.32);
+    sub.frequency.setValueAtTime(130.81, now);
+    sGain.gain.setValueAtTime(0.001, now);
+    sGain.gain.linearRampToValueAtTime(0.18, now + 0.05);
+    sGain.gain.exponentialRampToValueAtTime(0.001, now + 0.9);
+    sub.connect(subFilter);
+    subFilter.connect(sGain);
+    sGain.connect(this.master);
+    sub.start(now);
+    sub.stop(now + 0.95);
+
+    const fanfare = [
+      { f: 523.25, t: 0.0, d: 0.45 },
+      { f: 659.25, t: 0.07, d: 0.45 },
+      { f: 783.99, t: 0.14, d: 0.5 },
+      { f: 1046.5, t: 0.22, d: 0.72 },
+      { f: 1318.51, t: 0.30, d: 0.78 },
+      { f: 1567.98, t: 0.38, d: 0.88 },
+      { f: 2093.0, t: 0.46, d: 0.95 },
+    ];
+    fanfare.forEach(({ f, t: offset, d }) => {
+      const t = now + offset;
+      const osc = this.ctx.createOscillator();
+      const g = this.ctx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(f, t);
+      g.gain.setValueAtTime(0.001, t);
+      g.gain.linearRampToValueAtTime(0.16, t + 0.025);
+      g.gain.exponentialRampToValueAtTime(0.0008, t + d);
+      osc.connect(g);
+      g.connect(this.master);
+      osc.start(t);
+      osc.stop(t + d + 0.04);
+    });
+  }
+
+  /**
+   * Crisp wooden-stone placement thump + subtle golden chime when placing or rotating furniture.
+   */
+  playDecorPlace(rotateOnly = false) {
+    if (!this._ready()) return;
+    const now = this.ctx.currentTime;
+
+    const osc = this.ctx.createOscillator();
+    const g = this.ctx.createGain();
+    osc.type = 'triangle';
+    if (rotateOnly) {
+      osc.frequency.setValueAtTime(480, now);
+      osc.frequency.exponentialRampToValueAtTime(720, now + 0.06);
+      g.gain.setValueAtTime(0.15, now);
+      g.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
+    } else {
+      osc.frequency.setValueAtTime(220, now);
+      osc.frequency.exponentialRampToValueAtTime(95, now + 0.09);
+      g.gain.setValueAtTime(0.25, now);
+      g.gain.exponentialRampToValueAtTime(0.001, now + 0.11);
+    }
+    osc.connect(g);
+    g.connect(this.master);
+    osc.start(now);
+    osc.stop(now + 0.12);
+
+    if (!rotateOnly) {
+      const chime = this.ctx.createOscillator();
+      const cg = this.ctx.createGain();
+      chime.type = 'sine';
+      chime.frequency.setValueAtTime(880, now + 0.03);
+      cg.gain.setValueAtTime(0.09, now + 0.03);
+      cg.gain.exponentialRampToValueAtTime(0.001, now + 0.22);
+      chime.connect(cg);
+      cg.connect(this.master);
+      chime.start(now + 0.03);
+      chime.stop(now + 0.24);
+    }
+  }
+
+  /**
+   * Soft downward pop when removing a placed furniture item.
+   */
+  playDecorRemove() {
+    if (!this._ready()) return;
+    const now = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const g = this.ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(460, now);
+    osc.frequency.exponentialRampToValueAtTime(190, now + 0.09);
+    g.gain.setValueAtTime(0.16, now);
+    g.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
+    osc.connect(g);
+    g.connect(this.master);
+    osc.start(now);
+    osc.stop(now + 0.11);
+  }
+
   dispose() {
     if (this.ctx && this.ctx.state !== 'closed') {
       this.ctx.close().catch(() => {});
