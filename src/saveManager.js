@@ -285,6 +285,14 @@ export class SaveManager {
     return this.data.coins;
   }
 
+  spendCoins(amount) {
+    const cost = Math.max(0, Math.floor(amount));
+    if (this.data.coins < cost) return { ok: false, coins: this.data.coins };
+    this.data.coins -= cost;
+    this._persist();
+    return { ok: true, coins: this.data.coins };
+  }
+
   addRoguelikeTokens(amount) {
     const gain = Math.max(0, Math.floor(amount));
     this.data.tokens += gain;

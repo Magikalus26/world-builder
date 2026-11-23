@@ -211,6 +211,53 @@
       </div>
     </div>
 
+    <!-- STAGE 1 PRE-RUN ROGUELIKE DICE / PORTAL ROLL MODAL -->
+    <div id="roguelike-lobby-modal" class="roguelike-lobby-modal" hidden role="dialog" aria-modal="true" aria-labelledby="roguelike-lobby-title">
+      <div id="roguelike-lobby-backdrop" class="shop-backdrop"></div>
+      <div class="roguelike-lobby-panel">
+        <div class="shop-header roguelike-lobby-header">
+          <button id="roguelike-lobby-close" class="shop-close-btn" type="button" aria-label="Fermer le tirage Roguelike">
+            <span class="shop-close-inner" aria-hidden="true">
+              <svg viewBox="0 0 24 24" class="shop-close-x"><path d="M6.5 6.5L17.5 17.5M17.5 6.5L6.5 17.5" stroke="currentColor" stroke-width="3.4" stroke-linecap="round"/></svg>
+            </span>
+          </button>
+          <div class="roguelike-header-row">
+            <span id="roguelike-dice-badge" class="roguelike-dice-badge" aria-hidden="true">🎲</span>
+            <div>
+              <h1 id="roguelike-lobby-title" class="shop-title roguelike-lobby-title">Roguelike</h1>
+              <p class="roguelike-lobby-sub">Tirage du chantier aléatoire</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="roguelike-lobby-body">
+          <div class="roguelike-preview-frame">
+            <canvas id="roguelike-preview-canvas" class="roguelike-preview-canvas" aria-label="Aperçu 3D du niveau tiré"></canvas>
+            <span class="roguelike-stage-chip">Étape 1 • Thème du Niveau</span>
+          </div>
+
+          <div id="roguelike-theme-card" class="roguelike-theme-card">
+            <h2 id="roguelike-theme-title" class="roguelike-theme-title">Niveau 1 : Égypte — Désert de Gizeh</h2>
+            <p id="roguelike-theme-biome" class="roguelike-theme-biome">Sable doré &amp; Oasis du Nil</p>
+            <div class="roguelike-mystery-banner">
+              🏛️ Structure secrète : 1 sur 5 dévoilée au lancement
+            </div>
+            <div id="roguelike-lobby-modifier" class="roguelike-lobby-pill">🎲 Modificateur : Taille Rapide x2</div>
+            <div id="roguelike-lobby-reward" class="roguelike-lobby-reward">💠 +30 à +55 Éclats • 🪙 +115 à +210 Or</div>
+          </div>
+
+          <div class="roguelike-lobby-actions">
+            <button id="roguelike-launch-btn" class="play-btn roguelike-launch-btn" type="button">
+              LANCER LE CHANTIER
+            </button>
+            <button id="roguelike-reroll-btn" class="roguelike-reroll-btn" type="button">
+              🎲 Relancer le dé (Gratuit)
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- FULL-SCREEN ANIMATED LOOT BOX OPENING STAGE -->
     <div id="lootbox-stage" class="lootbox-stage" hidden role="dialog" aria-modal="true" aria-label="Ouverture de coffre">
       <div class="lootbox-stage-bg"></div>

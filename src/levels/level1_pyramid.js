@@ -757,11 +757,89 @@ export class Level1Pyramid {
   }
 
   _createPalmTree(parent, x, z, scale = 1, lean = 0.12) {
+    const themeId = this.runConfig && this.runConfig.themeId;
     const group = new THREE.Group();
     const groundY = this.getTerrainHeight(x, z);
     group.position.set(x, groundY - 0.04, z);
     group.scale.setScalar(scale);
 
+    if (themeId === 'rome') {
+      // Sculpted Mediterranean Cypress tree for Rome — Colline Impériale
+      const trunkGeo = this._trackGeo(new THREE.CylinderGeometry(0.09, 0.13, 0.55, 6));
+      const trunk = new THREE.Mesh(trunkGeo, this.textures.materials.palmTrunk);
+      trunk.position.y = 0.26;
+      trunk.castShadow = true;
+      group.add(trunk);
+
+      const foliage = new THREE.Group();
+      foliage.position.y = 0.45;
+      const c1 = new THREE.Mesh(
+        this._trackGeo(new THREE.ConeGeometry(0.42, 1.35, 7)),
+        this.textures.materials.palmLeaf
+      );
+      c1.position.y = 0.65;
+      c1.castShadow = true;
+      foliage.add(c1);
+
+      const c2 = new THREE.Mesh(
+        this._trackGeo(new THREE.ConeGeometry(0.32, 1.15, 7)),
+        this.textures.materials.palmLeaf
+      );
+      c2.position.y = 1.32;
+      c2.castShadow = true;
+      foliage.add(c2);
+
+      const c3 = new THREE.Mesh(
+        this._trackGeo(new THREE.ConeGeometry(0.2, 0.85, 7)),
+        this.textures.materials.palmLeaf
+      );
+      c3.position.y = 1.88;
+      c3.castShadow = true;
+      foliage.add(c3);
+
+      group.add(foliage);
+      this.palmFronds.push({ group: foliage, phase: x * 0.7 + z * 0.3 });
+      parent.add(group);
+      return;
+    }
+
+    if (themeId === 'china') {
+      // Cluster of 3 tall Jade Bamboo stalks for Chine — Montagne Céleste
+      const stalkGeo = this._trackGeo(new THREE.CylinderGeometry(0.055, 0.075, 2.35, 6));
+      const leafGeo = this._trackGeo(new THREE.ConeGeometry(0.18, 0.72, 4));
+      leafGeo.scale(1, 1, 0.2);
+      leafGeo.translate(0, 0.34, 0);
+
+      const grove = new THREE.Group();
+      [
+        [0, 0, 1.0, 0.06],
+        [-0.24, 0.14, 0.86, -0.09],
+        [0.22, -0.15, 0.92, 0.08],
+      ].forEach(([ox, oz, sc, tilt], idx) => {
+        const s = new THREE.Mesh(stalkGeo, this.textures.materials.palmLeaf);
+        s.position.set(ox, 1.12 * sc, oz);
+        s.scale.set(1, sc, 1);
+        s.rotation.z = tilt;
+        s.castShadow = true;
+        grove.add(s);
+
+        for (let k = 0; k < 3; k++) {
+          const lf = new THREE.Mesh(leafGeo, this.textures.materials.palmLeaf);
+          lf.position.set(ox, (1.45 + k * 0.32) * sc, oz);
+          lf.rotation.y = idx * 2.1 + k * 2.05;
+          lf.rotation.z = 1.08;
+          lf.castShadow = true;
+          grove.add(lf);
+        }
+      });
+
+      group.add(grove);
+      this.palmFronds.push({ group: grove, phase: x * 0.7 + z * 0.3 });
+      parent.add(group);
+      return;
+    }
+
+    // Default / Égypte: Sunlit Desert Date Palm
     const segGeo = this._trackGeo(new THREE.CylinderGeometry(0.11, 0.16, 0.52, 6));
     let curY = 0.22;
     let curX = 0;

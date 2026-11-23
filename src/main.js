@@ -17,6 +17,7 @@ import { SaveManager } from './saveManager.js';
 import { ShopController } from './shop.js';
 import { MainMenuController } from './mainMenu.js';
 import { DecorationSystem } from './decorationSystem.js';
+import { RoguelikeLobbyController } from './roguelikeLobby.js';
 import { Level1Pyramid } from './levels/level1_pyramid.js';
 import { RoguelikeLevel, generateRoguelikeConfig } from './levels/roguelike_level.js';
 
@@ -85,12 +86,21 @@ class WorkdBuilderApp {
       },
     });
 
+    this.roguelikeLobby = new RoguelikeLobbyController({
+      audio: this.audio,
+      save: this.save,
+      onBalanceChange: () => {
+        if (this.shop) this.shop.refreshBalances();
+      },
+      onLaunchRun: (runConfig) => this._transitionIntoRoguelike(runConfig),
+    });
+
     this.mainMenu = new MainMenuController({
       audio: this.audio,
       save: this.save,
       shop: this.shop,
       onOpenWorldMap: () => this.openWorldMap(false),
-      onStartRoguelike: () => this._transitionIntoRoguelike(),
+      onStartRoguelike: () => this.roguelikeLobby.open(),
     });
 
     this._bindUI();
@@ -236,12 +246,12 @@ class WorkdBuilderApp {
       this._transitionIntoLevel(this.pendingLevelIndex);
     });
 
-    // Completion primary button (Recommencer Level 1 OR Nouveau Run Roguelike)
+    // Completion primary button (Recommencer Level 1 OR Nouveau Tirage Roguelike)
     this.restartBtn.addEventListener('click', () => {
       this.audio.unlock();
       if (this.mode === 'roguelike') {
         this.audio.playDiceChime();
-        this._transitionIntoRoguelike();
+        this.roguelikeLobby.open();
       } else {
         this.audio.playLeverFlip();
         this.restartCurrentLevel();
@@ -324,11 +334,11 @@ class WorkdBuilderApp {
     });
   }
 
-  _transitionIntoRoguelike() {
+  _transitionIntoRoguelike(runConfig = null) {
     this._runSceneTransition({
       direction: 'in',
       onMidpoint: () => {
-        this.startRoguelikeRun(true);
+        this.startRoguelikeRun(true, runConfig);
         this.cameraController.distance = this.cameraController.desiredDistance * 1.16;
         this.cameraController.elevation = this.cameraController.desiredElevation + 0.08;
       },
@@ -562,30 +572,30 @@ class WorkdBuilderApp {
   }
 
   /**
-   * Launches a freshly generated procedural Roguelike random level (18–45 blocks).
+   * Stage 2: Launches a procedural Roguelike run using the rolled theme + 1-of-5 dedicated structure.
    */
-  startRoguelikeRun(immediateCamera = false) {
-    const cfg = generateRoguelikeConfig();
+  startRoguelikeRun(immediateCamera = false, prebuiltConfig = null) {
+    const cfg = prebuiltConfig || generateRoguelikeConfig();
 
     this._disposeActiveLevel();
     this._disposeWorldMap();
     this._hideMapBottomOverlays();
     this._hideCompletionAndModifiers();
     this.mainMenu.hide();
+    if (this.roguelikeLobby) this.roguelikeLobby.close();
 
     this.mode = 'roguelike';
+    this.activeRoguelikeConfig = cfg;
     this.scene.background.set(cfg.skyColor);
     this.scene.fog.color.set(cfg.skyColor);
 
     this.hudMapTop.hidden = true;
     this.hudGameTop.hidden = false;
     this.gameBackMenuBtn.textContent = '← Menu';
-    this.restartBtn.textContent = 'Nouveau Niveau';
+    this.restartBtn.textContent = 'Nouveau Tirage';
     this.completionMapBtn.textContent = 'Retour au Menu';
-    this._updateHUD(0, cfg.totalGoal, cfg.hudLabel, false);
-
-    // Show crisp Roguelike run modifier + dual rewards pill beneath top bar
-    this.rogueModPill.textContent = `🎲 ${cfg.modifierLabel} • +${cfg.rewardTokens} Éclats • +${cfg.rewardCoins} Or`;
+    this._updateHUD(0, cfg.totalGoal, cfg.themeShortName || 'Roguelike', false);
+    this._updateRoguelikeBanner(cfg, 0, cfg.totalGoal);
     this.rogueModWrap.hidden = false;
 
     this.cameraController.configurePreset({
@@ -605,7 +615,8 @@ class WorkdBuilderApp {
       upgrades: this.save.getUpgrades(),
       runConfig: cfg,
       onProgress: (count, total) => {
-        this._updateHUD(count, total, cfg.hudLabel, true);
+        this._updateHUD(count, total, cfg.themeShortName || 'Roguelike', true);
+        this._updateRoguelikeBanner(cfg, count, total);
       },
       onComplete: (payload) => {
         this._handleLevelComplete(payload);
@@ -616,6 +627,11 @@ class WorkdBuilderApp {
     this.interaction.setLevel(this.currentLevel);
     this.interaction.setEnabled(true);
     this.cameraController.resetView(immediateCamera);
+  }
+
+  _updateRoguelikeBanner(cfg, count, total) {
+    if (!this.rogueModPill || !cfg) return;
+    this.rogueModPill.textContent = `Roguelike • ${cfg.themeShortName} : ${cfg.structureName} (${count} / ${total} blocs) • 🎲 ${cfg.modifierLabel} • +${cfg.rewardTokens} Éclats`;
   }
 
   restartCurrentLevel() {

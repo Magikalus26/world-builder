@@ -2567,3 +2567,270 @@ body {
   opacity: 0.46;
   cursor: not-allowed;
 }
+
+/* ============================================================================
+ * STAGE 1 PRE-RUN ROGUELIKE DICE / PORTAL ROLL MODAL
+ * Carved Wood, Double-Beveled Gold & Amethyst Portal Styling
+ * ========================================================================== */
+.roguelike-lobby-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 55;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: calc(env(safe-area-inset-top, 0px) + 14px) 14px calc(env(safe-area-inset-bottom, 0px) + 14px);
+  opacity: 0;
+  transition: opacity 0.22s ease;
+}
+
+.roguelike-lobby-modal.is-visible {
+  opacity: 1;
+}
+
+.roguelike-lobby-modal[hidden] {
+  display: none;
+}
+
+.roguelike-lobby-panel {
+  position: relative;
+  width: 100%;
+  max-width: 368px;
+  max-height: 90dvh;
+  display: flex;
+  flex-direction: column;
+  border-radius: 26px;
+  background:
+    repeating-linear-gradient(
+      0deg,
+      rgba(255, 224, 172, 0.025) 0px,
+      rgba(255, 224, 172, 0.025) 2px,
+      rgba(16, 7, 2, 0.08) 2px,
+      rgba(16, 7, 2, 0.08) 14px
+    ),
+    linear-gradient(180deg, #543118 0%, #371e0c 100%);
+  border: 3px solid #ecc066;
+  box-shadow:
+    0 24px 58px rgba(8, 4, 1, 0.8),
+    0 0 0 2px #6e4116,
+    0 0 0 4.5px #d7a347,
+    inset 0 2px 0 rgba(255, 246, 210, 0.44);
+  overflow: hidden;
+  transform: scale(0.94);
+  transition: transform 0.24s cubic-bezier(0.22, 1.32, 0.36, 1);
+  z-index: 2;
+}
+
+.roguelike-lobby-modal.is-visible .roguelike-lobby-panel {
+  transform: scale(1);
+}
+
+.roguelike-lobby-header {
+  padding: 12px 14px 10px;
+}
+
+.roguelike-header-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-right: 48px;
+}
+
+.roguelike-dice-badge {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: linear-gradient(180deg, #8b62c4 0%, #523082 100%);
+  border: 2px solid #e2cdfc;
+  box-shadow: 0 4px 12px rgba(24, 8, 44, 0.55), inset 0 1px 0 rgba(255, 246, 255, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  flex: 0 0 auto;
+}
+
+@keyframes diceTumble {
+  0% { transform: rotate(0deg) scale(1); }
+  25% { transform: rotate(-22deg) scale(1.12); }
+  50% { transform: rotate(180deg) scale(0.95); }
+  75% { transform: rotate(340deg) scale(1.1); }
+  100% { transform: rotate(360deg) scale(1); }
+}
+
+.roguelike-dice-badge.is-tumbling {
+  animation: diceTumble 0.42s linear infinite;
+}
+
+.roguelike-lobby-title {
+  font-size: 20px;
+  line-height: 1.1;
+}
+
+.roguelike-lobby-sub {
+  margin: 2px 0 0;
+  color: #f6dfba;
+  font-size: 11.5px;
+  font-weight: 700;
+}
+
+.roguelike-lobby-body {
+  padding: 12px 13px 15px;
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.roguelike-preview-frame {
+  position: relative;
+  width: 100%;
+  height: 180px;
+  border-radius: 16px;
+  border: 2px solid #c99a4c;
+  background: radial-gradient(circle at 50% 52%, rgba(92, 168, 198, 0.34) 0%, rgba(28, 17, 9, 0.88) 78%);
+  box-shadow: inset 0 3px 12px rgba(10, 5, 1, 0.65);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.roguelike-preview-canvas {
+  width: 316px;
+  height: 176px;
+  display: block;
+}
+
+.roguelike-stage-chip {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: rgba(24, 14, 6, 0.82);
+  border: 1px solid rgba(250, 214, 128, 0.55);
+  color: #ffe8a8;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+.roguelike-theme-card {
+  padding: 11px 12px;
+  border-radius: 16px;
+  background: linear-gradient(180deg, rgba(44, 26, 12, 0.88) 0%, rgba(26, 15, 6, 0.94) 100%);
+  border: 2px solid var(--theme-accent, #f0c25c);
+  box-shadow: 0 5px 14px rgba(12, 5, 1, 0.5), inset 0 1px 0 rgba(255, 240, 200, 0.16);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  text-align: center;
+  transition: border-color 0.2s ease, opacity 0.15s ease;
+}
+
+.roguelike-theme-card.is-rolling {
+  opacity: 0.86;
+}
+
+.roguelike-theme-title {
+  margin: 0;
+  color: #fff6de;
+  font-size: 14.5px;
+  font-weight: 900;
+  line-height: 1.2;
+  text-shadow: 0 1.5px 2px rgba(14, 6, 1, 0.8);
+}
+
+.roguelike-theme-biome {
+  margin: 0;
+  color: #e6cca0;
+  font-size: 11.5px;
+  font-weight: 700;
+}
+
+.roguelike-mystery-banner {
+  width: 100%;
+  padding: 6px 10px;
+  border-radius: 10px;
+  background: rgba(84, 52, 134, 0.45);
+  border: 1px solid rgba(206, 174, 255, 0.48);
+  color: #f4e6ff;
+  font-size: 11.2px;
+  font-weight: 800;
+}
+
+.roguelike-lobby-pill {
+  padding: 4px 11px;
+  border-radius: 999px;
+  background: rgba(34, 22, 12, 0.82);
+  border: 1px solid rgba(244, 202, 114, 0.45);
+  color: #ffe399;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.roguelike-lobby-reward {
+  color: #a8ebff;
+  font-size: 12px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.roguelike-lobby-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.roguelike-launch-btn {
+  min-height: 46px;
+  padding: 12px 20px;
+  font-size: 15px;
+  letter-spacing: 0.04em;
+}
+
+.roguelike-launch-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.roguelike-reroll-btn {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 100%;
+  min-height: 40px;
+  padding: 9px 16px;
+  border-radius: 999px;
+  border: 1.8px solid #c69a56;
+  background: linear-gradient(180deg, #644123 0%, #412611 100%);
+  color: #fff2d0;
+  font-family: var(--font-ui);
+  font-size: 13px;
+  font-weight: 800;
+  box-shadow: 0 4px 10px rgba(14, 7, 2, 0.45), inset 0 1px 0 rgba(255, 232, 186, 0.28);
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: transform 0.14s ease, opacity 0.15s ease;
+}
+
+.roguelike-reroll-btn:active:not(:disabled) {
+  transform: scale(0.95);
+}
+
+.roguelike-reroll-btn:disabled {
+  opacity: 0.46;
+  cursor: not-allowed;
+}
+
+/* Enhanced Roguelike In-Level Structure & Modifier HUD Banner */
+.roguelike-modifier-pill {
+  max-width: 94vw;
+  white-space: normal;
+  text-align: center;
+  line-height: 1.28;
+  padding: 6px 13px;
+  font-size: 11.5px;
+}
