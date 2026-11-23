@@ -434,6 +434,94 @@ export class SoundEngine {
     });
   }
 
+  /**
+   * Tactile World Map island tile tap (warm resonant chime if unlocked, muted stone knock if locked).
+   */
+  playMapTap(locked = false) {
+    if (!this._ready()) return;
+    const now = this.ctx.currentTime;
+
+    if (locked) {
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(220, now);
+      osc.frequency.exponentialRampToValueAtTime(145, now + 0.09);
+      gain.gain.setValueAtTime(0.22, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.11);
+      osc.connect(gain);
+      gain.connect(this.master);
+      osc.start(now);
+      osc.stop(now + 0.12);
+      return;
+    }
+
+    // Crisp wooden-stone tile tap + warm golden fifth harmonic
+    [440, 659.25].forEach((freq, idx) => {
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = idx === 0 ? 'triangle' : 'sine';
+      osc.frequency.setValueAtTime(freq, now + idx * 0.03);
+      gain.gain.setValueAtTime(idx === 0 ? 0.2 : 0.13, now + idx * 0.03);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.24 + idx * 0.04);
+      osc.connect(gain);
+      gain.connect(this.master);
+      osc.start(now + idx * 0.03);
+      osc.stop(now + 0.3);
+    });
+  }
+
+  /**
+   * Soft airy camera fly-to whoosh when gliding across the 3D World Map.
+   */
+  playCameraWhoosh() {
+    if (!this._ready()) return;
+    const now = this.ctx.currentTime;
+
+    const noise = this.ctx.createBufferSource();
+    noise.buffer = this.noiseBuffer;
+    const bp = this.ctx.createBiquadFilter();
+    bp.type = 'bandpass';
+    bp.frequency.setValueAtTime(340, now);
+    bp.frequency.exponentialRampToValueAtTime(980, now + 0.18);
+    bp.frequency.exponentialRampToValueAtTime(420, now + 0.36);
+    bp.Q.setValueAtTime(1.6, now);
+
+    const gain = this.ctx.createGain();
+    gain.gain.setValueAtTime(0.001, now);
+    gain.gain.linearRampToValueAtTime(0.11, now + 0.09);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.38);
+
+    noise.connect(bp);
+    bp.connect(gain);
+    gain.connect(this.master);
+    noise.start(now, Math.random() * 0.35, 0.4);
+  }
+
+  /**
+   * Bright uplifting adventure chime when tapping JOUER to launch a level.
+   */
+  playStartChime() {
+    if (!this._ready()) return;
+    const now = this.ctx.currentTime;
+    const notes = [523.25, 659.25, 783.99, 1046.5]; // C5 - E5 - G5 - C6
+
+    notes.forEach((freq, i) => {
+      const t = now + i * 0.055;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = i === notes.length - 1 ? 'sine' : 'triangle';
+      osc.frequency.setValueAtTime(freq, t);
+      gain.gain.setValueAtTime(0.001, t);
+      gain.gain.linearRampToValueAtTime(0.16, t + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.42);
+      osc.connect(gain);
+      gain.connect(this.master);
+      osc.start(t);
+      osc.stop(t + 0.45);
+    });
+  }
+
   dispose() {
     if (this.ctx && this.ctx.state !== 'closed') {
       this.ctx.close().catch(() => {});

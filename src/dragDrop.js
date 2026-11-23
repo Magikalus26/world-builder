@@ -10,6 +10,7 @@ import * as THREE from 'three';
 const PRIORITY = {
   'workbench-carve': 1,
   block: 2,
+  'map-node': 2,
   'sled-lever': 3,
   sled: 4,
   'quarry-node': 5,
@@ -304,6 +305,12 @@ export class TouchInteractionEngine {
       return;
     }
 
+    if (interact.type === 'map-node') {
+      this.mode = 'MAP_TAP';
+      this.activeMapNode = interact.node;
+      return;
+    }
+
     if (interact.type === 'quarry-node') {
       this.mode = 'QUARRY_HOLD';
       this.activeQuarryNode = interact.node;
@@ -416,6 +423,15 @@ export class TouchInteractionEngine {
       return;
     }
 
+    if (this.mode === 'MAP_TAP') {
+      if (this.movedDist > 14) {
+        this.activeMapNode = null;
+        this.mode = 'PAN';
+        this.cameraController.panByScreenDelta(dx, dy, dt);
+      }
+      return;
+    }
+
     if (this.mode === 'QUARRY_HOLD') {
       if (this.movedDist > 34) {
         // Finger slid away from rock node; transition cleanly into camera pan
@@ -463,6 +479,15 @@ export class TouchInteractionEngine {
       if (!this.workbenchDidSwipe && this.movedDist < 24 && now - this.workbenchLastCarveTime >= 110) {
         this.workbenchLastCarveTime = now;
         this.level.carveWorkbenchBlock(null);
+      }
+    } else if (this.mode === 'MAP_TAP' && this.activeMapNode && this.level) {
+      if (this.movedDist <= 14 && typeof this.level.onMapNodeTap === 'function') {
+        this.level.onMapNodeTap(this.activeMapNode);
+      }
+      this.activeMapNode = null;
+    } else if (this.mode === 'PAN' && this.level) {
+      if (this.movedDist < 10 && typeof this.level.onEmptyGroundTap === 'function') {
+        this.level.onEmptyGroundTap();
       }
     } else if (this.mode === 'QUARRY_HOLD') {
       this.activeQuarryNode = null;

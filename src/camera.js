@@ -182,7 +182,51 @@ export class DioramaCameraController {
   }
 
   /**
-   * Smoothly returns to the initial playable Level 1 diorama framing.
+   * Configures default camera framing for a scene (World Map vs playable Level diorama).
+   */
+  configurePreset({
+    target,
+    elevationDeg = 55,
+    azimuth = 0.08,
+    minDistance = 10.5,
+    maxDistance = 56,
+    panBounds = { minX: -8.5, maxX: 8.5, minZ: -8.2, maxZ: 8.5 },
+    distanceScale = 1.0,
+  } = {}) {
+    if (target) this.defaultTarget.copy(target);
+    this.defaultElevation = elevationDeg * DEG2RAD;
+    this.defaultAzimuth = azimuth;
+    this.minDistance = minDistance;
+    this.maxDistance = maxDistance;
+    this.panBounds = panBounds;
+    this.distanceScale = distanceScale;
+  }
+
+  /**
+   * Smoothly flies the camera toward a focused World Map island or diorama landmark.
+   */
+  flyTo({ target, distance, elevationDeg, azimuth } = {}) {
+    this.isVictoryOrbit = false;
+    this.stopInertia();
+    if (target) {
+      this.desiredTarget.copy(target);
+      this._clampTarget(this.desiredTarget);
+    }
+    if (typeof distance === 'number') {
+      const aspect = this.camera.aspect || 0.46;
+      const responsiveDist = aspect < 0.65 ? distance : distance * 0.72;
+      this.desiredDistance = THREE.MathUtils.clamp(responsiveDist, this.minDistance, this.maxDistance);
+    }
+    if (typeof elevationDeg === 'number') {
+      this.desiredElevation = elevationDeg * DEG2RAD;
+    }
+    if (typeof azimuth === 'number') {
+      this.desiredAzimuth = azimuth;
+    }
+  }
+
+  /**
+   * Smoothly returns to the active scene's default diorama framing.
    */
   resetView(immediate = false) {
     this.isVictoryOrbit = false;
@@ -190,7 +234,7 @@ export class DioramaCameraController {
     this.desiredTarget.copy(this.defaultTarget);
     this.desiredAzimuth = this.defaultAzimuth;
     this.desiredElevation = this.defaultElevation;
-    this.desiredDistance = this._computeResponsiveDistance();
+    this.desiredDistance = this._computeResponsiveDistance() * (this.distanceScale || 1.0);
 
     if (immediate) {
       this.target.copy(this.desiredTarget);

@@ -36,22 +36,48 @@
       aria-label="Workd Builder — Diorama 3D interactif"
     ></canvas>
 
-    <header class="hud-top">
+    <!-- World Map Top Title Badge (default launch) -->
+    <header id="hud-map-top" class="hud-top">
+      <div id="hud-map-badge" class="hud-pill hud-map-badge">
+        <span class="hud-brand">Workd Builder</span>
+      </div>
+    </header>
+
+    <!-- In-Game Top HUD Bar (discrete ← Carte button + Pyramid block counter) -->
+    <header id="hud-game-top" class="hud-top hud-game-top" hidden>
+      <button id="back-to-map-btn" class="hud-back-btn" type="button" aria-label="Retour à la carte">
+        ← Carte
+      </button>
       <div
         id="hud-pill"
         class="hud-pill"
         role="status"
         aria-live="polite"
       >
-        <span class="hud-brand">Workd Builder</span>
-        <span class="hud-sep" aria-hidden="true">•</span>
         <span id="hud-counter" class="hud-counter">Pyramide : 0 / 55 blocs</span>
       </div>
     </header>
 
+    <!-- World Map Bottom Floating Card (Level 1 Unlocked) -->
+    <section id="map-level-card" class="map-bottom-wrap" hidden aria-live="polite">
+      <div class="map-card">
+        <p id="map-card-title" class="map-card-title">Niveau 1 : La Petite Pyramide (55 blocs)</p>
+        <button id="play-level-btn" class="play-btn" type="button">JOUER</button>
+      </div>
+    </section>
+
+    <!-- World Map Brief Locked Notice Pill (Levels 2 & 3) -->
+    <div id="map-locked-pill" class="map-bottom-wrap" hidden role="status" aria-live="polite">
+      <div class="locked-pill">Prochaine civilisation en construction</div>
+    </div>
+
+    <!-- Level Completion Action Bar -->
     <div id="completion-bar" class="completion-bar" hidden>
       <button id="restart-btn" class="restart-btn" type="button">
         Recommencer
+      </button>
+      <button id="completion-map-btn" class="secondary-btn" type="button">
+        Retour à la Carte
       </button>
     </div>
   </main>
