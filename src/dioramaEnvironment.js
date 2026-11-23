@@ -108,6 +108,25 @@ export const BIOME_ATMOSPHERES = {
     particleStyle: 'dust',
     particleCount: 42,
   },
+  coalmine: {
+    id: 'coalmine',
+    skyTop: '#6e8da8',
+    skyHorizon: '#cbd8e0',
+    skyBottom: '#8f9aa3',
+    fogColor: '#c9d6de',
+    fogNear: 42,
+    fogFar: 92,
+    sunColor: '#fff1d4',
+    sunIntensity: 2.08,
+    hemiSky: '#eef5fa',
+    hemiGround: '#596356',
+    hemiIntensity: 0.88,
+    rimColor: '#98c4dc',
+    rimIntensity: 0.54,
+    particleColor: '#ffe0a8',
+    particleStyle: 'dust',
+    particleCount: 40,
+  },
   worldmap: {
     id: 'worldmap',
     skyTop: '#67add6',
@@ -156,6 +175,7 @@ export function resolveBiomeConfig(levelIdOrTheme = 'egypt', overrides = null) {
     else if (s.includes('japan') || s.includes('japon') || s.includes('minka')) key = 'japan';
     else if (s.includes('maya') || s.includes('kukul')) key = 'maya';
     else if (s.includes('penitentiary') || s.includes('prison') || s.includes('1800')) key = 'penitentiary';
+    else if (s.includes('coal') || s.includes('mine') || s.includes('charbon')) key = 'coalmine';
     else if (s.includes('worldmap')) key = 'worldmap';
     else if (s.includes('menu')) key = 'menu';
     else if (BIOME_ATMOSPHERES[s]) key = s;

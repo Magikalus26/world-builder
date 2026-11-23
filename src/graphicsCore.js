@@ -71,8 +71,8 @@ export function createUnifiedRenderer(
     powerPreference: 'high-performance',
   });
 
-  // Retina clarity up to 3x DPR on iPhone Safari (zero upscaling blur)
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 3));
+  // Crisp Retina clarity capped at 2x DPR for locked 60 FPS on iPhone 16e Safari
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   if (width && height) {
     renderer.setSize(width, height, false);
   }

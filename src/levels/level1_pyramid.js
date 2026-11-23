@@ -32,6 +32,7 @@ import {
   applyVerticalFoliageGradient,
   buildStylizedRomanCypress,
   buildStylizedCeibaTree,
+  buildStylizedFrontierPine,
 } from '../foliageAndGround.js';
 
 const BLOCK_W = 0.96;
@@ -942,6 +943,22 @@ export class Level1Pyramid {
         groundY,
         scale: scale * 0.94,
         seed: Math.abs(Math.round(x * 11 + z * 17)) + 5,
+        barkMat: this.textures.materials.palmTrunk,
+        foliageMat,
+        trackGeo: (g) => this._trackGeo(g),
+      });
+      this.palmFronds.push({ group: crown, phase: x * 0.7 + z * 0.3 });
+      parent.add(tree);
+      return;
+    }
+
+    if (themeId === 'coalmine') {
+      const { tree, crown } = buildStylizedFrontierPine({
+        x,
+        z,
+        groundY,
+        scale,
+        seed: Math.abs(Math.round(x * 13 + z * 19)) + 7,
         barkMat: this.textures.materials.palmTrunk,
         foliageMat,
         trackGeo: (g) => this._trackGeo(g),

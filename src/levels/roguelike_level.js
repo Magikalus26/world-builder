@@ -487,6 +487,122 @@ export const ROGUELIKE_THEMES = [
       },
     ],
   },
+  {
+    id: 'coalmine',
+    levelNum: 6,
+    shortName: 'Mine de Charbon',
+    title: 'Niveau 6 : Mine de Charbon — Bassin Industriel',
+    biomeLabel: 'Charbon, Briques Rouges & Chevalement',
+    skyColor: '#c9d6de',
+    terrainTint: '#bac4c8',
+    stoneTint: '#d6a48e',
+    accentColor: '#e89d3c',
+    rewardRangeLabel: '+30 à +55 Éclats',
+    structures: [
+      {
+        id: 'coal_headframe_6',
+        name: 'Le Chevalement du Puits N°6',
+        subtitle: 'Puits de mine & tour métallique à molettes',
+        // 16 + 8 + 6 + 4 = 34 blocks
+        layers: [
+          { cells: makeRectCells(4, 4) },
+          {
+            cells: [
+              [-1.5, -1.5], [-0.5, -1.5], [0.5, -1.5], [1.5, -1.5],
+              [-1.5, 1.5], [1.5, 1.5], [-0.5, 0], [0.5, 0],
+            ],
+          },
+          {
+            cells: [
+              [-1, 0], [0, 0], [1, 0],
+              [-1, -1], [1, -1], [0, 1],
+            ],
+          },
+          {
+            cells: [[-0.5, 0], [0.5, 0], [-0.5, -1], [0.5, -1]],
+          },
+        ],
+      },
+      {
+        id: 'coal_cokerie_furnace',
+        name: 'La Cokerie & Haut-Fourneau',
+        subtitle: 'Doubles hauts-fourneaux en briques & conduites',
+        // 14 + 10 + 6 + 2 = 32 blocks
+        layers: [
+          { cells: makeRectCells(5, 3).filter(([x, z]) => !(x === 0 && z === 0)) },
+          {
+            cells: [
+              [-2, -0.5], [-1, -0.5], [-2, 0.5], [-1, 0.5],
+              [1, -0.5], [2, -0.5], [1, 0.5], [2, 0.5],
+              [-0.5, 0], [0.5, 0],
+            ],
+          },
+          {
+            cells: [
+              [-1.5, -0.5], [-1.5, 0.5],
+              [1.5, -0.5], [1.5, 0.5],
+              [-0.5, 0], [0.5, 0],
+            ],
+          },
+          { cells: [[-1.5, 0], [1.5, 0]] },
+        ],
+      },
+      {
+        id: 'coal_lavoir_conveyor',
+        name: 'Le Lavoir à Charbon & Convoyeur',
+        subtitle: 'Atelier de triage étagé & goulotte inclinée',
+        // 12 + 10 + 6 + 2 = 30 blocks
+        layers: [
+          { cells: makeRectCells(4, 3) },
+          {
+            cells: [
+              ...makeRectCells(4, 2),
+              [-1.5, 1.5], [1.5, 1.5],
+            ],
+          },
+          { cells: makeRectCells(3, 2) },
+          { cells: [[-0.5, 0], [0.5, 0]] },
+        ],
+      },
+      {
+        id: 'coal_gare_chateau_eau',
+        name: "La Gare de Triage & Château d'Eau",
+        subtitle: "Château d'eau en briques & quai de chargement",
+        // 12 + 6 + 4 + 4 = 26 blocks
+        layers: [
+          { cells: makeRectCells(4, 3) },
+          {
+            cells: [
+              ...makeRectCells(2, 2),
+              [-1.5, 1], [1.5, 1],
+            ],
+          },
+          { cells: makeRectCells(2, 2) },
+          { cells: makeRectCells(2, 2) },
+        ],
+      },
+      {
+        id: 'coal_centrale_vapeur',
+        name: 'La Centrale à Vapeur & Grande Cheminée',
+        subtitle: 'Salle des turbines & haute cheminée cerclée',
+        // 12 + 8 + 4 + 2 + 2 = 28 blocks
+        layers: [
+          { cells: makeRectCells(4, 3) },
+          {
+            cells: [
+              [-1.5, -1], [-0.5, -1], [0.5, -1], [1.5, -1],
+              [-1.5, 1], [-0.5, 1], [0.5, 1], [1.5, 1],
+            ],
+          },
+          {
+            cells: [[-0.5, 0], [0.5, 0], [1.5, 0], [-1.5, -1]],
+          },
+          { cells: [[-1.5, -1], [0.5, 0]] },
+          { cells: [[-1.5, -1], [0.5, 0]] },
+        ],
+      },
+    ],
+  },
 ];
 
 /** 4 randomized gameplay run modifiers */

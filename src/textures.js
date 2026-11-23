@@ -1983,6 +1983,155 @@ export function createTextureLibrary(renderer) {
     return penitentiaryPack;
   }
 
+  // Lazy-cached Level 6 (Industrial Coal Mine & Chevalement) 512x512 procedural PBR pack
+  let coalMinePack = null;
+  const coalMineTextures = [];
+  const coalMineMaterials = [];
+
+  function ensureCoalMinePack() {
+    if (coalMinePack) return coalMinePack;
+
+    const northGrass = buildNorthernMeadowGrassPBR(anisotropy);
+    const rustyCinder = buildRustyCinderRailGravelPBR(anisotropy);
+    const coalDust = buildCoalDustShaleGravelPBR(anisotropy);
+    const canalMoss = buildCoolingCanalMossPBR(anisotropy);
+
+    const anthracite = buildAnthraciteCoalSeamsPBR(anisotropy);
+    const indBrick = buildIndustrialRedBrickPBR(anisotropy);
+    const indBrickWin = buildIndustrialArchedWindowBrickPBR(anisotropy);
+    const rivetedIron = buildRivetedCastIronSteelPBR(anisotropy);
+    const zincRoof = buildCorrugatedZincPanelsPBR(anisotropy);
+    const concrete = buildReinforcedConcretePBR(anisotropy);
+
+    [northGrass, rustyCinder, coalDust, canalMoss].forEach((b) => {
+      coalMineTextures.push(b.albedo, b.normalRough);
+    });
+    [anthracite, indBrick, indBrickWin, rivetedIron, zincRoof, concrete].forEach((pack) => {
+      if (pack.map) coalMineTextures.push(pack.map);
+      if (pack.normalMap) coalMineTextures.push(pack.normalMap);
+      if (pack.roughnessMap) coalMineTextures.push(pack.roughnessMap);
+    });
+
+    const coalTerrainSplat = createTerrainSplatMaterial({
+      sand: northGrass, // Biome 0: Hardy northern meadow grass & pine edge
+      earthPath: rustyCinder, // Biome 1: Compacted rusty-brown cinder & steel rail gravel
+      quarryDust: coalDust, // Biome 2: Crushed black coal dust & dark grey shale gravel
+      oasisGrass: canalMoss, // Biome 3: Wet slate cooling canal rim & northern moss
+    });
+    coalTerrainSplat.customProgramCacheKey = () => 'workd-builder-coalmine-terrain-splat-v1';
+
+    const cMats = {
+      terrainSplat: coalTerrainSplat,
+      anthraciteCoal: new THREE.MeshStandardMaterial({
+        map: anthracite.map,
+        normalMap: anthracite.normalMap,
+        normalScale: new THREE.Vector2(1.45, 1.45),
+        roughnessMap: anthracite.roughnessMap,
+        roughness: 0.48,
+        metalness: 0.34,
+      }),
+      shaleRock: new THREE.MeshStandardMaterial({
+        map: coalDust.albedo,
+        color: new THREE.Color('#6a7078'),
+        roughness: 0.9,
+        metalness: 0.08,
+      }),
+      concrete: new THREE.MeshStandardMaterial({
+        map: concrete.map,
+        normalMap: concrete.normalMap,
+        normalScale: new THREE.Vector2(1.05, 1.05),
+        roughnessMap: concrete.roughnessMap,
+        roughness: 0.92,
+        metalness: 0.06,
+      }),
+      industrialBrick: new THREE.MeshStandardMaterial({
+        map: indBrick.map,
+        normalMap: indBrick.normalMap,
+        normalScale: new THREE.Vector2(1.25, 1.25),
+        roughnessMap: indBrick.roughnessMap,
+        roughness: 0.92,
+        metalness: 0.04,
+      }),
+      industrialBrickWindow: new THREE.MeshStandardMaterial({
+        map: indBrickWin.map,
+        normalMap: indBrickWin.normalMap,
+        normalScale: new THREE.Vector2(1.2, 1.2),
+        roughnessMap: indBrickWin.roughnessMap,
+        roughness: 0.88,
+        metalness: 0.1,
+      }),
+      rivetedIron: new THREE.MeshStandardMaterial({
+        map: rivetedIron.map,
+        normalMap: rivetedIron.normalMap,
+        normalScale: new THREE.Vector2(1.3, 1.3),
+        roughnessMap: rivetedIron.roughnessMap,
+        roughness: 0.62,
+        metalness: 0.78,
+      }),
+      steelRail: new THREE.MeshStandardMaterial({
+        color: new THREE.Color('#8e969e'),
+        roughness: 0.32,
+        metalness: 0.88,
+      }),
+      pulleySteel: new THREE.MeshStandardMaterial({
+        color: new THREE.Color('#3a424c'),
+        roughness: 0.38,
+        metalness: 0.86,
+      }),
+      corrugatedZinc: new THREE.MeshStandardMaterial({
+        map: zincRoof.map,
+        normalMap: zincRoof.normalMap,
+        normalScale: new THREE.Vector2(1.35, 1.35),
+        roughnessMap: zincRoof.roughnessMap,
+        roughness: 0.68,
+        metalness: 0.52,
+      }),
+      mineTimber: new THREE.MeshStandardMaterial({
+        map: timber.map,
+        normalMap: timber.normalMap,
+        normalScale: new THREE.Vector2(1.15, 1.15),
+        color: new THREE.Color('#6b5038'),
+        roughness: 0.9,
+        metalness: 0.04,
+      }),
+      mineCartIron: new THREE.MeshStandardMaterial({
+        map: rivetedIron.map,
+        color: new THREE.Color('#525b66'),
+        roughness: 0.56,
+        metalness: 0.72,
+      }),
+      rustAccent: new THREE.MeshStandardMaterial({
+        color: new THREE.Color('#9c4727'),
+        roughness: 0.72,
+        metalness: 0.32,
+      }),
+      lanternGlow: new THREE.MeshStandardMaterial({
+        color: new THREE.Color('#fff1bd'),
+        emissive: new THREE.Color('#ff9d2e'),
+        emissiveIntensity: 1.45,
+        roughness: 0.35,
+      }),
+      shaftVoid: new THREE.MeshStandardMaterial({
+        color: new THREE.Color('#0c0e12'),
+        roughness: 0.98,
+        metalness: 0.0,
+      }),
+      coolingWater: new THREE.MeshStandardMaterial({
+        color: new THREE.Color('#2d7484'),
+        normalMap: waterNormal,
+        normalScale: new THREE.Vector2(0.55, 0.55),
+        roughness: 0.16,
+        metalness: 0.16,
+        transparent: true,
+        opacity: 0.88,
+      }),
+    };
+
+    Object.values(cMats).forEach((m) => coalMineMaterials.push(m));
+    coalMinePack = { materials: cMats };
+    return coalMinePack;
+  }
+
   return {
     maps: {
       blueprint: blueprintMap,
@@ -1996,6 +2145,7 @@ export function createTextureLibrary(renderer) {
     ensureJapanPack,
     ensureMayaPack,
     ensurePenitentiaryPack,
+    ensureCoalMinePack,
     dispose() {
       textures.forEach((t) => t.dispose());
       Object.values(materials).forEach((m) => m.dispose());
@@ -2007,6 +2157,8 @@ export function createTextureLibrary(renderer) {
       mayaMaterials.forEach((m) => m.dispose());
       penitentiaryTextures.forEach((t) => t.dispose());
       penitentiaryMaterials.forEach((m) => m.dispose());
+      coalMineTextures.forEach((t) => t.dispose());
+      coalMineMaterials.forEach((m) => m.dispose());
       materialFactory.dispose();
     },
   };
@@ -3922,3 +4074,584 @@ function build1800sUSFlagTexture(anisotropy) {
   const tex = new THREE.CanvasTexture(canvas);
   return applyCrispTextureSettings(tex, { isColor: true, anisotropy });
 }
+
+/* ============================================================================
+ * LEVEL 6 (INDUSTRIAL COAL MINE & CHEVALEMENT) — 512x512 PROCEDURAL PBR PACK
+ * ========================================================================== */
+
+/** Coal Mine Biome 0: Hardy Northern Meadow Grass & Pine Edge (512x512) */
+function buildNorthernMeadowGrassPBR(anisotropy) {
+  const size = 512;
+  const albedoCanvas = makeCanvas(size);
+  const ctx = albedoCanvas.getContext('2d');
+  const img = ctx.createImageData(size, size);
+  const data = img.data;
+  const height = new Float32Array(size * size);
+  const rough = new Float32Array(size * size);
+
+  for (let y = 0; y < size; y++) {
+    const v = y / size;
+    for (let x = 0; x < size; x++) {
+      const u = x / size;
+      const i = y * size + x;
+      const macro = tileFBM(u, v, 5, 3, 6101);
+      const moss = tileFBM(u, v, 8, 2, 6113);
+      const goldTouch = smoothstep(0.58, 0.86, tileFBM(u, v, 6, 2, 6121));
+      const blades = tileFBM(u * 2, v * 2, 16, 2, 6133);
+      const grit = hash2i(x, y, 6143);
+
+      // Hardy cool-northern meadow green + damp moss + subtle sunlit golden touches
+      const r = lerp(74, 114, macro) + (moss - 0.5) * 16 + goldTouch * 32 + (blades - 0.5) * 18 + (grit - 0.5) * 9;
+      const g = lerp(110, 152, macro) + (moss - 0.5) * 20 + goldTouch * 24 + (blades - 0.5) * 20 + (grit - 0.5) * 10;
+      const b = lerp(54, 78, macro) - (moss - 0.5) * 8 - goldTouch * 8 + (blades - 0.5) * 10 + (grit - 0.5) * 7;
+
+      height[i] = clamp01(0.44 + blades * 0.34 + (macro - 0.5) * 0.14 + (grit - 0.5) * 0.08);
+      rough[i] = clamp01(0.9 + (0.5 - blades) * 0.08);
+
+      const idx = i * 4;
+      data[idx] = Math.min(255, Math.max(0, Math.round(r)));
+      data[idx + 1] = Math.min(255, Math.max(0, Math.round(g)));
+      data[idx + 2] = Math.min(255, Math.max(0, Math.round(b)));
+      data[idx + 3] = 255;
+    }
+  }
+
+  ctx.putImageData(img, 0, 0);
+  const normalPacked = buildSobelNormalCanvas(height, size, 2.5, rough);
+  return {
+    albedo: wrapTexture(albedoCanvas, { isColor: true, anisotropy }),
+    normalRough: wrapTexture(normalPacked, { isColor: false, anisotropy }),
+  };
+}
+
+/** Coal Mine Biome 1: Compacted Rusty-Brown Cinder & Steel Rail Gravel (512x512) */
+function buildRustyCinderRailGravelPBR(anisotropy) {
+  const size = 512;
+  const albedoCanvas = makeCanvas(size);
+  const ctx = albedoCanvas.getContext('2d');
+  const img = ctx.createImageData(size, size);
+  const data = img.data;
+  const height = new Float32Array(size * size);
+  const rough = new Float32Array(size * size);
+
+  for (let y = 0; y < size; y++) {
+    const v = y / size;
+    for (let x = 0; x < size; x++) {
+      const u = x / size;
+      const i = y * size + x;
+      const ballast = tileWorley(u, v, 20, 6203);
+      const rustPatch = tileFBM(u, v, 6, 3, 6217);
+      const grit = hash2i(x, y, 6229);
+
+      const pebble = smoothstep(0.03, 0.16, ballast.edge);
+      const shade = 0.78 + ballast.id * 0.28 + (grit - 0.5) * 0.12;
+      // Warm iron-oxide rusty-brown cinder mixed with dark steel-grey rail ballast
+      const r = lerp(88, 134, rustPatch) * shade * (0.86 + pebble * 0.16);
+      const g = lerp(74, 96, rustPatch) * shade * (0.86 + pebble * 0.16);
+      const b = lerp(66, 78, rustPatch) * shade * (0.86 + pebble * 0.16);
+
+      height[i] = clamp01(0.28 + pebble * 0.52 + (grit - 0.5) * 0.14);
+      rough[i] = clamp01(0.88 + (1 - pebble) * 0.1 + (grit - 0.5) * 0.06);
+
+      const idx = i * 4;
+      data[idx] = Math.min(255, Math.max(0, Math.round(r)));
+      data[idx + 1] = Math.min(255, Math.max(0, Math.round(g)));
+      data[idx + 2] = Math.min(255, Math.max(0, Math.round(b)));
+      data[idx + 3] = 255;
+    }
+  }
+
+  ctx.putImageData(img, 0, 0);
+  const normalPacked = buildSobelNormalCanvas(height, size, 3.2, rough);
+  return {
+    albedo: wrapTexture(albedoCanvas, { isColor: true, anisotropy }),
+    normalRough: wrapTexture(normalPacked, { isColor: false, anisotropy }),
+  };
+}
+
+/** Coal Mine Biome 2: Crushed Black Coal Dust & Dark Grey Shale Gravel (512x512) */
+function buildCoalDustShaleGravelPBR(anisotropy) {
+  const size = 512;
+  const albedoCanvas = makeCanvas(size);
+  const ctx = albedoCanvas.getContext('2d');
+  const img = ctx.createImageData(size, size);
+  const data = img.data;
+  const height = new Float32Array(size * size);
+  const rough = new Float32Array(size * size);
+
+  for (let y = 0; y < size; y++) {
+    const v = y / size;
+    for (let x = 0; x < size; x++) {
+      const u = x / size;
+      const i = y * size + x;
+      const macro = tileFBM(u, v, 6, 3, 6301);
+      const chips = tileWorley(u, v, 18, 6317);
+      const grit = hash2i(x, y, 6337);
+
+      const facet = smoothstep(0.04, 0.18, chips.edge);
+      const coalStreak = smoothstep(0.48, 0.82, macro);
+      const base = lerp(82, 42, coalStreak) * (0.82 + chips.id * 0.28) + (grit - 0.5) * 14;
+      const r = base - 2;
+      const g = base;
+      const b = base + 5;
+
+      height[i] = clamp01(0.32 + facet * 0.44 + (macro - 0.5) * 0.16 + (grit - 0.5) * 0.1);
+      // Matte shale gravel with tiny glinting anthracite specks
+      rough[i] = clamp01(lerp(0.9, 0.62, coalStreak * facet) + (grit - 0.5) * 0.08);
+
+      const idx = i * 4;
+      data[idx] = Math.min(255, Math.max(0, Math.round(r)));
+      data[idx + 1] = Math.min(255, Math.max(0, Math.round(g)));
+      data[idx + 2] = Math.min(255, Math.max(0, Math.round(b)));
+      data[idx + 3] = 255;
+    }
+  }
+
+  ctx.putImageData(img, 0, 0);
+  const normalPacked = buildSobelNormalCanvas(height, size, 3.1, rough);
+  return {
+    albedo: wrapTexture(albedoCanvas, { isColor: true, anisotropy }),
+    normalRough: wrapTexture(normalPacked, { isColor: false, anisotropy }),
+  };
+}
+
+/** Coal Mine Biome 3: Wet Slate Cooling Canal Rim & Northern Moss (512x512) */
+function buildCoolingCanalMossPBR(anisotropy) {
+  const size = 512;
+  const albedoCanvas = makeCanvas(size);
+  const ctx = albedoCanvas.getContext('2d');
+  const img = ctx.createImageData(size, size);
+  const data = img.data;
+  const height = new Float32Array(size * size);
+  const rough = new Float32Array(size * size);
+
+  for (let y = 0; y < size; y++) {
+    const v = y / size;
+    for (let x = 0; x < size; x++) {
+      const u = x / size;
+      const i = y * size + x;
+      const moss = tileFBM(u, v, 7, 3, 6401);
+      const silt = tileFBM(u, v, 16, 2, 6421);
+      const grit = hash2i(x, y, 6449);
+
+      const mMask = smoothstep(0.38, 0.72, moss);
+      const r = lerp(56, 68, mMask) + (silt - 0.5) * 14 + (grit - 0.5) * 8;
+      const g = lerp(64, 108, mMask) + (silt - 0.5) * 18 + (grit - 0.5) * 8;
+      const b = lerp(68, 56, mMask) + (silt - 0.5) * 12 + (grit - 0.5) * 8;
+
+      height[i] = clamp01(0.4 + mMask * 0.28 + (silt - 0.5) * 0.22);
+      rough[i] = clamp01(0.86 - (1 - mMask) * 0.14);
+
+      const idx = i * 4;
+      data[idx] = Math.min(255, Math.max(0, Math.round(r)));
+      data[idx + 1] = Math.min(255, Math.max(0, Math.round(g)));
+      data[idx + 2] = Math.min(255, Math.max(0, Math.round(b)));
+      data[idx + 3] = 255;
+    }
+  }
+
+  ctx.putImageData(img, 0, 0);
+  const normalPacked = buildSobelNormalCanvas(height, size, 2.5, rough);
+  return {
+    albedo: wrapTexture(albedoCanvas, { isColor: true, anisotropy }),
+    normalRough: wrapTexture(normalPacked, { isColor: false, anisotropy }),
+  };
+}
+
+/** 512x512 Glossy Faceted Anthracite Coal Seams PBR */
+function buildAnthraciteCoalSeamsPBR(anisotropy) {
+  const size = 512;
+  const albedoCanvas = makeCanvas(size);
+  const roughCanvas = makeCanvas(size);
+  const ctx = albedoCanvas.getContext('2d');
+  const rCtx = roughCanvas.getContext('2d');
+  const img = ctx.createImageData(size, size);
+  const rImg = rCtx.createImageData(size, size);
+  const height = new Float32Array(size * size);
+
+  for (let y = 0; y < size; y++) {
+    const v = y / size;
+    for (let x = 0; x < size; x++) {
+      const u = x / size;
+      const i = y * size + x;
+      // Sharp crystalline fracture cells + horizontal coal bedding planes
+      const crystal = tileWorley(u * 1.15, v * 1.85, 8, 6503);
+      const bedding = Math.sin(v * Math.PI * 16 + tileFBM(u, v, 5, 2, 6521) * 2.5) * 0.5 + 0.5;
+      const micro = hash2i(x, y, 6547);
+
+      const bevel = smoothstep(0.02, 0.12, crystal.edge);
+      const sheen = crystal.id;
+      height[i] = clamp01(0.2 + bevel * (0.55 + sheen * 0.25) + bedding * 0.14);
+
+      // Deep jet-black anthracite with subtle cool-steel specular crystalline facets
+      const lum = lerp(16, 46, bevel * (0.45 + sheen * 0.55)) + bedding * 6 + (micro - 0.5) * 6;
+      const idx = i * 4;
+      img.data[idx] = Math.min(255, Math.max(0, Math.round(lum * 0.92)));
+      img.data[idx + 1] = Math.min(255, Math.max(0, Math.round(lum * 0.98)));
+      img.data[idx + 2] = Math.min(255, Math.max(0, Math.round(lum * 1.14)));
+      img.data[idx + 3] = 255;
+
+      // Glossy fractured faces (~0.24-0.44), matte dusty seams (~0.82)
+      const rv = Math.round(clamp01(lerp(0.84, 0.24 + (1 - sheen) * 0.22, bevel)) * 255);
+      rImg.data[idx] = rv;
+      rImg.data[idx + 1] = rv;
+      rImg.data[idx + 2] = rv;
+      rImg.data[idx + 3] = 255;
+    }
+  }
+
+  ctx.putImageData(img, 0, 0);
+  rCtx.putImageData(rImg, 0, 0);
+  const normalCanvas = buildSobelNormalCanvas(height, size, 4.2);
+  return {
+    map: wrapTexture(albedoCanvas, { isColor: true, anisotropy }),
+    normalMap: wrapTexture(normalCanvas, { isColor: false, anisotropy }),
+    roughnessMap: wrapTexture(roughCanvas, { isColor: false, anisotropy }),
+  };
+}
+
+/** 512x512 Weathered Red Industrial Brick Masonry PBR */
+function buildIndustrialRedBrickPBR(anisotropy) {
+  const size = 512;
+  const albedoCanvas = makeCanvas(size);
+  const roughCanvas = makeCanvas(size);
+  const ctx = albedoCanvas.getContext('2d');
+  const rCtx = roughCanvas.getContext('2d');
+  const img = ctx.createImageData(size, size);
+  const rImg = rCtx.createImageData(size, size);
+  const height = new Float32Array(size * size);
+
+  const rows = 10;
+  const cols = 5;
+
+  for (let y = 0; y < size; y++) {
+    const v = y / size;
+    const row = Math.floor(v * rows);
+    const lv = (v * rows) - row;
+    const rowOffset = (row % 2) * 0.5;
+
+    for (let x = 0; x < size; x++) {
+      const u = x / size;
+      const i = y * size + x;
+      const uc = u * cols + rowOffset;
+      const col = Math.floor(uc);
+      const lu = uc - col;
+
+      const mortar = lv < 0.095 || lv > 0.905 || lu < 0.055 || lu > 0.945;
+      const brickId = hash2i(((col % cols) + cols) % cols, row, 6607);
+      const soot = smoothstep(0.54, 0.86, tileFBM(u, v, 5, 3, 6619));
+      const grain = hash2i(x, y, 6637);
+
+      let r, g, b, rv;
+      if (mortar) {
+        const mShade = 128 + (grain - 0.5) * 20 - soot * 36;
+        r = mShade;
+        g = mShade - 2;
+        b = mShade - 5;
+        height[i] = 0.22 + (grain - 0.5) * 0.08;
+        rv = 0.96;
+      } else {
+        // Classic Northern industrial kiln-red & rust brick with subtle coal-soot patina
+        const tone = 0.78 + brickId * 0.34;
+        const sootDark = 1.0 - soot * 0.32;
+        r = (146 * tone + (grain - 0.5) * 14) * sootDark;
+        g = (62 * tone + (grain - 0.5) * 10) * sootDark;
+        b = (44 * tone + (grain - 0.5) * 8) * sootDark;
+        const edgeBevel = Math.min(
+          smoothstep(0.095, 0.17, lv) * smoothstep(0.905, 0.83, lv),
+          smoothstep(0.055, 0.12, lu) * smoothstep(0.945, 0.88, lu)
+        );
+        height[i] = clamp01(0.45 + edgeBevel * 0.42 + (grain - 0.5) * 0.1);
+        rv = clamp01(0.86 + (0.5 - brickId) * 0.08 + soot * 0.06);
+      }
+
+      const idx = i * 4;
+      img.data[idx] = Math.min(255, Math.max(0, Math.round(r)));
+      img.data[idx + 1] = Math.min(255, Math.max(0, Math.round(g)));
+      img.data[idx + 2] = Math.min(255, Math.max(0, Math.round(b)));
+      img.data[idx + 3] = 255;
+
+      const rByte = Math.round(rv * 255);
+      rImg.data[idx] = rByte;
+      rImg.data[idx + 1] = rByte;
+      rImg.data[idx + 2] = rByte;
+      rImg.data[idx + 3] = 255;
+    }
+  }
+
+  ctx.putImageData(img, 0, 0);
+  rCtx.putImageData(rImg, 0, 0);
+  const normalCanvas = buildSobelNormalCanvas(height, size, 3.4);
+  return {
+    map: wrapTexture(albedoCanvas, { isColor: true, anisotropy }),
+    normalMap: wrapTexture(normalCanvas, { isColor: false, anisotropy }),
+    roughnessMap: wrapTexture(roughCanvas, { isColor: false, anisotropy }),
+  };
+}
+
+/** 512x512 Weathered Industrial Brick with Arched Cast-Iron Factory Window */
+function buildIndustrialArchedWindowBrickPBR(anisotropy) {
+  const base = buildIndustrialRedBrickPBR(anisotropy);
+  const size = 512;
+  const albedoCanvas = makeCanvas(size);
+  const roughCanvas = makeCanvas(size);
+  const ctx = albedoCanvas.getContext('2d');
+  const rCtx = roughCanvas.getContext('2d');
+
+  ctx.drawImage(base.map.image, 0, 0);
+  rCtx.drawImage(base.roughnessMap.image, 0, 0);
+
+  // Draw an arched industrial iron-framed factory window centered on the wall face
+  const cx = size * 0.5;
+  const winW = size * 0.44;
+  const winH = size * 0.56;
+  const left = cx - winW * 0.5;
+  const top = size * 0.22;
+  const archR = winW * 0.5;
+  const archCy = top + archR * 0.72;
+  const bottom = top + winH;
+
+  // Stone lintel & sill
+  ctx.fillStyle = '#8b8e90';
+  ctx.fillRect(left - 18, bottom - 6, winW + 36, 22);
+  ctx.strokeStyle = '#484b4f';
+  ctx.lineWidth = 4;
+  ctx.strokeRect(left - 18, bottom - 6, winW + 36, 22);
+
+  // Arched recessed dark iron frame + warm furnace-lit industrial glass panes
+  ctx.save();
+  ctx.beginPath();
+  ctx.moveTo(left, bottom);
+  ctx.lineTo(left, archCy);
+  ctx.arc(cx, archCy, archR, Math.PI, 0, false);
+  ctx.lineTo(left + winW, bottom);
+  ctx.closePath();
+
+  const grad = ctx.createLinearGradient(0, top, 0, bottom);
+  grad.addColorStop(0.0, '#6a5b44');
+  grad.addColorStop(0.45, '#d89a44');
+  grad.addColorStop(1.0, '#f4c66a');
+  ctx.fillStyle = grad;
+  ctx.fill();
+
+  // Cast-iron factory window mullions (3x3 panes)
+  ctx.clip();
+  ctx.strokeStyle = '#252a30';
+  ctx.lineWidth = 10;
+  for (let gx = 1; gx <= 2; gx++) {
+    const px = left + (winW * gx) / 3;
+    ctx.beginPath();
+    ctx.moveTo(px, top - 20);
+    ctx.lineTo(px, bottom);
+    ctx.stroke();
+  }
+  for (let gy = 1; gy <= 2; gy++) {
+    const py = archCy + ((bottom - archCy) * gy) / 3;
+    ctx.beginPath();
+    ctx.moveTo(left, py);
+    ctx.lineTo(left + winW, py);
+    ctx.stroke();
+  }
+  ctx.restore();
+
+  // Outer arched iron surround
+  ctx.beginPath();
+  ctx.moveTo(left, bottom);
+  ctx.lineTo(left, archCy);
+  ctx.arc(cx, archCy, archR, Math.PI, 0, false);
+  ctx.lineTo(left + winW, bottom);
+  ctx.closePath();
+  ctx.strokeStyle = '#23282e';
+  ctx.lineWidth = 14;
+  ctx.stroke();
+
+  // Glossy window pane roughness
+  rCtx.fillStyle = '#383838';
+  rCtx.fillRect(left + 6, archCy - archR * 0.7, winW - 12, bottom - (archCy - archR * 0.7));
+
+  return {
+    map: wrapTexture(albedoCanvas, { isColor: true, anisotropy }),
+    normalMap: base.normalMap,
+    roughnessMap: wrapTexture(roughCanvas, { isColor: false, anisotropy }),
+  };
+}
+
+/** 512x512 Riveted Dark Cast-Iron & Steel Beams PBR */
+function buildRivetedCastIronSteelPBR(anisotropy) {
+  const size = 512;
+  const albedoCanvas = makeCanvas(size);
+  const roughCanvas = makeCanvas(size);
+  const ctx = albedoCanvas.getContext('2d');
+  const rCtx = roughCanvas.getContext('2d');
+  const img = ctx.createImageData(size, size);
+  const rImg = rCtx.createImageData(size, size);
+  const height = new Float32Array(size * size);
+
+  for (let y = 0; y < size; y++) {
+    const v = y / size;
+    for (let x = 0; x < size; x++) {
+      const u = x / size;
+      const i = y * size + x;
+      const brushed = tileFBM(u * 4, v, 8, 2, 6701);
+      const patina = smoothstep(0.56, 0.86, tileFBM(u, v, 6, 3, 6719));
+      const micro = hash2i(x, y, 6733);
+
+      // Steel plate borders & cross flange seam
+      const pu = (u * 2) % 1;
+      const pv = (v * 2) % 1;
+      const isSeam = pu < 0.035 || pu > 0.965 || pv < 0.035 || pv > 0.965;
+
+      // Raised dome rivets running neatly along steel plate edges
+      const rGridU = ((pu * 6) % 1) - 0.5;
+      const rGridV = ((pv * 6) % 1) - 0.5;
+      const onRivetBand =
+        (pu > 0.06 && pu < 0.14) ||
+        (pu > 0.86 && pu < 0.94) ||
+        (pv > 0.06 && pv < 0.14) ||
+        (pv > 0.86 && pv < 0.94);
+      const rivetDist = Math.hypot(rGridU, rGridV);
+      const rivet = onRivetBand ? 1.0 - smoothstep(0.18, 0.34, rivetDist) : 0.0;
+
+      height[i] = clamp01((isSeam ? 0.24 : 0.54) + rivet * 0.42 + (brushed - 0.5) * 0.08);
+
+      // Dark gunmetal cast iron with subtle warm iron-rust edge wear
+      let r = lerp(52, 82, brushed) + rivet * 28 + (micro - 0.5) * 8;
+      let g = lerp(58, 88, brushed) + rivet * 26 + (micro - 0.5) * 8;
+      let b = lerp(66, 98, brushed) + rivet * 24 + (micro - 0.5) * 8;
+      if (patina > 0.05) {
+        r = lerp(r, 118, patina * 0.42);
+        g = lerp(g, 74, patina * 0.42);
+        b = lerp(b, 52, patina * 0.42);
+      }
+      if (isSeam) {
+        r *= 0.62;
+        g *= 0.62;
+        b *= 0.62;
+      }
+
+      const idx = i * 4;
+      img.data[idx] = Math.min(255, Math.max(0, Math.round(r)));
+      img.data[idx + 1] = Math.min(255, Math.max(0, Math.round(g)));
+      img.data[idx + 2] = Math.min(255, Math.max(0, Math.round(b)));
+      img.data[idx + 3] = 255;
+
+      const rv = Math.round(clamp01(0.42 + patina * 0.38 - rivet * 0.14 + (micro - 0.5) * 0.06) * 255);
+      rImg.data[idx] = rv;
+      rImg.data[idx + 1] = rv;
+      rImg.data[idx + 2] = rv;
+      rImg.data[idx + 3] = 255;
+    }
+  }
+
+  ctx.putImageData(img, 0, 0);
+  rCtx.putImageData(rImg, 0, 0);
+  const normalCanvas = buildSobelNormalCanvas(height, size, 3.6);
+  return {
+    map: wrapTexture(albedoCanvas, { isColor: true, anisotropy }),
+    normalMap: wrapTexture(normalCanvas, { isColor: false, anisotropy }),
+    roughnessMap: wrapTexture(roughCanvas, { isColor: false, anisotropy }),
+  };
+}
+
+/** 512x512 Corrugated Galvanized Zinc Roof Panels PBR */
+function buildCorrugatedZincPanelsPBR(anisotropy) {
+  const size = 512;
+  const albedoCanvas = makeCanvas(size);
+  const roughCanvas = makeCanvas(size);
+  const ctx = albedoCanvas.getContext('2d');
+  const rCtx = roughCanvas.getContext('2d');
+  const img = ctx.createImageData(size, size);
+  const rImg = rCtx.createImageData(size, size);
+  const height = new Float32Array(size * size);
+
+  for (let y = 0; y < size; y++) {
+    const v = y / size;
+    const sheetOverlap = Math.abs(((v * 3) % 1) - 0.5) > 0.485;
+    for (let x = 0; x < size; x++) {
+      const u = x / size;
+      const i = y * size + x;
+      const rib = Math.sin(u * Math.PI * 2 * 18) * 0.5 + 0.5;
+      const spangle = tileFBM(u, v, 10, 3, 6803);
+      const streak = tileFBM(u * 2, v * 0.5, 6, 2, 6827);
+      const micro = hash2i(x, y, 6841);
+
+      height[i] = clamp01(0.24 + rib * 0.64 - (sheetOverlap ? 0.16 : 0) + (micro - 0.5) * 0.04);
+
+      // Cool blue-grey galvanized zinc sheets with subtle weather streaks
+      const lum = (118 + rib * 44 + (spangle - 0.5) * 26 - streak * 16) * (sheetOverlap ? 0.72 : 1.0);
+      const r = lum * 0.94 + (micro - 0.5) * 6;
+      const g = lum * 0.99 + (micro - 0.5) * 6;
+      const b = lum * 1.08 + (micro - 0.5) * 6;
+
+      const idx = i * 4;
+      img.data[idx] = Math.min(255, Math.max(0, Math.round(r)));
+      img.data[idx + 1] = Math.min(255, Math.max(0, Math.round(g)));
+      img.data[idx + 2] = Math.min(255, Math.max(0, Math.round(b)));
+      img.data[idx + 3] = 255;
+
+      const rv = Math.round(clamp01(0.46 + streak * 0.28 + (1 - rib) * 0.12) * 255);
+      rImg.data[idx] = rv;
+      rImg.data[idx + 1] = rv;
+      rImg.data[idx + 2] = rv;
+      rImg.data[idx + 3] = 255;
+    }
+  }
+
+  ctx.putImageData(img, 0, 0);
+  rCtx.putImageData(rImg, 0, 0);
+  const normalCanvas = buildSobelNormalCanvas(height, size, 3.8);
+  return {
+    map: wrapTexture(albedoCanvas, { isColor: true, anisotropy }),
+    normalMap: wrapTexture(normalCanvas, { isColor: false, anisotropy }),
+    roughnessMap: wrapTexture(roughCanvas, { isColor: false, anisotropy }),
+  };
+}
+
+/** 512x512 Reinforced Industrial Stone & Poured Concrete Foundation PBR */
+function buildReinforcedConcretePBR(anisotropy) {
+  const size = 512;
+  const albedoCanvas = makeCanvas(size);
+  const roughCanvas = makeCanvas(size);
+  const ctx = albedoCanvas.getContext('2d');
+  const rCtx = roughCanvas.getContext('2d');
+  const img = ctx.createImageData(size, size);
+  const rImg = rCtx.createImageData(size, size);
+  const height = new Float32Array(size * size);
+
+  for (let y = 0; y < size; y++) {
+    const v = y / size;
+    for (let x = 0; x < size; x++) {
+      const u = x / size;
+      const i = y * size + x;
+      const macro = tileFBM(u, v, 5, 3, 6907);
+      const aggregate = tileFBM(u, v, 24, 2, 6917);
+      const grit = hash2i(x, y, 6947);
+      const joint = Math.abs(((u * 2) % 1) - 0.5) > 0.485 || Math.abs(((v * 2) % 1) - 0.5) > 0.485;
+
+      height[i] = clamp01((joint ? 0.25 : 0.55) + (aggregate - 0.5) * 0.22 + (grit - 0.5) * 0.1);
+      const base = (132 + (macro - 0.5) * 28 + (aggregate - 0.5) * 16 + (grit - 0.5) * 12) * (joint ? 0.74 : 1.0);
+
+      const idx = i * 4;
+      img.data[idx] = Math.min(255, Math.max(0, Math.round(base * 0.99)));
+      img.data[idx + 1] = Math.min(255, Math.max(0, Math.round(base * 1.0)));
+      img.data[idx + 2] = Math.min(255, Math.max(0, Math.round(base * 1.02)));
+      img.data[idx + 3] = 255;
+
+      const rv = Math.round(clamp01(0.88 + (0.5 - aggregate) * 0.12) * 255);
+      rImg.data[idx] = rv;
+      rImg.data[idx + 1] = rv;
+      rImg.data[idx + 2] = rv;
+      rImg.data[idx + 3] = 255;
+    }
+  }
+
+  ctx.putImageData(img, 0, 0);
+  rCtx.putImageData(rImg, 0, 0);
+  const normalCanvas = buildSobelNormalCanvas(height, size, 2.8);
+  return {
+    map: wrapTexture(albedoCanvas, { isColor: true, anisotropy }),
+    normalMap: wrapTexture(normalCanvas, { isColor: false, anisotropy }),
+    roughnessMap: wrapTexture(roughCanvas, { isColor: false, anisotropy }),
+  };
+}
+

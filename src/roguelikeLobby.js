@@ -239,6 +239,63 @@ function buildMiniatureIsland(themeId) {
     return root;
   }
 
+  if (themeId === 'coalmine') {
+    const basinMat = new THREE.MeshStandardMaterial({ color: '#56694e', roughness: 0.9 });
+    const terrilMat = new THREE.MeshStandardMaterial({ color: '#31363e', roughness: 0.86, metalness: 0.14 });
+    const brickMat = new THREE.MeshStandardMaterial({ color: '#8f3f2f', roughness: 0.84 });
+    const ironMat = new THREE.MeshStandardMaterial({ color: '#2b313a', roughness: 0.42, metalness: 0.82 });
+    const zincMat = new THREE.MeshStandardMaterial({ color: '#7b8692', roughness: 0.56, metalness: 0.44 });
+
+    const island = new THREE.Mesh(new THREE.CylinderGeometry(0.98, 1.14, 0.28, 18), basinMat);
+    island.position.y = 0.12;
+    island.receiveShadow = true;
+    root.add(island);
+
+    // Conical dark-slate Terril slag heap
+    const terril = new THREE.Mesh(new THREE.ConeGeometry(0.36, 0.44, 7), terrilMat);
+    terril.position.set(-0.48, 0.44, -0.32);
+    terril.castShadow = true;
+    root.add(terril);
+
+    // Red-brick engine house + corrugated zinc roof
+    const house = new THREE.Mesh(new THREE.BoxGeometry(0.68, 0.28, 0.36), brickMat);
+    house.position.set(0.14, 0.4, 0.22);
+    house.castShadow = true;
+    root.add(house);
+
+    const roof = new THREE.Mesh(new THREE.BoxGeometry(0.74, 0.06, 0.42), zincMat);
+    roof.position.set(0.14, 0.56, 0.22);
+    roof.rotation.x = 0.18;
+    root.add(roof);
+
+    // Tall brick smokestack
+    const chimney = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.075, 0.72, 8), brickMat);
+    chimney.position.set(-0.18, 0.62, -0.18);
+    chimney.castShadow = true;
+    root.add(chimney);
+
+    // Cast-iron headframe tower & spoked pulley wheel (molette)
+    const legGeo = new THREE.BoxGeometry(0.045, 0.68, 0.045);
+    [
+      [-0.02, -0.18],
+      [0.3, -0.18],
+      [-0.02, 0.04],
+      [0.3, 0.04],
+    ].forEach(([lx, lz]) => {
+      const leg = new THREE.Mesh(legGeo, ironMat);
+      leg.position.set(lx, 0.6, lz);
+      leg.castShadow = true;
+      root.add(leg);
+    });
+    const wheel = new THREE.Mesh(new THREE.TorusGeometry(0.16, 0.028, 8, 16), ironMat);
+    wheel.position.set(0.14, 0.98, -0.07);
+    wheel.rotation.y = Math.PI / 2;
+    wheel.castShadow = true;
+    root.add(wheel);
+
+    return root;
+  }
+
   // 'china': Terraced Jade Mountain Island + 3-Roof Red & Gold Pagoda + Bamboo
   const jadeGrass = new THREE.MeshStandardMaterial({ color: '#7ea870', roughness: 0.84 });
   const rockMat = new THREE.MeshStandardMaterial({ color: '#9ea89e', roughness: 0.88 });

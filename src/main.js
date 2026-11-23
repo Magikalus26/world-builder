@@ -30,9 +30,17 @@ import { Level2Rome } from './levels/level2_rome.js';
 import { Level3Japan } from './levels/level3_japan.js';
 import { Level4Maya } from './levels/level4_maya.js';
 import { Level5Penitentiary } from './levels/level5_penitentiary.js';
+import { Level6CoalMine } from './levels/level6_coalmine.js';
 import { RoguelikeLevel, generateRoguelikeConfig } from './levels/roguelike_level.js';
 
-const LEVEL_REGISTRY = [Level1Pyramid, Level2Rome, Level3Japan, Level4Maya, Level5Penitentiary];
+const LEVEL_REGISTRY = [
+  Level1Pyramid,
+  Level2Rome,
+  Level3Japan,
+  Level4Maya,
+  Level5Penitentiary,
+  Level6CoalMine,
+];
 
 class WorkdBuilderApp {
   constructor() {
@@ -166,7 +174,7 @@ class WorkdBuilderApp {
     this._onResize = () => {
       const w = window.innerWidth || 390;
       const h = window.innerHeight || 844;
-      this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 3));
+      this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
       this.renderer.setSize(w, h, false);
       this.cameraController.handleResize(w, h);
     };

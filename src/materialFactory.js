@@ -79,7 +79,19 @@ export const THEME_PALETTES = {
     metal: { base: '#282c32', mortar: '#121519', roughness: 0.38, metalness: 0.84, pattern: 'metal' },
     accent: { base: '#b9873e', mortar: '#6b4c1c', roughness: 0.32, metalness: 0.84, pattern: 'metal' },
   },
-  // Future biome presets ready for Levels 6–100!
+  coalmine: {
+    id: 'coalmine',
+    groundBase: '#4d5359',
+    groundDetail: '#687e4b',
+    strataColors: ['#4d6144', '#564c44', '#2f3238', '#1c1e24'],
+    stone: { base: '#7e8388', mortar: '#4c5056', roughness: 0.84, metalness: 0.08, pattern: 'ashlar' },
+    brick: { base: '#8e3d2d', mortar: '#9d958c', roughness: 0.84, metalness: 0.05, pattern: 'brick' },
+    wood: { base: '#583f2c', mortar: '#322216', roughness: 0.86, metalness: 0.04, pattern: 'wood' },
+    roof: { base: '#747f8a', mortar: '#48515a', roughness: 0.56, metalness: 0.42, pattern: 'slate' },
+    metal: { base: '#2d333b', mortar: '#161a1f', roughness: 0.38, metalness: 0.86, pattern: 'metal' },
+    accent: { base: '#d99838', mortar: '#7c5318', roughness: 0.34, metalness: 0.78, pattern: 'metal' },
+  },
+  // Future biome presets ready for Levels 7–100!
   viking: {
     id: 'viking',
     groundBase: '#687e78',

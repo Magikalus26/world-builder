@@ -727,18 +727,19 @@ export class WorldMapScene {
    *    - Levels 10, 20, ..., 100: Grand 2.2x Village / City Milestone Islands
    * ========================================================================== */
   _buildAll100Nodes() {
-    // 1. Build the 5 full 3D Playable Hero Islands (Levels 1–5)
+    // 1. Build the 6 full 3D Playable Hero Islands (Levels 1–6)
     this._buildHeroEgyptIsland(this.levelCoords[0]);
     this._buildHeroRomeIsland(this.levelCoords[1]);
     this._buildHeroJapanIsland(this.levelCoords[2]);
     this._buildHeroMayaIsland(this.levelCoords[3]);
     this._buildHeroPenitentiaryIsland(this.levelCoords[4]);
+    this._buildHeroCoalMineIsland(this.levelCoords[5]);
 
-    // 2. Collect regular "Bientôt" nodes (85) and Milestone Village/City nodes (10)
+    // 2. Collect regular "Bientôt" nodes (84) and Milestone Village/City nodes (10)
     const regularEntries = [];
     const milestoneEntries = [];
 
-    for (let i = 5; i < 100; i++) {
+    for (let i = 6; i < 100; i++) {
       const levelNum = i + 1;
       const chapterIdx = Math.floor(i / 10);
       const chapter = WORLD_CHAPTERS[chapterIdx];
@@ -1465,6 +1466,182 @@ export class WorldMapScene {
       focusDistance: 17.5,
       focusElevation: 42,
       focusAzimuth: 0.14,
+      group,
+      hitbox,
+      bounceTime: 0,
+    };
+
+    hitbox.userData.interact = { type: 'map-node', node };
+    this.nodes.push(node);
+  }
+
+  /**
+   * Level 6 — Ère Industrielle : La Mine de Charbon & Chevalement (UNLOCKED & PLAYABLE — 50 blocs)
+   * Miniature 3D dark-slate Terril slag hill, weathered red-brick engine house & smokestack,
+   * cast-iron headframe tower (chevalement) with spoked steel pulley wheel (molette), & pines.
+   */
+  _buildHeroCoalMineIsland(coord) {
+    const pos = new THREE.Vector3(coord.x, 0, coord.z);
+    const group = new THREE.Group();
+    group.position.copy(pos);
+    this.root.add(group);
+
+    this._addShoreFoamRing(group, 2.38, 2.18, 7.2);
+    this._addUnlockedGoldRing(group, 'level6_coalmine', 2.46, 2.26, 7.2);
+
+    const coalGroundMat = this._trackMat(
+      new THREE.MeshStandardMaterial({ color: '#617456', roughness: 0.9, metalness: 0.02 })
+    );
+    const terrilMat = this._trackMat(
+      new THREE.MeshStandardMaterial({ color: '#333840', roughness: 0.88, metalness: 0.14 })
+    );
+    const brickMat = this._trackMat(
+      new THREE.MeshStandardMaterial({ color: '#8f3f2f', roughness: 0.84, metalness: 0.04 })
+    );
+    const ironMat = this._trackMat(
+      new THREE.MeshStandardMaterial({ color: '#2b313a', roughness: 0.42, metalness: 0.82 })
+    );
+    const zincMat = this._trackMat(
+      new THREE.MeshStandardMaterial({ color: '#798490', roughness: 0.56, metalness: 0.44 })
+    );
+
+    const island = new THREE.Mesh(
+      this._trackGeo(createIslandMoundGeometry(2.3, 2.1, 0.72, 9.7)),
+      coalGroundMat
+    );
+    island.castShadow = true;
+    island.receiveShadow = true;
+    group.add(island);
+
+    // Miniature dark-slate conical Terril (coal slag heap) in the back-left corner
+    const terril = new THREE.Mesh(
+      this._trackGeo(new THREE.ConeGeometry(0.68, 0.78, 7)),
+      terrilMat
+    );
+    terril.position.set(-0.78, 0.96, -0.55);
+    terril.castShadow = true;
+    group.add(terril);
+
+    // Miniature Industrial Coal Mine & Chevalement complex
+    const mine = new THREE.Group();
+    mine.position.set(0.18, 0.68, 0.08);
+    mine.rotation.y = -0.18;
+
+    // Poured concrete yard plinth
+    const base = new THREE.Mesh(
+      this._trackGeo(new THREE.BoxGeometry(1.52, 0.14, 1.38)),
+      this.mats.instancedStone
+    );
+    base.position.y = 0.07;
+    base.castShadow = true;
+    base.receiveShadow = true;
+    mine.add(base);
+
+    // Weathered red-brick Salle des Machines + sloped corrugated zinc roof
+    const engineHouse = new THREE.Mesh(
+      this._trackGeo(new THREE.BoxGeometry(1.18, 0.46, 0.64)),
+      brickMat
+    );
+    engineHouse.position.set(0.0, 0.36, 0.3);
+    engineHouse.castShadow = true;
+    mine.add(engineHouse);
+
+    const zincRoof = new THREE.Mesh(
+      this._trackGeo(new THREE.BoxGeometry(1.26, 0.1, 0.72)),
+      zincMat
+    );
+    zincRoof.position.set(0.0, 0.62, 0.3);
+    zincRoof.rotation.x = 0.18;
+    zincRoof.castShadow = true;
+    mine.add(zincRoof);
+
+    // Tall industrial red-brick smokestack
+    const chimney = new THREE.Mesh(
+      this._trackGeo(new THREE.CylinderGeometry(0.075, 0.115, 1.18, 8)),
+      brickMat
+    );
+    chimney.position.set(-0.52, 0.72, -0.34);
+    chimney.castShadow = true;
+    mine.add(chimney);
+
+    // Cast-iron Headframe (Chevalement) lattice legs rising over the mine shaft
+    const legGeo = this._trackGeo(new THREE.BoxGeometry(0.07, 1.12, 0.07));
+    [
+      [-0.24, -0.32, 0.08, -0.08],
+      [0.24, -0.32, -0.08, -0.08],
+      [-0.24, 0.06, 0.08, 0.08],
+      [0.24, 0.06, -0.08, 0.08],
+    ].forEach(([lx, lz, rz, rx]) => {
+      const leg = new THREE.Mesh(legGeo, ironMat);
+      leg.position.set(lx, 0.64, lz);
+      leg.rotation.set(rx, 0, rz);
+      leg.castShadow = true;
+      mine.add(leg);
+    });
+
+    // Iconic Twin Spoked Steel Headframe Pulley Wheels (Molettes) crowning the Chevalement
+    const wheelGeo = this._trackGeo(new THREE.TorusGeometry(0.24, 0.04, 8, 16));
+    [-0.12, 0.12].forEach((ox) => {
+      const wheel = new THREE.Mesh(wheelGeo, ironMat);
+      wheel.position.set(ox, 1.24, -0.13);
+      wheel.rotation.y = Math.PI / 2;
+      wheel.castShadow = true;
+      mine.add(wheel);
+    });
+
+    group.add(mine);
+
+    // Sculpted northern pines flanking the coal basin island
+    const coalFoliageMat = this._trackMat(createMatteFoliageMaterial());
+    const pineGeo = this._trackGeo(
+      createIrregularConiferTierGeo({
+        radiusBottom: 0.19,
+        radiusTop: 0.025,
+        height: 0.72,
+        radialSegments: 8,
+        heightSegments: 3,
+        jaggedness: 0.24,
+        droop: 0.04,
+        seed: 66,
+        baseColor: '#1f3b26',
+        midColor: '#3f6838',
+        topColor: '#84ad52',
+      })
+    );
+    [
+      [1.22, 0.84, -0.45],
+      [1.14, 0.82, 0.62],
+      [-1.18, 0.84, 0.56],
+    ].forEach(([px, py, pz], idx) => {
+      const pine = new THREE.Mesh(pineGeo, coalFoliageMat);
+      pine.position.set(px, py, pz);
+      pine.rotation.set(0.04 * (idx % 2 ? 1 : -1), idx * 1.2, 0.03);
+      pine.castShadow = true;
+      group.add(pine);
+    });
+
+    const hitbox = new THREE.Mesh(
+      this._trackGeo(new THREE.CylinderGeometry(2.45, 2.55, 2.4, 10)),
+      this.mats.hitbox
+    );
+    hitbox.position.y = 1.1;
+    group.add(hitbox);
+
+    const node = {
+      id: 'level6_coalmine',
+      levelIndex: 5,
+      levelNum: 6,
+      chapter: WORLD_CHAPTERS[0],
+      unlocked: true,
+      isMilestone: false,
+      title: 'Niveau 6 : La Mine de Charbon (50 blocs)',
+      shortLabel: 'Mine de Charbon',
+      labelText: 'Niveau 6 • Jouable',
+      position: pos,
+      labelAnchor: new THREE.Vector3(pos.x, 2.5, pos.z),
+      focusDistance: 17.5,
+      focusElevation: 42,
+      focusAzimuth: -0.14,
       group,
       hitbox,
       bounceTime: 0,
