@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover"
+  />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="theme-color" content="#e6be7a" />
+  <meta
+    name="description"
+    content="Workd Builder — Jeu tactile 3D de construction en diorama mobile. Extrayez, transportez, taillez et assemblez votre pyramide bloc par bloc."
+  />
+  <title>Workd Builder</title>
+  <link rel="stylesheet" href="./style.css" />
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.187.0/build/three.module.min.js"
+      }
+    }
+  </script>
+</head>
+<body>
+  <main id="game-root" class="game-root">
+    <canvas
+      id="game-canvas"
+      class="game-canvas"
+      aria-label="Workd Builder — Diorama 3D interactif"
+    ></canvas>
+
+    <header class="hud-top">
+      <div
+        id="hud-pill"
+        class="hud-pill"
+        role="status"
+        aria-live="polite"
+      >
+        <span class="hud-brand">Workd Builder</span>
+        <span class="hud-sep" aria-hidden="true">•</span>
+        <span id="hud-counter" class="hud-counter">Pyramide : 0 / 55 blocs</span>
+      </div>
+    </header>
+
+    <div id="completion-bar" class="completion-bar" hidden>
+      <button id="restart-btn" class="restart-btn" type="button">
+        Recommencer
+      </button>
+    </div>
+  </main>
+
+  <script type="module" src="./src/main.js"></script>
+</body>
+</html>
