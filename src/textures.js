@@ -1776,6 +1776,187 @@ export function createTextureLibrary(renderer) {
     return mayaPack;
   }
 
+  let penitentiaryPack = null;
+  const penitentiaryTextures = [];
+  const penitentiaryMaterials = [];
+
+  function ensurePenitentiaryPack() {
+    if (penitentiaryPack) return penitentiaryPack;
+
+    const ochreDirt = buildOchreDirtPBR(anisotropy);
+    const greyGravel = buildGreyGravelPBR(anisotropy);
+    const quarryClay = buildGraniteClayQuarryPBR(anisotropy);
+    const frontierScrub = buildFrontierScrubPBR(anisotropy);
+
+    const dressedGranite = buildDressedGranitePBR(anisotropy);
+    const graniteLoophole = buildGraniteLoopholePBR(anisotropy);
+    const darkRedBrick = buildDarkRedBrickPBR(anisotropy);
+    const brickCellBars = buildBrickCellBarsPBR(anisotropy);
+    const darkSlateRoof = buildDarkSlateRoofPBR(anisotropy);
+    const corrugatedTin = buildCorrugatedTinPBR(anisotropy);
+    const usFlagTex = build1800sUSFlagTexture(anisotropy);
+
+    [ochreDirt, greyGravel, quarryClay, frontierScrub].forEach((b) => {
+      penitentiaryTextures.push(b.albedo, b.normalRough);
+    });
+    [dressedGranite, graniteLoophole, darkRedBrick, brickCellBars, darkSlateRoof, corrugatedTin].forEach(
+      (pack) => {
+        if (pack.map) penitentiaryTextures.push(pack.map);
+        if (pack.normalMap) penitentiaryTextures.push(pack.normalMap);
+        if (pack.roughnessMap) penitentiaryTextures.push(pack.roughnessMap);
+      }
+    );
+    penitentiaryTextures.push(usFlagTex);
+
+    const penTerrainSplat = createTerrainSplatMaterial({
+      sand: ochreDirt, // Biome 0: Dusty ochre-brown Old West compacted earth
+      earthPath: greyGravel, // Biome 1: Grey crushed gravel paths & courtyard
+      quarryDust: quarryClay, // Biome 2: Grey granite dust & red clay quarry floor
+      oasisGrass: frontierScrub, // Biome 3: Parched frontier scrub & pine needles
+    });
+    penTerrainSplat.customProgramCacheKey = () => 'workd-builder-penitentiary-terrain-splat-v1';
+
+    const pMats = {
+      terrainSplat: penTerrainSplat,
+      dressedGranite: new THREE.MeshStandardMaterial({
+        map: dressedGranite.map,
+        normalMap: dressedGranite.normalMap,
+        normalScale: new THREE.Vector2(1.25, 1.25),
+        roughnessMap: dressedGranite.roughnessMap,
+        roughness: 1.0,
+        metalness: 0.06,
+      }),
+      graniteLoophole: new THREE.MeshStandardMaterial({
+        map: graniteLoophole.map,
+        normalMap: graniteLoophole.normalMap,
+        normalScale: new THREE.Vector2(1.35, 1.35),
+        roughnessMap: graniteLoophole.roughnessMap,
+        roughness: 1.0,
+        metalness: 0.08,
+      }),
+      darkRedBrick: new THREE.MeshStandardMaterial({
+        map: darkRedBrick.map,
+        normalMap: darkRedBrick.normalMap,
+        normalScale: new THREE.Vector2(1.2, 1.2),
+        roughnessMap: darkRedBrick.roughnessMap,
+        roughness: 1.0,
+        metalness: 0.04,
+      }),
+      brickCellBars: new THREE.MeshStandardMaterial({
+        map: brickCellBars.map,
+        normalMap: brickCellBars.normalMap,
+        normalScale: new THREE.Vector2(1.35, 1.35),
+        roughnessMap: brickCellBars.roughnessMap,
+        roughness: 1.0,
+        metalness: 0.14,
+      }),
+      darkSlateRoof: new THREE.MeshStandardMaterial({
+        map: darkSlateRoof.map,
+        normalMap: darkSlateRoof.normalMap,
+        normalScale: new THREE.Vector2(1.15, 1.15),
+        roughnessMap: darkSlateRoof.roughnessMap,
+        roughness: 0.92,
+        metalness: 0.16,
+      }),
+      corrugatedTin: new THREE.MeshStandardMaterial({
+        map: corrugatedTin.map,
+        normalMap: corrugatedTin.normalMap,
+        normalScale: new THREE.Vector2(1.1, 1.1),
+        roughnessMap: corrugatedTin.roughnessMap,
+        roughness: 0.72,
+        metalness: 0.42,
+        side: THREE.DoubleSide,
+      }),
+      rawGranite: new THREE.MeshStandardMaterial({
+        map: dressedGranite.map,
+        normalMap: dressedGranite.normalMap,
+        normalScale: new THREE.Vector2(1.35, 1.35),
+        color: new THREE.Color('#9ea2a6'),
+        roughness: 0.92,
+        metalness: 0.06,
+      }),
+      rawRedClay: new THREE.MeshStandardMaterial({
+        map: quarryClay.albedo,
+        normalMap: darkRedBrick.normalMap,
+        normalScale: new THREE.Vector2(1.1, 1.1),
+        color: new THREE.Color('#a6523b'),
+        roughness: 0.94,
+        metalness: 0.02,
+      }),
+      graniteCliff: new THREE.MeshStandardMaterial({
+        map: dressedGranite.map,
+        normalMap: dressedGranite.normalMap,
+        normalScale: new THREE.Vector2(1.2, 1.2),
+        color: new THREE.Color('#7a7d80'),
+        roughness: 0.9,
+        metalness: 0.05,
+      }),
+      gravelSlab: new THREE.MeshStandardMaterial({
+        map: greyGravel.albedo,
+        roughness: 0.92,
+        metalness: 0.03,
+      }),
+      darkOak: new THREE.MeshStandardMaterial({
+        map: timber.map,
+        normalMap: timber.normalMap,
+        normalScale: new THREE.Vector2(1.0, 1.0),
+        color: new THREE.Color('#5a3d28'),
+        roughness: 0.88,
+        metalness: 0.04,
+      }),
+      palisadeLog: new THREE.MeshStandardMaterial({
+        map: timber.map,
+        normalMap: timber.normalMap,
+        normalScale: new THREE.Vector2(0.95, 0.95),
+        color: new THREE.Color('#7a5738'),
+        roughness: 0.9,
+        metalness: 0.02,
+      }),
+      wroughtIron: new THREE.MeshStandardMaterial({
+        color: new THREE.Color('#22262b'),
+        roughness: 0.42,
+        metalness: 0.82,
+      }),
+      agedBronze: new THREE.MeshStandardMaterial({
+        color: new THREE.Color('#b6863d'),
+        roughness: 0.34,
+        metalness: 0.84,
+      }),
+      forgeEmber: new THREE.MeshStandardMaterial({
+        color: new THREE.Color('#ff5e14'),
+        emissive: new THREE.Color('#ff3c00'),
+        emissiveIntensity: 1.5,
+        roughness: 0.6,
+      }),
+      lanternGlow: new THREE.MeshStandardMaterial({
+        color: new THREE.Color('#fff2bf'),
+        emissive: new THREE.Color('#ff9d28'),
+        emissiveIntensity: 1.35,
+        roughness: 0.4,
+      }),
+      dryPineFoliage: new THREE.MeshStandardMaterial({
+        color: new THREE.Color('#475c3b'),
+        roughness: 0.86,
+        metalness: 0.02,
+      }),
+      dryPineDark: new THREE.MeshStandardMaterial({
+        color: new THREE.Color('#38492e'),
+        roughness: 0.88,
+        metalness: 0.02,
+      }),
+      usFlag1800s: new THREE.MeshStandardMaterial({
+        map: usFlagTex,
+        roughness: 0.78,
+        metalness: 0.02,
+        side: THREE.DoubleSide,
+      }),
+    };
+
+    Object.values(pMats).forEach((m) => penitentiaryMaterials.push(m));
+    penitentiaryPack = { materials: pMats, maps: { usFlag1800s: usFlagTex } };
+    return penitentiaryPack;
+  }
+
   return {
     maps: {
       blueprint: blueprintMap,
@@ -1787,6 +1968,7 @@ export function createTextureLibrary(renderer) {
     ensureRomePack,
     ensureJapanPack,
     ensureMayaPack,
+    ensurePenitentiaryPack,
     dispose() {
       textures.forEach((t) => t.dispose());
       Object.values(materials).forEach((m) => m.dispose());
@@ -1796,6 +1978,8 @@ export function createTextureLibrary(renderer) {
       japanMaterials.forEach((m) => m.dispose());
       mayaTextures.forEach((t) => t.dispose());
       mayaMaterials.forEach((m) => m.dispose());
+      penitentiaryTextures.forEach((t) => t.dispose());
+      penitentiaryMaterials.forEach((m) => m.dispose());
     },
   };
 }
@@ -3057,3 +3241,654 @@ function buildMayaRedStuccoPBR(anisotropy) {
 }
 
 
+
+/* ============================================================================
+ * LEVEL 5 (1800s AMERICAN PENITENTIARY — OLD WEST) PROCEDURAL 512x512 PBR PACK
+ * Dusty ochre-brown frontier dirt, grey crushed gravel paths, grey granite &
+ * red clay quarry dust, Eastern State style ashlar granite, loopholes, dark red
+ * penitentiary brick, black wrought-iron barred cell doors, dark slate roofing,
+ * patinated corrugated tin canopy, and authentic 1800s circular-star US flag.
+ * ========================================================================== */
+
+/** Penitentiary Biome 0: Dusty Ochre-Brown American Frontier Dirt (512x512) */
+function buildOchreDirtPBR(anisotropy) {
+  const size = 512;
+  const albedoCanvas = makeCanvas(size);
+  const ctx = albedoCanvas.getContext('2d');
+  const img = ctx.createImageData(size, size);
+  const data = img.data;
+  const height = new Float32Array(size * size);
+  const rough = new Float32Array(size * size);
+
+  for (let y = 0; y < size; y++) {
+    const v = y / size;
+    for (let x = 0; x < size; x++) {
+      const u = x / size;
+      const i = y * size + x;
+      const soil = tileFBM(u, v, 8, 4, 4109);
+      const cracks = tileFBM(u, v, 18, 3, 4127);
+      const grit = hash2i(x, y, 4139);
+      const pebble = smoothstep(0.76, 0.9, tileFBM(u, v, 28, 2, 4153));
+
+      const h = clamp01(0.45 + (soil - 0.5) * 0.34 + pebble * 0.24 - (1 - smoothstep(0.18, 0.3, cracks)) * 0.16);
+      height[i] = h;
+      rough[i] = clamp01(0.9 + (0.5 - soil) * 0.12 - pebble * 0.1);
+
+      const shade = 0.84 + soil * 0.24 + (grit - 0.5) * 0.09;
+      let r = 184 * shade;
+      let g = 136 * shade;
+      let b = 88 * shade;
+      if (pebble > 0.1) {
+        r = lerp(r, 146, pebble * 0.55);
+        g = lerp(g, 134, pebble * 0.55);
+        b = lerp(b, 120, pebble * 0.55);
+      }
+
+      const idx = i * 4;
+      data[idx] = Math.min(255, Math.max(0, Math.round(r)));
+      data[idx + 1] = Math.min(255, Math.max(0, Math.round(g)));
+      data[idx + 2] = Math.min(255, Math.max(0, Math.round(b)));
+      data[idx + 3] = 255;
+    }
+  }
+
+  ctx.putImageData(img, 0, 0);
+  const normalPacked = buildSobelNormalCanvas(height, size, 2.8, rough);
+  return {
+    albedo: wrapTexture(albedoCanvas, { isColor: true, anisotropy }),
+    normalRough: wrapTexture(normalPacked, { isColor: false, anisotropy }),
+  };
+}
+
+/** Penitentiary Biome 1: Compacted Grey Crushed Gravel Paths & Courtyard (512x512) */
+function buildGreyGravelPBR(anisotropy) {
+  const size = 512;
+  const albedoCanvas = makeCanvas(size);
+  const ctx = albedoCanvas.getContext('2d');
+  const img = ctx.createImageData(size, size);
+  const data = img.data;
+  const height = new Float32Array(size * size);
+  const rough = new Float32Array(size * size);
+
+  for (let y = 0; y < size; y++) {
+    const v = y / size;
+    for (let x = 0; x < size; x++) {
+      const u = x / size;
+      const i = y * size + x;
+      const base = tileFBM(u, v, 10, 3, 4201);
+      const stone = tileFBM(u, v, 32, 3, 4217);
+      const speck = hash2i(x, y, 4231);
+      const brightChip = smoothstep(0.68, 0.86, stone);
+
+      const h = clamp01(0.42 + stone * 0.42 + (speck - 0.5) * 0.14);
+      height[i] = h;
+      rough[i] = clamp01(0.86 - brightChip * 0.12);
+
+      const shade = 0.78 + base * 0.22 + brightChip * 0.18 + (speck - 0.5) * 0.12;
+      const r = 138 * shade;
+      const g = 136 * shade;
+      const b = 131 * shade;
+
+      const idx = i * 4;
+      data[idx] = Math.min(255, Math.max(0, Math.round(r)));
+      data[idx + 1] = Math.min(255, Math.max(0, Math.round(g)));
+      data[idx + 2] = Math.min(255, Math.max(0, Math.round(b)));
+      data[idx + 3] = 255;
+    }
+  }
+
+  ctx.putImageData(img, 0, 0);
+  const normalPacked = buildSobelNormalCanvas(height, size, 3.2, rough);
+  return {
+    albedo: wrapTexture(albedoCanvas, { isColor: true, anisotropy }),
+    normalRough: wrapTexture(normalPacked, { isColor: false, anisotropy }),
+  };
+}
+
+/** Penitentiary Biome 2: Grey Granite Dust & Red Terracotta Clay Quarry Floor (512x512) */
+function buildGraniteClayQuarryPBR(anisotropy) {
+  const size = 512;
+  const albedoCanvas = makeCanvas(size);
+  const ctx = albedoCanvas.getContext('2d');
+  const img = ctx.createImageData(size, size);
+  const data = img.data;
+  const height = new Float32Array(size * size);
+  const rough = new Float32Array(size * size);
+
+  for (let y = 0; y < size; y++) {
+    const v = y / size;
+    for (let x = 0; x < size; x++) {
+      const u = x / size;
+      const i = y * size + x;
+      const clayPatch = smoothstep(0.38, 0.68, tileFBM(u, v, 6, 3, 4327));
+      const grit = tileFBM(u, v, 24, 3, 4339);
+      const noise = hash2i(x, y, 4349);
+
+      height[i] = clamp01(0.45 + grit * 0.35 + (noise - 0.5) * 0.12);
+      rough[i] = clamp01(0.88 + clayPatch * 0.06);
+
+      const shade = 0.82 + grit * 0.24 + (noise - 0.5) * 0.08;
+      const r = lerp(142, 166, clayPatch) * shade;
+      const g = lerp(140, 102, clayPatch) * shade;
+      const b = lerp(136, 82, clayPatch) * shade;
+
+      const idx = i * 4;
+      data[idx] = Math.min(255, Math.max(0, Math.round(r)));
+      data[idx + 1] = Math.min(255, Math.max(0, Math.round(g)));
+      data[idx + 2] = Math.min(255, Math.max(0, Math.round(b)));
+      data[idx + 3] = 255;
+    }
+  }
+
+  ctx.putImageData(img, 0, 0);
+  const normalPacked = buildSobelNormalCanvas(height, size, 3.0, rough);
+  return {
+    albedo: wrapTexture(albedoCanvas, { isColor: true, anisotropy }),
+    normalRough: wrapTexture(normalPacked, { isColor: false, anisotropy }),
+  };
+}
+
+/** Penitentiary Biome 3: Parched Western Frontier Scrub & Dry Pine Soil (512x512) */
+function buildFrontierScrubPBR(anisotropy) {
+  const size = 512;
+  const albedoCanvas = makeCanvas(size);
+  const ctx = albedoCanvas.getContext('2d');
+  const img = ctx.createImageData(size, size);
+  const data = img.data;
+  const height = new Float32Array(size * size);
+  const rough = new Float32Array(size * size);
+
+  for (let y = 0; y < size; y++) {
+    const v = y / size;
+    for (let x = 0; x < size; x++) {
+      const u = x / size;
+      const i = y * size + x;
+      const tuft = smoothstep(0.42, 0.72, tileFBM(u, v, 14, 3, 4409));
+      const soil = tileFBM(u, v, 9, 3, 4421);
+      const speck = hash2i(x, y, 4441);
+
+      height[i] = clamp01(0.4 + tuft * 0.36 + (soil - 0.5) * 0.2);
+      rough[i] = clamp01(0.9 - tuft * 0.06);
+
+      const shade = 0.8 + soil * 0.24 + (speck - 0.5) * 0.08;
+      const r = lerp(164, 126, tuft) * shade;
+      const g = lerp(128, 126, tuft) * shade;
+      const b = lerp(84, 78, tuft) * shade;
+
+      const idx = i * 4;
+      data[idx] = Math.min(255, Math.max(0, Math.round(r)));
+      data[idx + 1] = Math.min(255, Math.max(0, Math.round(g)));
+      data[idx + 2] = Math.min(255, Math.max(0, Math.round(b)));
+      data[idx + 3] = 255;
+    }
+  }
+
+  ctx.putImageData(img, 0, 0);
+  const normalPacked = buildSobelNormalCanvas(height, size, 2.6, rough);
+  return {
+    albedo: wrapTexture(albedoCanvas, { isColor: true, anisotropy }),
+    normalRough: wrapTexture(normalPacked, { isColor: false, anisotropy }),
+  };
+}
+
+/** Massive Dressed Grey Penitentiary Ashlar Granite Blocks (512x512) */
+function buildDressedGranitePBR(anisotropy) {
+  const size = 512;
+  const albedoCanvas = makeCanvas(size);
+  const ctx = albedoCanvas.getContext('2d');
+  const img = ctx.createImageData(size, size);
+  const data = img.data;
+  const height = new Float32Array(size * size);
+  const rough = new Float32Array(size * size);
+
+  const rows = 4;
+  const cols = 3;
+
+  for (let y = 0; y < size; y++) {
+    const v = y / size;
+    const rowId = Math.floor(v * rows);
+    const rv = (v * rows) % 1;
+    for (let x = 0; x < size; x++) {
+      const u = x / size;
+      const i = y * size + x;
+      const shift = (rowId % 2) * 0.5;
+      const su = (u * cols + shift) % cols;
+      const colId = Math.floor(su);
+      const cu = su % 1;
+
+      const edgeX = Math.min(cu, 1 - cu);
+      const edgeY = Math.min(rv, 1 - rv);
+      const mortar = Math.min(smoothstep(0.025, 0.065, edgeX), smoothstep(0.035, 0.085, edgeY));
+
+      const blockTint = 0.88 + hash2i(colId, rowId, 4507) * 0.22;
+      const grain = tileFBM(u, v, 16, 4, 4519);
+      const crystal = hash2i(x, y, 4547);
+
+      const h = clamp01(0.18 + mortar * (0.58 + (grain - 0.5) * 0.24));
+      height[i] = h;
+      rough[i] = clamp01(0.92 - mortar * 0.16 + (grain - 0.5) * 0.08);
+
+      const shade = blockTint * (0.82 + grain * 0.26 + (crystal - 0.5) * 0.1);
+      const r = lerp(82, 138 * shade, mortar);
+      const g = lerp(83, 141 * shade, mortar);
+      const b = lerp(86, 145 * shade, mortar);
+
+      const idx = i * 4;
+      data[idx] = Math.min(255, Math.max(0, Math.round(r)));
+      data[idx + 1] = Math.min(255, Math.max(0, Math.round(g)));
+      data[idx + 2] = Math.min(255, Math.max(0, Math.round(b)));
+      data[idx + 3] = 255;
+    }
+  }
+
+  ctx.putImageData(img, 0, 0);
+  const normalCanvas = buildSobelNormalCanvas(height, size, 4.2);
+  const roughCanvas = buildRoughnessCanvas(rough, size);
+  return {
+    map: wrapTexture(albedoCanvas, { isColor: true, anisotropy }),
+    normalMap: wrapTexture(normalCanvas, { isColor: false, anisotropy }),
+    roughnessMap: wrapTexture(roughCanvas, { isColor: false, anisotropy }),
+  };
+}
+
+/** Dressed Grey Granite Fortified Wall with Narrow Recessed Prison Loophole (512x512) */
+function buildGraniteLoopholePBR(anisotropy) {
+  const size = 512;
+  const albedoCanvas = makeCanvas(size);
+  const ctx = albedoCanvas.getContext('2d');
+  const img = ctx.createImageData(size, size);
+  const data = img.data;
+  const height = new Float32Array(size * size);
+  const rough = new Float32Array(size * size);
+
+  const rows = 4;
+  const cols = 3;
+
+  for (let y = 0; y < size; y++) {
+    const v = y / size;
+    const rowId = Math.floor(v * rows);
+    const rv = (v * rows) % 1;
+    for (let x = 0; x < size; x++) {
+      const u = x / size;
+      const i = y * size + x;
+      const shift = (rowId % 2) * 0.5;
+      const su = (u * cols + shift) % cols;
+      const colId = Math.floor(su);
+      const cu = su % 1;
+
+      const edgeX = Math.min(cu, 1 - cu);
+      const edgeY = Math.min(rv, 1 - rv);
+      const mortar = Math.min(smoothstep(0.025, 0.065, edgeX), smoothstep(0.035, 0.085, edgeY));
+      const blockTint = 0.88 + hash2i(colId, rowId, 4603) * 0.2;
+      const grain = tileFBM(u, v, 16, 4, 4621);
+      const crystal = hash2i(x, y, 4637);
+
+      // Narrow vertical prison loophole slit centered at u = 0.5, v in [0.22, 0.78]
+      const inSlit = Math.abs(u - 0.5) < 0.062 && v > 0.24 && v < 0.76;
+      const inBevelFrame = !inSlit && Math.abs(u - 0.5) < 0.13 && v > 0.16 && v < 0.84;
+      const inBar = inSlit && (Math.abs(u - 0.5) < 0.014 || Math.abs(v - 0.5) < 0.022);
+
+      let r, g, b;
+      if (inBar) {
+        r = 34;
+        g = 38;
+        b = 44;
+        height[i] = 0.32;
+        rough[i] = 0.42;
+      } else if (inSlit) {
+        r = 16;
+        g = 18;
+        b = 22;
+        height[i] = 0.04;
+        rough[i] = 0.96;
+      } else if (inBevelFrame) {
+        const s = 0.96 + (grain - 0.5) * 0.16;
+        r = 152 * s;
+        g = 154 * s;
+        b = 158 * s;
+        height[i] = 0.86;
+        rough[i] = 0.74;
+      } else {
+        const shade = blockTint * (0.82 + grain * 0.25 + (crystal - 0.5) * 0.09);
+        r = lerp(80, 134 * shade, mortar);
+        g = lerp(81, 137 * shade, mortar);
+        b = lerp(84, 141 * shade, mortar);
+        height[i] = clamp01(0.18 + mortar * (0.58 + (grain - 0.5) * 0.22));
+        rough[i] = clamp01(0.92 - mortar * 0.16);
+      }
+
+      const idx = i * 4;
+      data[idx] = Math.min(255, Math.max(0, Math.round(r)));
+      data[idx + 1] = Math.min(255, Math.max(0, Math.round(g)));
+      data[idx + 2] = Math.min(255, Math.max(0, Math.round(b)));
+      data[idx + 3] = 255;
+    }
+  }
+
+  ctx.putImageData(img, 0, 0);
+  const normalCanvas = buildSobelNormalCanvas(height, size, 4.4);
+  const roughCanvas = buildRoughnessCanvas(rough, size);
+  return {
+    map: wrapTexture(albedoCanvas, { isColor: true, anisotropy }),
+    normalMap: wrapTexture(normalCanvas, { isColor: false, anisotropy }),
+    roughnessMap: wrapTexture(roughCanvas, { isColor: false, anisotropy }),
+  };
+}
+
+/** 1800s Dark Red Penitentiary Brick Masonry (512x512) */
+function buildDarkRedBrickPBR(anisotropy) {
+  const size = 512;
+  const albedoCanvas = makeCanvas(size);
+  const ctx = albedoCanvas.getContext('2d');
+  const img = ctx.createImageData(size, size);
+  const data = img.data;
+  const height = new Float32Array(size * size);
+  const rough = new Float32Array(size * size);
+
+  const rows = 10;
+  const cols = 5;
+
+  for (let y = 0; y < size; y++) {
+    const v = y / size;
+    const rowId = Math.floor(v * rows);
+    const rv = (v * rows) % 1;
+    for (let x = 0; x < size; x++) {
+      const u = x / size;
+      const i = y * size + x;
+      const shift = (rowId % 2) * 0.5;
+      const su = (u * cols + shift) % cols;
+      const colId = Math.floor(su);
+      const cu = su % 1;
+
+      const edgeX = Math.min(cu, 1 - cu);
+      const edgeY = Math.min(rv, 1 - rv);
+      const mortar = Math.min(smoothstep(0.035, 0.08, edgeX), smoothstep(0.06, 0.13, edgeY));
+
+      const brickVar = hash2i(colId, rowId, 4703);
+      const kiln = tileFBM(u, v, 18, 3, 4721);
+      const grit = hash2i(x, y, 4733);
+
+      height[i] = clamp01(0.2 + mortar * (0.62 + (kiln - 0.5) * 0.2));
+      rough[i] = clamp01(0.88 - mortar * 0.08 + (kiln - 0.5) * 0.08);
+
+      const shade = 0.78 + brickVar * 0.28 + (kiln - 0.5) * 0.16 + (grit - 0.5) * 0.07;
+      const r = lerp(146, 128 * shade, mortar);
+      const g = lerp(142, 52 * shade, mortar);
+      const b = lerp(132, 40 * shade, mortar);
+
+      const idx = i * 4;
+      data[idx] = Math.min(255, Math.max(0, Math.round(r)));
+      data[idx + 1] = Math.min(255, Math.max(0, Math.round(g)));
+      data[idx + 2] = Math.min(255, Math.max(0, Math.round(b)));
+      data[idx + 3] = 255;
+    }
+  }
+
+  ctx.putImageData(img, 0, 0);
+  const normalCanvas = buildSobelNormalCanvas(height, size, 3.8);
+  const roughCanvas = buildRoughnessCanvas(rough, size);
+  return {
+    map: wrapTexture(albedoCanvas, { isColor: true, anisotropy }),
+    normalMap: wrapTexture(normalCanvas, { isColor: false, anisotropy }),
+    roughnessMap: wrapTexture(roughCanvas, { isColor: false, anisotropy }),
+  };
+}
+
+/** Dark Red Brick Cellblock Facade with Arched Wrought-Iron Barred Cell Door (512x512) */
+function buildBrickCellBarsPBR(anisotropy) {
+  const size = 512;
+  const albedoCanvas = makeCanvas(size);
+  const ctx = albedoCanvas.getContext('2d');
+  const img = ctx.createImageData(size, size);
+  const data = img.data;
+  const height = new Float32Array(size * size);
+  const rough = new Float32Array(size * size);
+
+  const rows = 10;
+  const cols = 5;
+
+  for (let y = 0; y < size; y++) {
+    const v = y / size;
+    const rowId = Math.floor(v * rows);
+    const rv = (v * rows) % 1;
+    for (let x = 0; x < size; x++) {
+      const u = x / size;
+      const i = y * size + x;
+      const shift = (rowId % 2) * 0.5;
+      const su = (u * cols + shift) % cols;
+      const colId = Math.floor(su);
+      const cu = su % 1;
+
+      const edgeX = Math.min(cu, 1 - cu);
+      const edgeY = Math.min(rv, 1 - rv);
+      const mortar = Math.min(smoothstep(0.035, 0.08, edgeX), smoothstep(0.06, 0.13, edgeY));
+      const brickVar = hash2i(colId, rowId, 4801);
+      const kiln = tileFBM(u, v, 16, 3, 4817);
+
+      // Arched recessed cell doorway (u in [0.24, 0.76], bottom up to arch center at v=0.38)
+      const dx = u - 0.5;
+      const dyArch = v - 0.38;
+      const inRect = Math.abs(dx) < 0.24 && v >= 0.38 && v <= 0.92;
+      const inArch = v < 0.38 && dx * dx + dyArch * dyArch < 0.24 * 0.24;
+      const inDoorOpening = inRect || inArch;
+
+      const inStoneArchRim =
+        !inDoorOpening &&
+        ((Math.abs(dx) < 0.3 && v >= 0.38 && v <= 0.94) ||
+          (v < 0.38 && dx * dx + dyArch * dyArch < 0.3 * 0.3));
+
+      let r, g, b;
+      if (inDoorOpening) {
+        // Vertical & horizontal black wrought-iron bars over dark prison cell interior
+        const barPhase = Math.abs((((u - 0.26) / 0.08) % 1 + 1) % 1 - 0.5);
+        const isVertBar = barPhase > 0.34;
+        const isCrossBar = Math.abs(v - 0.54) < 0.024 || Math.abs(v - 0.76) < 0.024 || Math.abs(v - 0.36) < 0.022;
+        const isFrame = Math.abs(dx) > 0.215 || v > 0.89;
+
+        if (isVertBar || isCrossBar || isFrame) {
+          r = 28;
+          g = 31;
+          b = 36;
+          height[i] = 0.52;
+          rough[i] = 0.38;
+        } else {
+          // Deep shadowed cell interior with subtle faint warm lantern hint near top
+          const warm = Math.max(0, 1 - Math.hypot(dx * 2.4, (v - 0.42) * 2.2)) * 22;
+          r = 18 + warm * 1.1;
+          g = 17 + warm * 0.75;
+          b = 20 + warm * 0.35;
+          height[i] = 0.06;
+          rough[i] = 0.95;
+        }
+      } else if (inStoneArchRim) {
+        // Cut grey granite arch surround framing the barred brick cell door
+        const s = 0.9 + (kiln - 0.5) * 0.18;
+        r = 148 * s;
+        g = 150 * s;
+        b = 154 * s;
+        height[i] = 0.88;
+        rough[i] = 0.74;
+      } else {
+        const shade = 0.78 + brickVar * 0.28 + (kiln - 0.5) * 0.16;
+        r = lerp(146, 128 * shade, mortar);
+        g = lerp(142, 52 * shade, mortar);
+        b = lerp(132, 40 * shade, mortar);
+        height[i] = clamp01(0.2 + mortar * 0.62);
+        rough[i] = clamp01(0.88 - mortar * 0.08);
+      }
+
+      const idx = i * 4;
+      data[idx] = Math.min(255, Math.max(0, Math.round(r)));
+      data[idx + 1] = Math.min(255, Math.max(0, Math.round(g)));
+      data[idx + 2] = Math.min(255, Math.max(0, Math.round(b)));
+      data[idx + 3] = 255;
+    }
+  }
+
+  ctx.putImageData(img, 0, 0);
+  const normalCanvas = buildSobelNormalCanvas(height, size, 4.2);
+  const roughCanvas = buildRoughnessCanvas(rough, size);
+  return {
+    map: wrapTexture(albedoCanvas, { isColor: true, anisotropy }),
+    normalMap: wrapTexture(normalCanvas, { isColor: false, anisotropy }),
+    roughnessMap: wrapTexture(roughCanvas, { isColor: false, anisotropy }),
+  };
+}
+
+/** Dark Charcoal-Blue 19th-Century Overlapping Slate Roof Shingles (512x512) */
+function buildDarkSlateRoofPBR(anisotropy) {
+  const size = 512;
+  const albedoCanvas = makeCanvas(size);
+  const ctx = albedoCanvas.getContext('2d');
+  const img = ctx.createImageData(size, size);
+  const data = img.data;
+  const height = new Float32Array(size * size);
+  const rough = new Float32Array(size * size);
+
+  const rows = 10;
+  const cols = 8;
+
+  for (let y = 0; y < size; y++) {
+    const v = y / size;
+    const rowId = Math.floor(v * rows);
+    const rv = (v * rows) % 1;
+    for (let x = 0; x < size; x++) {
+      const u = x / size;
+      const i = y * size + x;
+      const shift = (rowId % 2) * 0.5;
+      const su = (u * cols + shift) % cols;
+      const colId = Math.floor(su);
+      const cu = su % 1;
+
+      const seamX = smoothstep(0.025, 0.06, Math.min(cu, 1 - cu));
+      const overlap = smoothstep(0.0, 0.16, rv);
+      const tileVar = hash2i(colId, rowId, 4903);
+      const slateGrain = tileFBM(u, v, 14, 3, 4919);
+
+      height[i] = clamp01(0.24 + seamX * (0.28 + overlap * 0.42));
+      rough[i] = clamp01(0.68 - tileVar * 0.14 + (slateGrain - 0.5) * 0.1);
+
+      const shade = (0.74 + tileVar * 0.24 + (slateGrain - 0.5) * 0.12) * (0.68 + overlap * 0.32) * (0.72 + seamX * 0.28);
+      const r = 64 * shade;
+      const g = 74 * shade;
+      const b = 86 * shade;
+
+      const idx = i * 4;
+      data[idx] = Math.min(255, Math.max(0, Math.round(r)));
+      data[idx + 1] = Math.min(255, Math.max(0, Math.round(g)));
+      data[idx + 2] = Math.min(255, Math.max(0, Math.round(b)));
+      data[idx + 3] = 255;
+    }
+  }
+
+  ctx.putImageData(img, 0, 0);
+  const normalCanvas = buildSobelNormalCanvas(height, size, 3.8);
+  const roughCanvas = buildRoughnessCanvas(rough, size);
+  return {
+    map: wrapTexture(albedoCanvas, { isColor: true, anisotropy }),
+    normalMap: wrapTexture(normalCanvas, { isColor: false, anisotropy }),
+    roughnessMap: wrapTexture(roughCanvas, { isColor: false, anisotropy }),
+  };
+}
+
+/** Patinated Corrugated Tin & Weathered Iron Quarry Roof Sheet (512x512) */
+function buildCorrugatedTinPBR(anisotropy) {
+  const size = 512;
+  const albedoCanvas = makeCanvas(size);
+  const ctx = albedoCanvas.getContext('2d');
+  const img = ctx.createImageData(size, size);
+  const data = img.data;
+  const height = new Float32Array(size * size);
+  const rough = new Float32Array(size * size);
+
+  for (let y = 0; y < size; y++) {
+    const v = y / size;
+    for (let x = 0; x < size; x++) {
+      const u = x / size;
+      const i = y * size + x;
+      const wave = Math.sin(u * Math.PI * 2 * 18) * 0.5 + 0.5;
+      const rust = smoothstep(0.56, 0.82, tileFBM(u, v, 8, 3, 5003));
+      const patina = tileFBM(u, v, 14, 2, 5021);
+
+      height[i] = clamp01(0.2 + wave * 0.7);
+      rough[i] = clamp01(0.52 + rust * 0.36 + (patina - 0.5) * 0.1);
+
+      const shade = 0.78 + wave * 0.24 + (patina - 0.5) * 0.12;
+      const r = lerp(128, 134, rust) * shade;
+      const g = lerp(132, 82, rust) * shade;
+      const b = lerp(134, 54, rust) * shade;
+
+      const idx = i * 4;
+      data[idx] = Math.min(255, Math.max(0, Math.round(r)));
+      data[idx + 1] = Math.min(255, Math.max(0, Math.round(g)));
+      data[idx + 2] = Math.min(255, Math.max(0, Math.round(b)));
+      data[idx + 3] = 255;
+    }
+  }
+
+  ctx.putImageData(img, 0, 0);
+  const normalCanvas = buildSobelNormalCanvas(height, size, 4.0);
+  const roughCanvas = buildRoughnessCanvas(rough, size);
+  return {
+    map: wrapTexture(albedoCanvas, { isColor: true, anisotropy }),
+    normalMap: wrapTexture(normalCanvas, { isColor: false, anisotropy }),
+    roughnessMap: wrapTexture(roughCanvas, { isColor: false, anisotropy }),
+  };
+}
+
+/** Authentic 1800s American Flag (13 stripes + navy canton with 13 white stars in a circle) */
+function build1800sUSFlagTexture(anisotropy) {
+  const w = 256;
+  const h = 160;
+  const canvas = document.createElement('canvas');
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext('2d');
+
+  // 13 weathered vintage red & warm cream stripes
+  const stripeH = h / 13;
+  for (let s = 0; s < 13; s++) {
+    ctx.fillStyle = s % 2 === 0 ? '#9e2b25' : '#e8dec5';
+    ctx.fillRect(0, s * stripeH, w, stripeH + 0.8);
+  }
+
+  // Deep 19th-century navy canton covering top-left 7 stripes
+  const cw = w * 0.44;
+  const ch = stripeH * 7;
+  ctx.fillStyle = '#1e3054';
+  ctx.fillRect(0, 0, cw, ch);
+
+  // 13 white stars arranged in a crisp circle (classic 1800s circle-of-stars motif)
+  const cx = cw * 0.5;
+  const cy = ch * 0.5;
+  const ringR = Math.min(cw, ch) * 0.34;
+  ctx.fillStyle = '#f5eedc';
+  for (let i = 0; i < 13; i++) {
+    const a = (i / 13) * Math.PI * 2 - Math.PI / 2;
+    const sx = cx + Math.cos(a) * ringR;
+    const sy = cy + Math.sin(a) * ringR;
+    ctx.beginPath();
+    for (let k = 0; k < 10; k++) {
+      const r = k % 2 === 0 ? 4.4 : 1.9;
+      const sa = (k / 10) * Math.PI * 2 - Math.PI / 2;
+      const px = sx + Math.cos(sa) * r;
+      const py = sy + Math.sin(sa) * r;
+      if (k === 0) ctx.moveTo(px, py);
+      else ctx.lineTo(px, py);
+    }
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  // Subtle woven linen grain
+  ctx.fillStyle = 'rgba(40, 28, 16, 0.08)';
+  for (let y = 0; y < h; y += 3) {
+    ctx.fillRect(0, y, w, 1);
+  }
+
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = anisotropy;
+  tex.needsUpdate = true;
+  return tex;
+}

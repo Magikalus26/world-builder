@@ -22,9 +22,10 @@ import { Level1Pyramid } from './levels/level1_pyramid.js';
 import { Level2Rome } from './levels/level2_rome.js';
 import { Level3Japan } from './levels/level3_japan.js';
 import { Level4Maya } from './levels/level4_maya.js';
+import { Level5Penitentiary } from './levels/level5_penitentiary.js';
 import { RoguelikeLevel, generateRoguelikeConfig } from './levels/roguelike_level.js';
 
-const LEVEL_REGISTRY = [Level1Pyramid, Level2Rome, Level3Japan, Level4Maya];
+const LEVEL_REGISTRY = [Level1Pyramid, Level2Rome, Level3Japan, Level4Maya, Level5Penitentiary];
 
 class WorkdBuilderApp {
   constructor() {
@@ -746,6 +747,7 @@ class WorkdBuilderApp {
     rewardCoins = 150,
     rewardTokens = 0,
     firstCompletionTokens = 0,
+    rewardFurniture = [],
   }) {
     if (this.decorationSystem && this.decorationSystem.isActive()) {
       this.decorationSystem.setActive(false);
@@ -754,7 +756,7 @@ class WorkdBuilderApp {
     this.interaction.cancelActiveInteraction();
     this.cameraController.startVictoryOrbit(focusPoint);
 
-    // Award persistent Gold Coins + Roguelike Éclats (or campaign first-completion Éclats bonus)
+    // Award persistent Gold Coins + Roguelike Éclats + any Level-Completion Decoration Unlocks
     const parts = [];
     let totalTokensAwarded = 0;
 
@@ -776,9 +778,18 @@ class WorkdBuilderApp {
       parts.push(`🪙 +${rewardCoins} Or`);
     }
 
+    const newlyUnlockedDecor =
+      Array.isArray(rewardFurniture) && rewardFurniture.length > 0
+        ? this.save.unlockFurnitureReward(rewardFurniture)
+        : [];
+    if (newlyUnlockedDecor.length > 0) {
+      parts.push(`🪑 ${newlyUnlockedDecor.map((d) => d.name).join(' & ')}`);
+      if (this.decorationSystem) this.decorationSystem.renderDock();
+    }
+
     if (parts.length > 0) {
       this.shop.refreshBalances();
-      this.rewardPill.textContent = `${parts.join('  •  ')} gagnés !`;
+      this.rewardPill.textContent = `${parts.join('  •  ')} !`;
       this.rewardPill.hidden = false;
       setTimeout(() => this.audio.playCoinClink(), 380);
     }

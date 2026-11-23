@@ -195,17 +195,17 @@ function createIslandMoundGeometry(radiusX, radiusZ, height, seed = 1, radialSeg
 function computeAll100LevelCoords() {
   const coords = new Array(100);
 
-  // Chapter 1 (Levels 1–10): 4 generous hero playable islands + 5 regular + Lv 10 Grand City
+  // Chapter 1 (Levels 1–10): 5 generous hero playable islands + 4 regular + Lv 10 Grand City
   const ch1 = [
-    [-4.3, 84.2], // 1: Égypte (Playable)
-    [2.9, 81.2],  // 2: Rome (Playable)
-    [-4.1, 77.8], // 3: Japon (Playable)
-    [3.1, 75.0],  // 4: Maya (Playable)
-    [6.9, 71.8],  // 5
-    [2.6, 70.1],  // 6
-    [-2.4, 69.2], // 7
-    [-6.9, 67.6], // 8
-    [-4.5, 65.0], // 9
+    [-4.3, 85.4], // 1: Égypte (Playable)
+    [3.0, 82.8],  // 2: Rome (Playable)
+    [-4.2, 79.4], // 3: Japon (Playable)
+    [3.2, 76.6],  // 4: Maya (Playable)
+    [-4.0, 73.2], // 5: Pénitencier 1800 (Playable)
+    [3.2, 70.6],  // 6
+    [-2.2, 69.0], // 7
+    [-7.0, 67.6], // 8
+    [-4.6, 64.6], // 9
     [0.6, 63.6],  // 10: Milestone City (Cité de Thèbes)
   ];
   for (let i = 0; i < 10; i++) {
@@ -413,6 +413,18 @@ export class WorldMapScene {
           roughness: 0.28,
           metalness: 0.2,
         })
+      ),
+      frontierOchre: this._trackMat(
+        new THREE.MeshStandardMaterial({ color: '#b98b5b', roughness: 0.9 })
+      ),
+      prisonGranite: this._trackMat(
+        new THREE.MeshStandardMaterial({ color: '#8a8e92', roughness: 0.82 })
+      ),
+      prisonBrick: this._trackMat(
+        new THREE.MeshStandardMaterial({ color: '#7d3427', roughness: 0.82 })
+      ),
+      prisonSlate: this._trackMat(
+        new THREE.MeshStandardMaterial({ color: '#353e48', roughness: 0.62, metalness: 0.14 })
       ),
       lockStone: this._trackMat(
         new THREE.MeshStandardMaterial({ color: '#9e978b', roughness: 0.78, metalness: 0.12 })
@@ -714,17 +726,18 @@ export class WorldMapScene {
    *    - Levels 10, 20, ..., 100: Grand 2.2x Village / City Milestone Islands
    * ========================================================================== */
   _buildAll100Nodes() {
-    // 1. Build the 4 full 3D Playable Hero Islands (Levels 1–4)
+    // 1. Build the 5 full 3D Playable Hero Islands (Levels 1–5)
     this._buildHeroEgyptIsland(this.levelCoords[0]);
     this._buildHeroRomeIsland(this.levelCoords[1]);
     this._buildHeroJapanIsland(this.levelCoords[2]);
     this._buildHeroMayaIsland(this.levelCoords[3]);
+    this._buildHeroPenitentiaryIsland(this.levelCoords[4]);
 
-    // 2. Collect regular "Bientôt" nodes (86) and Milestone Village/City nodes (10)
+    // 2. Collect regular "Bientôt" nodes (85) and Milestone Village/City nodes (10)
     const regularEntries = [];
     const milestoneEntries = [];
 
-    for (let i = 4; i < 100; i++) {
+    for (let i = 5; i < 100; i++) {
       const levelNum = i + 1;
       const chapterIdx = Math.floor(i / 10);
       const chapter = WORLD_CHAPTERS[chapterIdx];
@@ -1279,6 +1292,146 @@ export class WorldMapScene {
       focusDistance: 17.5,
       focusElevation: 42,
       focusAzimuth: -0.14,
+      group,
+      hitbox,
+      bounceTime: 0,
+    };
+
+    hitbox.userData.interact = { type: 'map-node', node };
+    this.nodes.push(node);
+  }
+
+  /**
+   * Level 5 — Pénitencier Américain – Années 1800 (UNLOCKED & PLAYABLE — 50 blocs)
+   */
+  _buildHeroPenitentiaryIsland(coord) {
+    const pos = new THREE.Vector3(coord.x, 0, coord.z);
+    const group = new THREE.Group();
+    group.position.copy(pos);
+    this.root.add(group);
+
+    // Dusty ochre-brown Old West mesa island mound
+    const moundGeo = this._trackGeo(createIslandMoundGeometry(2.25, 2.08, 0.68, 11.4, 22));
+    const mound = new THREE.Mesh(moundGeo, this.mats.frontierOchre);
+    mound.position.y = 0.14;
+    mound.castShadow = true;
+    mound.receiveShadow = true;
+    group.add(mound);
+    this._addShoreFoamRing(group, 2.38, 2.18, 5.2);
+    this._addUnlockedGoldRing(group, 'level5_penitentiary', 2.46, 2.26, 6.1);
+
+    // Miniature 1800s American Penitentiary fortress compound
+    const compound = new THREE.Group();
+    compound.position.set(0.05, 0.68, 0.05);
+    compound.rotation.y = 0.14;
+
+    // Massive grey granite perimeter wall enclosure + open gravel courtyard
+    const wallNS = this._trackGeo(new THREE.BoxGeometry(1.36, 0.34, 0.18));
+    const wallEW = this._trackGeo(new THREE.BoxGeometry(0.18, 0.34, 1.24));
+    [
+      [wallNS, 0, 0.17, -0.58],
+      [wallNS, 0, 0.17, 0.58],
+      [wallEW, -0.59, 0.17, 0],
+      [wallEW, 0.59, 0.17, 0],
+    ].forEach(([g, wx, wy, wz]) => {
+      const m = new THREE.Mesh(g, this.mats.prisonGranite);
+      m.position.set(wx, wy, wz);
+      m.castShadow = true;
+      compound.add(m);
+    });
+
+    // Dark-red brick upper cellblock wing along North wall + double-pitched dark slate roof
+    const brickWing = new THREE.Mesh(
+      this._trackGeo(new THREE.BoxGeometry(1.28, 0.28, 0.36)),
+      this.mats.prisonBrick
+    );
+    brickWing.position.set(0, 0.48, -0.46);
+    brickWing.castShadow = true;
+    compound.add(brickWing);
+
+    const slateRoofGeo = this._trackGeo(new THREE.CylinderGeometry(0.02, 0.34, 1.34, 3));
+    slateRoofGeo.rotateZ(Math.PI / 2);
+    const slateRoof = new THREE.Mesh(slateRoofGeo, this.mats.prisonSlate);
+    slateRoof.scale.set(1.0, 0.72, 0.78);
+    slateRoof.position.set(0, 0.72, -0.46);
+    slateRoof.castShadow = true;
+    compound.add(slateRoof);
+
+    // Central Octagonal Guard Tower + Slate Cupola + Tiny 1800s American Flag
+    const towerBase = new THREE.Mesh(
+      this._trackGeo(new THREE.CylinderGeometry(0.22, 0.26, 0.72, 8)),
+      this.mats.prisonGranite
+    );
+    towerBase.position.set(0, 0.36, 0.04);
+    towerBase.castShadow = true;
+    compound.add(towerBase);
+
+    const towerTop = new THREE.Mesh(
+      this._trackGeo(new THREE.CylinderGeometry(0.2, 0.22, 0.34, 8)),
+      this.mats.prisonBrick
+    );
+    towerTop.position.set(0, 0.88, 0.04);
+    compound.add(towerTop);
+
+    const cupola = new THREE.Mesh(
+      this._trackGeo(new THREE.ConeGeometry(0.28, 0.28, 8)),
+      this.mats.prisonSlate
+    );
+    cupola.position.set(0, 1.18, 0.04);
+    cupola.castShadow = true;
+    compound.add(cupola);
+
+    const pole = new THREE.Mesh(
+      this._trackGeo(new THREE.CylinderGeometry(0.015, 0.018, 0.48, 6)),
+      this.mats.lockStone
+    );
+    pole.position.set(0, 1.52, 0.04);
+    compound.add(pole);
+
+    const miniFlag = new THREE.Mesh(
+      this._trackGeo(new THREE.BoxGeometry(0.32, 0.19, 0.02)),
+      this.mats.mayaRedOchre
+    );
+    miniFlag.position.set(0.16, 1.66, 0.04);
+    compound.add(miniFlag);
+
+    group.add(compound);
+
+    // Miniature timber corner watchtower & dry western pines
+    const pineGeo = this._trackGeo(new THREE.ConeGeometry(0.18, 0.72, 6));
+    [
+      [-1.18, 0.86, 0.56],
+      [1.16, 0.84, 0.52],
+      [-1.12, 0.88, -0.68],
+    ].forEach(([px, py, pz]) => {
+      const pine = new THREE.Mesh(pineGeo, this.mats.cypressGreen);
+      pine.position.set(px, py, pz);
+      pine.castShadow = true;
+      group.add(pine);
+    });
+
+    const hitbox = new THREE.Mesh(
+      this._trackGeo(new THREE.CylinderGeometry(2.45, 2.55, 2.4, 10)),
+      this.mats.hitbox
+    );
+    hitbox.position.y = 1.1;
+    group.add(hitbox);
+
+    const node = {
+      id: 'level5_penitentiary',
+      levelIndex: 4,
+      levelNum: 5,
+      chapter: WORLD_CHAPTERS[0],
+      unlocked: true,
+      isMilestone: false,
+      title: 'Niveau 5 : Pénitencier Américain – Années 1800 (50 blocs)',
+      shortLabel: 'Pénitencier 1800',
+      labelText: 'Niveau 5 • Jouable',
+      position: pos,
+      labelAnchor: new THREE.Vector3(pos.x, 2.45, pos.z),
+      focusDistance: 17.5,
+      focusElevation: 42,
+      focusAzimuth: 0.14,
       group,
       hitbox,
       bounceTime: 0,

@@ -153,6 +153,24 @@ export const FURNITURE_CATALOG = [
     img: './assets/furniture/item_12.png',
     scale: 2.0,
   },
+  {
+    id: 'item_13',
+    name: 'Lanterne en Fer Forgé',
+    rarity: 'rare',
+    price: 55,
+    promoPrice: null,
+    img: './assets/furniture/item_13.svg',
+    scale: 1.65,
+  },
+  {
+    id: 'item_14',
+    name: 'Chariot en Bois XIXe',
+    rarity: 'rare',
+    price: 60,
+    promoPrice: null,
+    img: './assets/furniture/item_14.svg',
+    scale: 1.75,
+  },
 ];
 
 export const LOOT_BOXES = [
@@ -378,6 +396,26 @@ export class SaveManager {
     this.data.furniture.push(id);
     this._persist();
     return { ok: true, item, cost, tokens: this.data.tokens };
+  }
+
+  /**
+   * Unlocks one or more decorative furniture items awarded by level completion.
+   * Returns the array of newly unlocked catalog entries.
+   */
+  unlockFurnitureReward(ids = []) {
+    const newlyUnlocked = [];
+    if (!Array.isArray(ids) || ids.length === 0) return newlyUnlocked;
+    let changed = false;
+    ids.forEach((id) => {
+      const item = getFurnitureById(id);
+      if (item && !this.data.furniture.includes(id)) {
+        this.data.furniture.push(id);
+        newlyUnlocked.push(item);
+        changed = true;
+      }
+    });
+    if (changed) this._persist();
+    return newlyUnlocked;
   }
 
   /* ---- Loot Boxes (Roguelike Éclats -> Furniture + Gold Coin Bonus) ---- */

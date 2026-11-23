@@ -1341,6 +1341,137 @@ function buildRomanFountain(A) {
 }
 
 /* ============================================================================
+ * 13. item_13 — LANTERNE EN FER FORGÉ (1800s Wrought-Iron Penitentiary Street Lantern)
+ * Carved granite base, fluted matte-black iron lamppost, scrolled bracket,
+ * hexagonal wrought-iron cage, and gently flickering warm oil flame
+ * ========================================================================== */
+function buildWroughtIronLantern(A) {
+  const g = new THREE.Group();
+  const { geo, mat } = A;
+
+  // Stepped grey granite plinth base
+  g.add(part(geo.unitBox, mat.limestone, { pos: [0, 0.08, 0], scale: [0.56, 0.16, 0.56] }));
+  g.add(part(geo.unitBox, mat.limestone, { pos: [0, 0.2, 0], scale: [0.42, 0.12, 0.42] }));
+
+  // Fluted wrought-iron lamppost column + collar moldings
+  g.add(part(geo.unitCyl8, mat.wroughtIron, { pos: [0, 0.34, 0], scale: [0.22, 0.18, 0.22] }));
+  g.add(part(geo.unitCyl8, mat.wroughtIron, { pos: [0, 0.86, 0], scale: [0.1, 0.96, 0.1] }));
+  g.add(part(geo.unitCyl8, mat.wroughtIron, { pos: [0, 0.62, 0], scale: [0.15, 0.05, 0.15] }));
+  g.add(part(geo.unitSphere, mat.wroughtIron, { pos: [0, 1.38, 0], scale: [0.14, 0.16, 0.14] }));
+
+  // Forged horizontal bracket arm + scrolled brace
+  g.add(part(geo.unitBox, mat.wroughtIron, { pos: [0.2, 1.24, 0], scale: [0.44, 0.045, 0.045] }));
+  g.add(part(geo.unitBox, mat.wroughtIron, { pos: [0.14, 1.12, 0], rot: [0, 0, 0.62], scale: [0.3, 0.035, 0.035] }));
+
+  // Hanging hexagonal wrought-iron lantern cage + glowing amber oil glass
+  const lantern = new THREE.Group();
+  lantern.position.set(0.36, 1.0, 0);
+  lantern.add(part(geo.unitCyl8, mat.wroughtIron, { pos: [0, 0.21, 0], scale: [0.028, 0.09, 0.028] }));
+  lantern.add(part(geo.unitCone, mat.wroughtIron, { pos: [0, 0.13, 0], scale: [0.3, 0.14, 0.3] }));
+
+  const flameMat = mat.paperGlow.clone();
+  g.userData.ownMaterials = [flameMat];
+  const glass = part(geo.unitCyl8, flameMat, { pos: [0, -0.02, 0], scale: [0.2, 0.22, 0.2], cast: false });
+  lantern.add(glass);
+
+  // 4 forged vertical iron corner bars around the glass
+  for (let i = 0; i < 4; i++) {
+    const a = (i / 4) * Math.PI * 2 + Math.PI / 4;
+    lantern.add(
+      part(geo.unitCyl8, mat.wroughtIron, {
+        pos: [Math.cos(a) * 0.115, -0.02, Math.sin(a) * 0.115],
+        scale: [0.022, 0.24, 0.022],
+      })
+    );
+  }
+  lantern.add(part(geo.unitCone, mat.wroughtIron, { pos: [0, -0.17, 0], rot: [Math.PI, 0, 0], scale: [0.24, 0.1, 0.24] }));
+  g.add(lantern);
+
+  g.userData.animators = [
+    (_dt, elapsed) => {
+      flameMat.emissiveIntensity = 1.05 + Math.sin(elapsed * 7.2) * 0.2 + Math.cos(elapsed * 11.4) * 0.1;
+      lantern.rotation.z = Math.sin(elapsed * 1.9) * 0.04;
+    },
+  ];
+
+  return g;
+}
+
+/* ============================================================================
+ * 14. item_14 — CHARIOT EN BOIS XIXe (1800s Two-Wheeled Wooden Site Handcart)
+ * Weathered timber slatted cargo bed, iron corner bands, twin spoked wooden wheels
+ * with iron tires, rear push handles, resting legs, and cut granite + dark brick load
+ * ========================================================================== */
+function buildWoodenHandcart(A) {
+  const g = new THREE.Group();
+  const { geo, mat } = A;
+
+  // Twin spoked wooden wheels with black wrought-iron rims
+  const wheelOffsets = [-0.4, 0.4];
+  wheelOffsets.forEach((wz) => {
+    const wheel = new THREE.Group();
+    wheel.position.set(0.14, 0.28, wz);
+    // Iron tire rim + wooden felloe
+    wheel.add(part(geo.ropeCoil, mat.wroughtIron, { scale: [2.45, 2.45, 1.35] }));
+    wheel.add(part(geo.ropeCoil, mat.timberDark, { scale: [2.15, 2.15, 1.1] }));
+    // Wooden hub & 4 diametric spokes (8 spokes total)
+    wheel.add(part(geo.unitCyl8, mat.wroughtIron, { rot: [Math.PI / 2, 0, 0], scale: [0.11, 0.1, 0.11] }));
+    for (let s = 0; s < 4; s++) {
+      wheel.add(
+        part(geo.unitBox, mat.timber, {
+          rot: [0, 0, (s * Math.PI) / 4],
+          scale: [0.46, 0.036, 0.032],
+        })
+      );
+    }
+    g.add(wheel);
+  });
+
+  // Iron axle spanning both wheels
+  g.add(part(geo.unitCyl8, mat.wroughtIron, { pos: [0.14, 0.28, 0], rot: [Math.PI / 2, 0, 0], scale: [0.055, 0.88, 0.055] }));
+
+  // Slatted weathered timber cargo box tilted subtly toward handles
+  const body = new THREE.Group();
+  body.position.set(0.06, 0.42, 0);
+  body.rotation.z = -0.06;
+
+  // Floor & 4 wooden side boards
+  body.add(part(geo.unitBox, mat.timber, { pos: [0, 0, 0], scale: [0.88, 0.07, 0.64] }));
+  body.add(part(geo.unitBox, mat.timber, { pos: [0, 0.16, -0.3], scale: [0.92, 0.28, 0.06] }));
+  body.add(part(geo.unitBox, mat.timber, { pos: [0, 0.16, 0.3], scale: [0.92, 0.28, 0.06] }));
+  body.add(part(geo.unitBox, mat.timberDark, { pos: [0.44, 0.16, 0], scale: [0.06, 0.28, 0.64] }));
+  body.add(part(geo.unitBox, mat.timberDark, { pos: [-0.44, 0.16, 0], scale: [0.06, 0.28, 0.64] }));
+
+  // Forged iron corner straps
+  [
+    [-0.44, -0.3],
+    [0.44, -0.3],
+    [-0.44, 0.3],
+    [0.44, 0.3],
+  ].forEach(([cx, cz]) => {
+    body.add(part(geo.unitBox, mat.wroughtIron, { pos: [cx, 0.16, cz], scale: [0.08, 0.3, 0.08] }));
+  });
+
+  // Rear push handles extending left (-X)
+  [-0.24, 0.24].forEach((hz) => {
+    body.add(part(geo.unitCyl8, mat.timberDark, { pos: [-0.66, 0.04, hz], rot: [0, 0, Math.PI / 2], scale: [0.055, 0.56, 0.055] }));
+  });
+
+  // Resting support legs under rear bed
+  [-0.24, 0.24].forEach((lz) => {
+    body.add(part(geo.unitBox, mat.timberDark, { pos: [-0.34, -0.2, lz], rot: [0, 0, -0.14], scale: [0.055, 0.38, 0.055] }));
+  });
+
+  // Miniature cargo: cut grey granite block + 2 dark red bricks
+  body.add(part(geo.unitBox, mat.limestone, { pos: [-0.14, 0.18, -0.05], rot: [0, 0.08, 0], scale: [0.34, 0.24, 0.32] }));
+  body.add(part(geo.unitBox, mat.crimsonFabric, { pos: [0.2, 0.15, 0.08], rot: [0, -0.12, 0], scale: [0.28, 0.16, 0.22] }));
+  body.add(part(geo.unitBox, mat.crimsonFabric, { pos: [0.16, 0.28, -0.04], rot: [0, 0.2, 0], scale: [0.26, 0.14, 0.2] }));
+
+  g.add(body);
+  return g;
+}
+
+/* ============================================================================
  * PUBLIC FACTORY & PER-FRAME ANIMATION HOOK
  * ========================================================================== */
 const BUILDERS = {
@@ -1356,6 +1487,8 @@ const BUILDERS = {
   item_10: buildDesertSled,
   item_11: buildTreasureChest,
   item_12: buildRomanFountain,
+  item_13: buildWroughtIronLantern,
+  item_14: buildWoodenHandcart,
 };
 
 const WORLD_SCALES = {
@@ -1371,6 +1504,8 @@ const WORLD_SCALES = {
   item_10: 1.08,
   item_11: 1.05,
   item_12: 1.05,
+  item_13: 1.08,
+  item_14: 1.08,
 };
 
 /**
