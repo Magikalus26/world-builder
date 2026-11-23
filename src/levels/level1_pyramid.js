@@ -371,6 +371,7 @@ export class Level1Pyramid {
     this.stagingSlots = [];
     this.pyramidSlots = [];
     this.hitTargets = [];
+    this.draggableItems = [];
     this.tweens = [];
     this.slotMarkers = [];
 
@@ -1173,6 +1174,7 @@ export class Level1Pyramid {
     const pad = new THREE.Mesh(padGeo, this.textures.materials.foundation);
     pad.position.set(this._mx(-4.6), 0.07, -3.15);
     pad.receiveShadow = true;
+    pad.raycast = () => {};
     quarryGroup.add(pad);
 
     for (let i = 0; i < 5; i++) {
@@ -1186,6 +1188,7 @@ export class Level1Pyramid {
         position: slotPos,
         dropIndicatorY: 0.15,
         marker,
+        occupied: false,
         block: null,
       });
     }
@@ -1565,11 +1568,13 @@ export class Level1Pyramid {
   _updateCarvingPips() {
     const block = this.workbenchSlot ? this.workbenchSlot.block : null;
     const show = Boolean(block && !block.isDragging && block.kind === 'raw');
-    this.workbenchCarveHitbox.visible = show;
-    if (show) {
-      this.workbenchCarveHitbox.userData.interact = { type: 'workbench-carve', block };
-    } else {
-      delete this.workbenchCarveHitbox.userData.interact;
+    if (this.workbenchCarveHitbox) {
+      this.workbenchCarveHitbox.visible = show;
+      if (show) {
+        this.workbenchCarveHitbox.userData.interact = { type: 'workbench-carve', block };
+      } else {
+        delete this.workbenchCarveHitbox.userData.interact;
+      }
     }
 
     this.carvingPips.forEach((p, idx) => {
@@ -1743,6 +1748,7 @@ export class Level1Pyramid {
   _createSlotMarker(parent, x, y, z) {
     const marker = new THREE.Mesh(this.geos.slotOutline, this.mats.slotIdle);
     marker.position.set(x, y, z);
+    marker.raycast = () => {};
     parent.add(marker);
     this.slotMarkers.push(marker);
     return marker;
@@ -1811,14 +1817,8 @@ export class Level1Pyramid {
    * ========================================================================== */
   _findFreeQuarrySpawnSlot() {
     for (let i = 0; i < this.quarrySlots.length; i++) {
-      if (!this.quarrySlots[i].block) return this.quarrySlots[i];
-    }
-    // Convenience overflow: if Sled A is parked at the Quarry and has an open cargo slot
-    const sledA = this.sleds[0];
-    if (sledA && sledA.progress < 0.08 && !sledA.isAutoGliding) {
-      for (let i = 0; i < sledA.slots.length; i++) {
-        if (!sledA.slots[i].block) return sledA.slots[i];
-      }
+      const slot = this.quarrySlots[i];
+      if (!slot.occupied && !slot.block) return slot;
     }
     return null;
   }
@@ -1828,15 +1828,15 @@ export class Level1Pyramid {
 
     const freeSlot = this._findFreeQuarrySpawnSlot();
     if (!freeSlot) {
-      // Pad is full: gentle tactile rock knock + dust nudge
-      node.shakeTime = 0.2;
+      // Quarry storage pad is full: refuse overlapping spawns & show tactile rock shake feedback
+      node.shakeTime = 0.24;
       this.audio.playHeavyThud();
       this._spawnParticles(node.basePos, {
-        count: 5,
+        count: 6,
         material: this.mats.dustLimestone,
-        speed: 1.4,
-        upSpeed: 2.0,
-        scale: 0.7,
+        speed: 1.5,
+        upSpeed: 2.1,
+        scale: 0.72,
       });
       return;
     }
@@ -1863,7 +1863,7 @@ export class Level1Pyramid {
       node.regenTimer = 0.85;
       node.mesh.visible = false;
 
-      // Spawn Raw Stone Block and arc-bounce it onto the Quarry Staging Pad
+      // Spawn Raw Stone Block and arc-bounce it onto the first unoccupied Quarry Storage Slot
       this._spawnRawBlock(node.basePos, freeSlot);
     } else {
       // Visual fracture shrink on first chip
@@ -1872,6 +1872,8 @@ export class Level1Pyramid {
   }
 
   _spawnRawBlock(fromPos, targetSlot) {
+    if (!targetSlot || targetSlot.occupied || targetSlot.block) return null;
+
     const mesh = new THREE.Mesh(this.geos.rawBlock, this._getRawBlockMaterial());
     mesh.castShadow = true;
     mesh.receiveShadow = true;
@@ -1891,9 +1893,13 @@ export class Level1Pyramid {
       locked: false,
     };
 
+    mesh.userData.draggable = true;
+    mesh.userData.state = 'raw';
     mesh.userData.interact = { type: 'block', block };
+    targetSlot.occupied = true;
     targetSlot.block = block;
     this.blocks.push(block);
+    mesh.updateMatrixWorld(true);
     this._rebuildHitTargets();
 
     this.audio.playStoneSpawn();
@@ -1905,6 +1911,7 @@ export class Level1Pyramid {
       arcHeight: 1.25,
       onDone: () => {
         block.isTweening = false;
+        mesh.updateMatrixWorld(true);
         this._spawnParticles(targetSlot.position, {
           count: 7,
           material: this.mats.dustSand,
@@ -1914,6 +1921,7 @@ export class Level1Pyramid {
         });
       },
     });
+    return block;
   }
 
   /* ============================================================================
@@ -1970,7 +1978,10 @@ export class Level1Pyramid {
         block.mesh.material = this.carvedBlockMat;
       }
       block.mesh.rotation.set(0, 0, 0);
+      block.mesh.userData.draggable = true;
+      block.mesh.userData.state = block.kind;
       block.mesh.userData.interact = { type: 'block', block };
+      block.mesh.updateMatrixWorld(true);
       this._triggerSquashBounce(block.mesh, 1.2, 0.84);
       this._rebuildHitTargets();
     }
@@ -2091,15 +2102,28 @@ export class Level1Pyramid {
    * 10. DRAG & DROP VALIDATION + MAGNETIC SNAPPING
    * ========================================================================== */
   onBlockDragStart(block) {
-    if (!block || block.locked || block.isTweening || this.isComplete) return null;
+    if (!block || block.locked || this.isComplete) return null;
     // If an uncarved raw block sits on the workbench, it should be carved instead of dragged
     if (block.slot === this.workbenchSlot && block.kind === 'raw') {
       return null;
     }
 
+    // Allow responsive immediate pickup of a raw block landing in a quarry/storage slot
+    if (block.isTweening) {
+      if (block.slot && block.slot.zoneType === 'quarry') {
+        for (let i = this.tweens.length - 1; i >= 0; i--) {
+          if (this.tweens[i].block === block) this.tweens.splice(i, 1);
+        }
+        block.isTweening = false;
+      } else {
+        return null;
+      }
+    }
+
     block.isDragging = true;
     block.originSlot = block.slot;
     if (block.slot) {
+      block.slot.occupied = false;
       block.slot.block = null;
       block.slot = null;
     }
@@ -2117,19 +2141,19 @@ export class Level1Pyramid {
     const valid = [];
 
     if (block.kind === 'raw') {
-      // Sled A (always valid when empty), Workbench Anvil, and Quarry pad
+      // Sled A (always valid when empty), Workbench Anvil, and Quarry storage pad
       this.sleds.forEach((s) => {
         if (s.id === 'sledA') {
           s.slots.forEach((slot) => {
-            if (!slot.block) valid.push(slot);
+            if (!slot.occupied && !slot.block) valid.push(slot);
           });
         }
       });
-      if (this.workbenchSlot && !this.workbenchSlot.block) {
+      if (this.workbenchSlot && !this.workbenchSlot.occupied && !this.workbenchSlot.block) {
         valid.push(this.workbenchSlot);
       }
       this.quarrySlots.forEach((slot) => {
-        if (!slot.block) valid.push(slot);
+        if (!slot.occupied && !slot.block) valid.push(slot);
       });
       return valid;
     }
@@ -2138,20 +2162,20 @@ export class Level1Pyramid {
     this.sleds.forEach((s) => {
       if (s.id === 'sledB') {
         s.slots.forEach((slot) => {
-          if (!slot.block) valid.push(slot);
+          if (!slot.occupied && !slot.block) valid.push(slot);
         });
       }
     });
     this.outputSlots.forEach((slot) => {
-      if (!slot.block) valid.push(slot);
+      if (!slot.occupied && !slot.block) valid.push(slot);
     });
     this.stagingSlots.forEach((slot) => {
-      if (!slot.block) valid.push(slot);
+      if (!slot.occupied && !slot.block) valid.push(slot);
     });
 
     // Active unlocked pyramid layer blueprint slots
     this.pyramidSlots.forEach((slot) => {
-      if (slot.layer === this.activeLayer && !slot.block) {
+      if (slot.layer === this.activeLayer && !slot.occupied && !slot.block) {
         valid.push(slot);
       }
     });
@@ -2228,6 +2252,7 @@ export class Level1Pyramid {
     block.isDragging = false;
     block.originSlot = null;
     block.slot = targetSlot;
+    targetSlot.occupied = true;
     targetSlot.block = block;
     block.isTweening = true;
 
@@ -2242,13 +2267,21 @@ export class Level1Pyramid {
 
     if (isPyramidSnap) {
       block.locked = true;
+      block.mesh.userData.draggable = false;
+      block.mesh.userData.state = 'placed';
       delete block.mesh.userData.interact;
       targetSlot.ghostGroup.visible = false;
       this._rebuildHitTargets();
     } else if (targetSlot === this.workbenchSlot && block.kind === 'raw') {
+      block.mesh.userData.draggable = false;
+      block.mesh.userData.state = 'raw';
       block.mesh.userData.interact = { type: 'workbench-carve', block };
+      this._rebuildHitTargets();
     } else {
+      block.mesh.userData.draggable = true;
+      block.mesh.userData.state = block.kind;
       block.mesh.userData.interact = { type: 'block', block };
+      this._rebuildHitTargets();
     }
 
     this._addTween({
@@ -2260,6 +2293,7 @@ export class Level1Pyramid {
       onDone: () => {
         block.isTweening = false;
         block.mesh.rotation.set(0, targetSlot.rotY || 0, 0);
+        block.mesh.updateMatrixWorld(true);
         this._triggerSquashBounce(block.mesh, 1.12, 0.88);
 
         if (isPyramidSnap) {
@@ -2281,13 +2315,21 @@ export class Level1Pyramid {
 
   onBlockDragCancel(block) {
     block.isDragging = false;
-    const home = block.originSlot;
+    let home = block.originSlot;
     block.originSlot = null;
+    if (home && (home.occupied || home.block)) {
+      // Fallback to first unoccupied quarry slot if home slot was filled mid-drag
+      home = block.kind === 'raw' ? this._findFreeQuarrySpawnSlot() : home;
+    }
     if (!home) return;
 
     block.slot = home;
+    home.occupied = true;
     home.block = block;
+    block.mesh.userData.draggable = !(home === this.workbenchSlot && block.kind === 'raw');
+    block.mesh.userData.state = block.kind;
     block.isTweening = true;
+    this._rebuildHitTargets();
 
     this._addTween({
       block,
@@ -2298,6 +2340,7 @@ export class Level1Pyramid {
       onDone: () => {
         block.isTweening = false;
         block.mesh.rotation.set(0, 0, 0);
+        block.mesh.updateMatrixWorld(true);
         this.audio.playHeavyThud();
         this._updateCarvingPips();
       },
@@ -2511,8 +2554,15 @@ export class Level1Pyramid {
 
   _rebuildHitTargets() {
     this.hitTargets.length = 0;
+    this.draggableItems.length = 0;
     this.blocks.forEach((b) => {
-      if (!b.locked) this.hitTargets.push(b.mesh);
+      if (!b.locked) {
+        b.mesh.updateMatrixWorld(true);
+        this.hitTargets.push(b.mesh);
+        if (b.mesh.userData && b.mesh.userData.draggable !== false) {
+          this.draggableItems.push(b.mesh);
+        }
+      }
     });
     if (this.workbenchCarveHitbox) {
       this.hitTargets.push(this.workbenchCarveHitbox);
@@ -2528,6 +2578,10 @@ export class Level1Pyramid {
 
   getHitTargets() {
     return this.hitTargets;
+  }
+
+  getDraggableItems() {
+    return this.draggableItems;
   }
 
   update(dt, elapsed) {
@@ -2749,6 +2803,7 @@ export class Level1Pyramid {
     this.stagingSlots.length = 0;
     this.pyramidSlots.length = 0;
     this.hitTargets.length = 0;
+    this.draggableItems.length = 0;
     this.slotMarkers.length = 0;
     this.particles.length = 0;
     this.palmFronds.length = 0;

@@ -182,14 +182,13 @@ export class TouchInteractionEngine {
     return this.raycaster.ray.intersectPlane(this.dragPlane, this.planeHit);
   }
 
-  _pickInteractable(clientX, clientY) {
+  _pickInteractable(clientX, clientY, pointerType = 'mouse') {
     if (!this.level) return null;
     const targets = this.level.getHitTargets();
     if (!targets || targets.length === 0) return null;
 
     this._screenToRay(clientX, clientY, 0);
     const hits = this.raycaster.intersectObjects(targets, true);
-    if (hits.length === 0) return null;
 
     let best = null;
     let bestPriority = 999;
@@ -212,6 +211,50 @@ export class TouchInteractionEngine {
         if (p === 1) break;
       }
     }
+
+    // Mobile touch precision assist: if direct ray missed a block (or grazed a lower-priority
+    // quarry node / sled right behind a stored block), check unlocked draggable blocks within
+    // a tight screen-space finger tolerance so stored quarry blocks always pick up cleanly!
+    if (
+      (!best || bestPriority > PRIORITY.block) &&
+      bestPriority !== PRIORITY['sled-lever'] &&
+      typeof this.level.getDraggableItems === 'function'
+    ) {
+      const draggables = this.level.getDraggableItems();
+      if (draggables && draggables.length > 0) {
+        const rect = this.canvas.getBoundingClientRect();
+        const maxPx = pointerType === 'touch' ? 22 : 16;
+        const maxDistSq = maxPx * maxPx;
+        const tmp = new THREE.Vector3();
+        let closestBlock = null;
+        let closestDistSq = maxDistSq;
+
+        for (let i = 0; i < draggables.length; i++) {
+          const mesh = draggables[i];
+          if (!mesh || !mesh.visible || !mesh.userData || !mesh.userData.draggable) continue;
+          const inter = mesh.userData.interact;
+          if (!inter || inter.type !== 'block' || !inter.block || inter.block.locked) continue;
+
+          mesh.getWorldPosition(tmp);
+          tmp.project(this.camera);
+          if (tmp.z < -1 || tmp.z > 1) continue;
+
+          const sx = rect.left + (tmp.x * 0.5 + 0.5) * rect.width;
+          const sy = rect.top + (-tmp.y * 0.5 + 0.5) * rect.height;
+          const dx = clientX - sx;
+          const dy = clientY - sy;
+          const dSq = dx * dx + dy * dy;
+          if (dSq < closestDistSq) {
+            closestDistSq = dSq;
+            closestBlock = { interact: inter, hit: { object: mesh, point: mesh.position.clone() } };
+          }
+        }
+        if (closestBlock) {
+          return closestBlock;
+        }
+      }
+    }
+
     return best;
   }
 
@@ -289,7 +332,7 @@ export class TouchInteractionEngine {
       return;
     }
 
-    const picked = this._pickInteractable(e.clientX, e.clientY);
+    const picked = this._pickInteractable(e.clientX, e.clientY, e.pointerType);
     if (!picked) {
       this.mode = 'PAN';
       return;

@@ -822,6 +822,7 @@ export class Level3Japan extends Level1Pyramid {
     );
     pad.position.set(this._mx(-4.6), 0.07, -3.15);
     pad.receiveShadow = true;
+    pad.raycast = () => {};
     quarryGroup.add(pad);
 
     for (let i = 0; i < 5; i++) {
@@ -835,6 +836,7 @@ export class Level3Japan extends Level1Pyramid {
         position: new THREE.Vector3(sx, 0.14 + BLOCK_H * 0.5, sz),
         dropIndicatorY: 0.15,
         marker,
+        occupied: false,
         block: null,
       });
     }

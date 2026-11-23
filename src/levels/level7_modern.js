@@ -669,6 +669,7 @@ export class Level7Modern extends Level1Pyramid {
       mesh.position.set(...l.pos);
       mesh.castShadow = true;
       mesh.receiveShadow = true;
+      mesh.raycast = () => {};
       qGroup.add(mesh);
     });
 
@@ -679,10 +680,12 @@ export class Level7Modern extends Level1Pyramid {
     );
     frameL.position.set(-6.55, qBaseY + 0.82, -5.35);
     frameL.castShadow = true;
+    frameL.raycast = () => {};
     qGroup.add(frameL);
 
     const frameR = frameL.clone();
     frameR.position.set(-2.95, qBaseY + 0.82, -5.35);
+    frameR.raycast = () => {};
     qGroup.add(frameR);
 
     const crossBeam = new THREE.Mesh(
@@ -691,16 +694,17 @@ export class Level7Modern extends Level1Pyramid {
     );
     crossBeam.position.set(-4.75, qBaseY + 1.66, -5.35);
     crossBeam.castShadow = true;
+    crossBeam.raycast = () => {};
     qGroup.add(crossBeam);
 
     // 3 Extractable Raw Architectural Material Nodes (White Limestone, Red Clay & Silica Aggregate)
     const nodeCoords = [
       [-5.95, -4.75],
-      [-4.65, -4.6],
+      [-4.65, -4.65],
       [-3.35, -4.75],
     ];
     const nodeGeo = this._trackGeo(new THREE.DodecahedronGeometry(0.64, 1));
-    const hitSphereGeo = this._trackGeo(new THREE.SphereGeometry(0.92, 8, 8));
+    const hitSphereGeo = this._trackGeo(new THREE.SphereGeometry(0.76, 8, 8));
     const hitMat = this._trackMat(new THREE.MeshBasicMaterial({ visible: false }));
 
     nodeCoords.forEach(([nx, nz], idx) => {
@@ -747,7 +751,8 @@ export class Level7Modern extends Level1Pyramid {
       this.quarryNodes.push(nodeObj);
     });
 
-    // Quarry Output Staging Pad (5 slots directly ahead of the mineral nodes)
+    // Quarry Output Staging Pad (5 distinct ground slots directly ahead of the mineral nodes)
+    // Raycast disabled on decorative pad so stored raw blocks are 100% unobstructed on touch!
     const outPadY = sampleModernTerrainHeight(-4.6, -3.28);
     const outPad = new THREE.Mesh(
       this._trackGeo(new THREE.BoxGeometry(5.45, 0.14, 1.42)),
@@ -756,6 +761,7 @@ export class Level7Modern extends Level1Pyramid {
     outPad.position.set(-4.6, outPadY + 0.07, -3.28);
     outPad.receiveShadow = true;
     outPad.castShadow = true;
+    outPad.raycast = () => {};
     qGroup.add(outPad);
 
     for (let i = 0; i < 5; i++) {
@@ -769,6 +775,7 @@ export class Level7Modern extends Level1Pyramid {
         position: new THREE.Vector3(sx, outPadY + 0.14 + BLOCK_H * 0.5, sz),
         dropIndicatorY: outPadY + 0.15,
         marker,
+        occupied: false,
         block: null,
       });
     }
@@ -955,8 +962,17 @@ export class Level7Modern extends Level1Pyramid {
       position: new THREE.Vector3(benchX, wy + 0.83 + BLOCK_H * 0.5, benchZ),
       dropIndicatorY: wy + 0.84,
       marker: wbMarker,
+      occupied: false,
       block: null,
     };
+
+    // Generous invisible carve-swipe hitbox over the prefabrication anvil (active when raw block sits on it)
+    const carveHitGeo = this._trackGeo(new THREE.BoxGeometry(1.9, 1.35, 1.9));
+    const carveHitMat = this._trackMat(new THREE.MeshBasicMaterial({ visible: false }));
+    this.workbenchCarveHitbox = new THREE.Mesh(carveHitGeo, carveHitMat);
+    this.workbenchCarveHitbox.position.set(benchX, wy + 1.28, benchZ);
+    this.workbenchCarveHitbox.visible = false;
+    ws.add(this.workbenchCarveHitbox);
 
     // 3 Carving Progress Pips floating neatly beside the prefabrication workbench
     const pipGeo = this._trackGeo(new THREE.OctahedronGeometry(0.11, 0));

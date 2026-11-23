@@ -733,6 +733,7 @@ export class Level6CoalMine extends Level1Pyramid {
     );
     pad.position.set(this._mx(-4.6), 0.07, -3.28);
     pad.receiveShadow = true;
+    pad.raycast = () => {};
     quarryGroup.add(pad);
 
     for (let i = 0; i < 5; i++) {
@@ -746,6 +747,7 @@ export class Level6CoalMine extends Level1Pyramid {
         position: new THREE.Vector3(sx, 0.14 + BLOCK_H * 0.5, sz),
         dropIndicatorY: 0.15,
         marker,
+        occupied: false,
         block: null,
       });
     }
@@ -968,8 +970,17 @@ export class Level6CoalMine extends Level1Pyramid {
       position: new THREE.Vector3(benchX, 0.84 + BLOCK_H * 0.5, benchZ),
       dropIndicatorY: 0.85,
       marker: wbMarker,
+      occupied: false,
       block: null,
     };
+
+    // Generous invisible carve-swipe hitbox over anvil (active whenever a raw block sits on it)
+    const carveHitGeo = this._trackGeo(new THREE.BoxGeometry(1.9, 1.35, 1.9));
+    const carveHitMat = this._trackMat(new THREE.MeshBasicMaterial({ visible: false }));
+    this.workbenchCarveHitbox = new THREE.Mesh(carveHitGeo, carveHitMat);
+    this.workbenchCarveHitbox.position.set(benchX, 1.29, benchZ);
+    this.workbenchCarveHitbox.visible = false;
+    wsGroup.add(this.workbenchCarveHitbox);
 
     // 3 Carving Progress Pips floating neatly beside the anvil
     const pipGeo = this._trackGeo(new THREE.OctahedronGeometry(0.11, 0));
