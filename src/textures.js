@@ -676,14 +676,20 @@ function buildCarvedSandstonePBR(anisotropy) {
 }
 
 /* ============================================================================
- * 7. INTERMEDIATE CARVING STAGES (STAGE 1 & STAGE 2, 256x256)
+ * 7. PROGRESSIVE CARVING STAGES (STAGE 1 ROUGH-HEWN & STAGE 2 FINE-DRESSED, 512x512 PBR)
+ *    Stage 1: Bright diagonal chisel gouge marks, chipped raw corners & half-exposed inner grain
+ *    Stage 2: Crisp parallel tooth-chisel dressing grooves, pale dust edge lines & emerging trim
  * ========================================================================== */
 function buildCarvingStageTexture(stage, anisotropy) {
-  const size = 256;
+  const size = 512;
   const canvas = makeCanvas(size);
+  const roughCanvas = makeCanvas(size);
   const ctx = canvas.getContext('2d');
+  const rCtx = roughCanvas.getContext('2d');
   const img = ctx.createImageData(size, size);
+  const rImg = rCtx.createImageData(size, size);
   const data = img.data;
+  const rData = rImg.data;
   const height = new Float32Array(size * size);
 
   for (let y = 0; y < size; y++) {
@@ -691,30 +697,94 @@ function buildCarvingStageTexture(stage, anisotropy) {
     for (let x = 0; x < size; x++) {
       const u = x / size;
       const i = y * size + x;
-      const fbm = tileFBM(u, v, 6, 3, stage === 1 ? 811 : 853);
-      const chisel = Math.sin((u * 26 + v * 26 + fbm * 2) * Math.PI * 2) * 0.5 + 0.5;
-      const grain = hash2i(x, y, 881);
-      const edge = smoothstep(0.04, 0.16, Math.min(u, 1 - u, v, 1 - v));
+      const edgeDist = Math.min(u, 1 - u, v, 1 - v);
+      const cornerDist = Math.min(
+        Math.hypot(u, v),
+        Math.hypot(1 - u, v),
+        Math.hypot(u, 1 - v),
+        Math.hypot(1 - u, 1 - v)
+      );
+      const macro = tileFBM(u, v, 6, 3, stage === 1 ? 811 : 853);
+      const fine = tileFBM(u, v, 20, 3, stage === 1 ? 829 : 863);
+      const grain = hash2i(x, y, stage === 1 ? 881 : 887);
 
-      height[i] = clamp01(0.5 + (fbm - 0.5) * 0.22 + (chisel - 0.5) * 0.16);
-      const baseR = stage === 1 ? lerp(176, 212, edge) : lerp(206, 232, edge);
-      const baseG = stage === 1 ? lerp(156, 184, edge) : lerp(164, 194, edge);
-      const baseB = stage === 1 ? lerp(124, 134, edge) : lerp(104, 120, edge);
+      let r, g, b, h, roughVal;
 
-      const shade = 0.9 + chisel * 0.16 + (fbm - 0.5) * 0.12;
+      if (stage === 1) {
+        // STAGE 1 (Rough-Hewn / 1st Chisel Strike):
+        // Bold bright diagonal chisel gouges cutting across rough stone + chipped dark raw corners
+        const diag = u * 11.0 + v * 6.5 + (macro - 0.5) * 1.4;
+        const gougeWave = Math.sin(diag * Math.PI * 2);
+        const chiselScars = smoothstep(0.45, 0.92, gougeWave) * smoothstep(0.06, 0.22, edgeDist);
+        const chipCorner = 1.0 - smoothstep(0.08, 0.28 + (macro - 0.5) * 0.08, cornerDist);
+        const rawRim = 1.0 - smoothstep(0.03, 0.14, edgeDist);
+        const fracture = smoothstep(0.68, 0.86, tileFBM(u * 1.4, v * 1.4, 9, 2, 823));
+
+        // Exposed inner stone where chisel struck vs darker dusty unworked corners
+        const innerMix = clamp01(0.48 + chiselScars * 0.52 - chipCorner * 0.65 - rawRim * 0.35);
+        const baseR = lerp(146, 214, innerMix) + chiselScars * 28 - fracture * 22;
+        const baseG = lerp(132, 194, innerMix) + chiselScars * 26 - fracture * 20;
+        const baseB = lerp(112, 162, innerMix) + chiselScars * 22 - fracture * 16;
+
+        const shade = 0.88 + (fine - 0.5) * 0.22 + (grain - 0.5) * 0.08;
+        r = baseR * shade;
+        g = baseG * shade;
+        b = baseB * shade;
+
+        h = clamp01(
+          0.56 - chiselScars * 0.26 - chipCorner * 0.24 - fracture * 0.18 + (fine - 0.5) * 0.24
+        );
+        roughVal = clamp01(0.92 - chiselScars * 0.2 + chipCorner * 0.06 + (0.5 - fine) * 0.08);
+      } else {
+        // STAGE 2 (Fine-Dressed / 2nd Chisel Strike):
+        // Crisp parallel tooth-chisel dressing grooves, pale chalk-dust perimeter lines, emerging trim
+        const grooveU = Math.sin((u * 34.0 + (macro - 0.5) * 0.35) * Math.PI * 2) * 0.5 + 0.5;
+        const grooveV = Math.sin((v * 22.0 + (macro - 0.5) * 0.25) * Math.PI * 2) * 0.5 + 0.5;
+        const dressing = grooveU * 0.68 + grooveV * 0.32;
+
+        // Pale stone-dust drafting line tracing the nearly-squared outer margin
+        const marginBand =
+          smoothstep(0.035, 0.065, edgeDist) * (1.0 - smoothstep(0.075, 0.115, edgeDist));
+        const trimGroove = Math.abs(edgeDist - 0.095) < 0.01 ? 1.0 : 0.0;
+        const courseHint = Math.abs(((v * 2) % 1) - 0.5) > 0.486 ? 0.55 : 0.0;
+
+        const baseR = 204 + dressing * 18 + marginBand * 32 - trimGroove * 28 - courseHint * 24;
+        const baseG = 188 + dressing * 16 + marginBand * 30 - trimGroove * 26 - courseHint * 22;
+        const baseB = 162 + dressing * 14 + marginBand * 26 - trimGroove * 22 - courseHint * 18;
+
+        const shade = 0.92 + (macro - 0.5) * 0.14 + (fine - 0.5) * 0.1 + (grain - 0.5) * 0.05;
+        r = baseR * shade;
+        g = baseG * shade;
+        b = baseB * shade;
+
+        h = clamp01(
+          0.62 + (dressing - 0.5) * 0.22 - trimGroove * 0.28 - courseHint * 0.18 + (fine - 0.5) * 0.1
+        );
+        roughVal = clamp01(0.76 - dressing * 0.1 + marginBand * 0.14 + trimGroove * 0.16);
+      }
+
+      height[i] = h;
       const idx = i * 4;
-      data[idx] = Math.min(255, Math.max(0, Math.round(baseR * shade + (grain - 0.5) * 14)));
-      data[idx + 1] = Math.min(255, Math.max(0, Math.round(baseG * shade + (grain - 0.5) * 12)));
-      data[idx + 2] = Math.min(255, Math.max(0, Math.round(baseB * shade + (grain - 0.5) * 10)));
+      data[idx] = Math.min(255, Math.max(0, Math.round(r)));
+      data[idx + 1] = Math.min(255, Math.max(0, Math.round(g)));
+      data[idx + 2] = Math.min(255, Math.max(0, Math.round(b)));
       data[idx + 3] = 255;
+
+      const rByte = Math.round(roughVal * 255);
+      rData[idx] = rByte;
+      rData[idx + 1] = rByte;
+      rData[idx + 2] = rByte;
+      rData[idx + 3] = 255;
     }
   }
   ctx.putImageData(img, 0, 0);
-  const normalCanvas = buildSobelNormalCanvas(height, size, 3.2);
+  rCtx.putImageData(rImg, 0, 0);
+  const normalCanvas = buildSobelNormalCanvas(height, size, stage === 1 ? 3.8 : 3.2);
 
   return {
     map: wrapTexture(canvas, { isColor: true, anisotropy }),
     normalMap: wrapTexture(normalCanvas, { isColor: false, anisotropy }),
+    roughnessMap: wrapTexture(roughCanvas, { isColor: false, anisotropy }),
   };
 }
 
@@ -1253,8 +1323,10 @@ export function createTextureLibrary(renderer) {
     limestone.roughnessMap,
     carving1.map,
     carving1.normalMap,
+    carving1.roughnessMap,
     carving2.map,
     carving2.normalMap,
+    carving2.roughnessMap,
     sandstone.map,
     sandstone.normalMap,
     sandstone.roughnessMap,
@@ -1310,15 +1382,17 @@ export function createTextureLibrary(renderer) {
     carvingStage1: new THREE.MeshStandardMaterial({
       map: carving1.map,
       normalMap: carving1.normalMap,
-      normalScale: new THREE.Vector2(0.85, 0.85),
-      roughness: 0.82,
+      normalScale: new THREE.Vector2(1.2, 1.2),
+      roughnessMap: carving1.roughnessMap,
+      roughness: 1.0,
       metalness: 0.04,
     }),
     carvingStage2: new THREE.MeshStandardMaterial({
       map: carving2.map,
       normalMap: carving2.normalMap,
-      normalScale: new THREE.Vector2(0.75, 0.75),
-      roughness: 0.74,
+      normalScale: new THREE.Vector2(1.0, 1.0),
+      roughnessMap: carving2.roughnessMap,
+      roughness: 1.0,
       metalness: 0.06,
     }),
     carvedBlock: new THREE.MeshStandardMaterial({
@@ -2321,6 +2395,9 @@ export function createTextureLibrary(renderer) {
         emissive: new THREE.Color('#ffdca4'),
         emissiveIntensity: 0.26,
         roughness: 0.65,
+        polygonOffset: true,
+        polygonOffsetFactor: -1,
+        polygonOffsetUnits: -1,
       }),
     };
 
@@ -4272,7 +4349,7 @@ function build1800sUSFlagTexture(anisotropy) {
   }
 
   const tex = new THREE.CanvasTexture(canvas);
-  return applyCrispTextureSettings(tex, { isColor: true, anisotropy });
+  return applyCrispTextureSettings(tex, { isColor: true, wrap: false, anisotropy });
 }
 
 /* ============================================================================

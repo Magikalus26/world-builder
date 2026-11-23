@@ -641,7 +641,7 @@ function getContactShadowTexture() {
   g.addColorStop(1.0, 'rgba(22, 28, 16, 0.0)');
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, size, size);
-  _contactShadowTex = applyCrispTextureSettings(new THREE.CanvasTexture(c), { isColor: true });
+  _contactShadowTex = applyCrispTextureSettings(new THREE.CanvasTexture(c), { isColor: true, wrap: false });
   return _contactShadowTex;
 }
 

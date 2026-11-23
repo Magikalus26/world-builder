@@ -97,22 +97,25 @@ export function createConnectedMasonryGeometry(w, h, d, mask = 0, bevel = 0.044)
   const positions = [];
   const uvs = [];
 
-  const uvTop = (p) => [p[0] / w + 0.5, p[2] / d + 0.5];
-  const uvX = (p) => [p[2] / d + 0.5, p[1] / h + 0.5];
-  const uvZ = (p) => [p[0] / w + 0.5, p[1] / h + 0.5];
+  // Uniform world-scale box UV projection (prevents vertical/horizontal texture stretching on thin blocks)
+  const uvScale = Math.max(w, d, 0.96);
+  const uvTop = (p) => [p[0] / uvScale + 0.5, p[2] / uvScale + 0.5];
+  const uvX = (p) => [p[2] / uvScale + 0.5, p[1] / uvScale + 0.5];
+  const uvZ = (p) => [p[0] / uvScale + 0.5, p[1] / uvScale + 0.5];
 
-  // 1. Main flat faces (cull hidden flush internal horizontal & bottom faces)
-  // Top face (+Y) is always emitted (flat when hasPY) so half-offset stepped pyramids stay sealed
-  pushQuadOriented(
-    positions,
-    uvs,
-    [x1, y3, z2],
-    [x2, y3, z2],
-    [x2, y3, z1],
-    [x1, y3, z1],
-    [0, 1, 0],
-    uvTop
-  );
+  // 1. Main flat faces (cull hidden flush internal horizontal & vertical faces -> zero z-fighting!)
+  if (!hasPY) {
+    pushQuadOriented(
+      positions,
+      uvs,
+      [x1, y3, z2],
+      [x2, y3, z2],
+      [x2, y3, z1],
+      [x1, y3, z1],
+      [0, 1, 0],
+      uvTop
+    );
+  }
 
   if (!hasNY) {
     pushQuadOriented(
@@ -377,31 +380,33 @@ export function createCompluviumStraightRoofGeometry({
   const positions = [];
   const uvs = [];
 
-  // UV runs cleanly along tile columns (X) and down slope (Z) so tegulae grooves align continuously
-  const uvSlope = (p) => [p[0] / tileStep + 0.5, (p[2] - zOut) / tileStep];
-  const uvFascia = (p) => [p[0] / tileStep + 0.5, p[1] / outerH];
-  const uvSide = (p) => [(p[2] - zOut) / tileStep, p[1] / outerH];
+  // World-scale UV projection so tegulae grooves align continuously without stretching
+  const yBot = 0.002;
+  const uvSlope = (p) => [p[0] / tileStep + 0.5, Math.hypot(p[2] - zOut, p[1] - outerH) / tileStep];
+  const uvFascia = (p) => [p[0] / tileStep + 0.5, p[1] / tileStep];
+  const uvSide = (p) => [(p[2] - zOut) / tileStep, p[1] / tileStep];
 
-  // Top sloped terracotta roof surface
+  // Top sloped terracotta roof surface (+0.002 overlap weld eliminates hairline seam gaps)
+  const wHx = hx + 0.002;
   pushQuadOriented(
     positions,
     uvs,
-    [-hx, outerH, zOut],
-    [hx, outerH, zOut],
-    [hx, innerH, zIn],
-    [-hx, innerH, zIn],
+    [-wHx, outerH, zOut],
+    [wHx, outerH, zOut],
+    [wHx, innerH, zIn],
+    [-wHx, innerH, zIn],
     [0, 1, 0.25],
     uvSlope
   );
 
-  // Flat underside soffit resting flush at y = 0 on cornice & columns
+  // Flat underside soffit (+0.002 clearance above cornice top prevents z-fighting)
   pushQuadOriented(
     positions,
     uvs,
-    [-hx, 0, zOut],
-    [-hx, 0, zIn],
-    [hx, 0, zIn],
-    [hx, 0, zOut],
+    [-hx, yBot, zOut],
+    [-hx, yBot, zIn],
+    [hx, yBot, zIn],
+    [hx, yBot, zOut],
     [0, -1, 0],
     uvSlope
   );
@@ -410,10 +415,10 @@ export function createCompluviumStraightRoofGeometry({
   pushQuadOriented(
     positions,
     uvs,
-    [hx, 0, zOut],
-    [-hx, 0, zOut],
-    [-hx, outerH, zOut],
-    [hx, outerH, zOut],
+    [wHx, yBot, zOut],
+    [-wHx, yBot, zOut],
+    [-wHx, outerH, zOut],
+    [wHx, outerH, zOut],
     [0, 0, -1],
     uvFascia
   );
@@ -422,32 +427,33 @@ export function createCompluviumStraightRoofGeometry({
   pushQuadOriented(
     positions,
     uvs,
-    [-hx, 0, zIn],
-    [hx, 0, zIn],
-    [hx, innerH, zIn],
-    [-hx, innerH, zIn],
+    [-wHx, yBot, zIn],
+    [wHx, yBot, zIn],
+    [wHx, innerH, zIn],
+    [-wHx, innerH, zIn],
     [0, 0, 1],
     uvFascia
   );
 
-  // End caps (hidden once adjacent corner roof tiles snap in, keeping piece solid while dragging/unmerged)
+  // End caps inset slightly inside ±hx so adjoining straight/corner roof seams never z-fight
+  const capX = hx - 0.002;
   pushQuadOriented(
     positions,
     uvs,
-    [-hx, 0, zOut],
-    [-hx, outerH, zOut],
-    [-hx, innerH, zIn],
-    [-hx, 0, zIn],
+    [-capX, yBot, zOut],
+    [-capX, outerH, zOut],
+    [-capX, innerH, zIn],
+    [-capX, yBot, zIn],
     [-1, 0, 0],
     uvSide
   );
   pushQuadOriented(
     positions,
     uvs,
-    [hx, 0, zIn],
-    [hx, innerH, zIn],
-    [hx, outerH, zOut],
-    [hx, 0, zOut],
+    [capX, yBot, zIn],
+    [capX, innerH, zIn],
+    [capX, outerH, zOut],
+    [capX, yBot, zOut],
     [1, 0, 0],
     uvSide
   );
@@ -481,12 +487,13 @@ export function createCompluviumCornerRoofGeometry({
   const positions = [];
   const uvs = [];
 
+  const yBot = 0.002;
   // North wing slopes along +Z -> U runs along X, V runs down +Z matching North straight roof!
-  const uvNorthWing = (p) => [(p[0] - inn) / tileStep, (p[2] - out) / tileStep];
+  const uvNorthWing = (p) => [(p[0] - inn) / tileStep, Math.hypot(p[2] - out, p[1] - outerH) / tileStep];
   // West wing slopes along +X -> U runs along Z, V runs down +X matching West straight roof!
-  const uvWestWing = (p) => [(p[2] - inn) / tileStep, (p[0] - out) / tileStep];
-  const uvNorthFascia = (p) => [(p[0] - out) / tileStep, p[1] / outerH];
-  const uvWestFascia = (p) => [(p[2] - out) / tileStep, p[1] / outerH];
+  const uvWestWing = (p) => [(p[2] - inn) / tileStep, Math.hypot(p[0] - out, p[1] - outerH) / tileStep];
+  const uvNorthFascia = (p) => [(p[0] - out) / tileStep, p[1] / tileStep];
+  const uvWestFascia = (p) => [(p[2] - out) / tileStep, p[1] / tileStep];
 
   // Top sloped roof — split cleanly along the exact 45-degree diagonal hip (out,out) -> (inn,inn)
   // 1. North-facing roof wing triangle: (out, outerH, out), (inn, outerH, out), (inn, innerH, inn)
@@ -511,14 +518,14 @@ export function createCompluviumCornerRoofGeometry({
     uvWestWing
   );
 
-  // Flat underside soffit at y = 0 resting solidly on Tier 3 cornice & atrium columns
+  // Flat underside soffit (+0.002 clearance above Tier 3 cornice & atrium columns prevents z-fighting)
   pushQuadOriented(
     positions,
     uvs,
-    [out, 0, out],
-    [out, 0, inn],
-    [inn, 0, inn],
-    [inn, 0, out],
+    [out, yBot, out],
+    [out, yBot, inn],
+    [inn, yBot, inn],
+    [inn, yBot, out],
     [0, -1, 0],
     uvNorthWing
   );
@@ -527,8 +534,8 @@ export function createCompluviumCornerRoofGeometry({
   pushQuadOriented(
     positions,
     uvs,
-    [inn, 0, out],
-    [out, 0, out],
+    [inn, yBot, out],
+    [out, yBot, out],
     [out, outerH, out],
     [inn, outerH, out],
     [0, 0, -1],
@@ -539,32 +546,33 @@ export function createCompluviumCornerRoofGeometry({
   pushQuadOriented(
     positions,
     uvs,
-    [out, 0, out],
-    [out, 0, inn],
+    [out, yBot, out],
+    [out, yBot, inn],
     [out, outerH, inn],
     [out, outerH, out],
     [-1, 0, 0],
     uvWestFascia
   );
 
-  // Seam side caps at x = inn and z = inn (solid before neighbor arrives; flush at weld plane once connected)
+  // Seam side caps inset slightly inside inn so adjoining straight/corner tiles never z-fight
+  const capInn = inn - 0.002;
   pushQuadOriented(
     positions,
     uvs,
-    [inn, 0, inn],
-    [inn, innerH, inn],
-    [inn, outerH, out],
-    [inn, 0, out],
+    [capInn, yBot, capInn],
+    [capInn, innerH, capInn],
+    [capInn, outerH, out],
+    [capInn, yBot, out],
     [1, 0, 0],
     uvWestFascia
   );
   pushQuadOriented(
     positions,
     uvs,
-    [out, 0, inn],
-    [inn, 0, inn],
-    [inn, innerH, inn],
-    [out, outerH, inn],
+    [out, yBot, capInn],
+    [capInn, yBot, capInn],
+    [capInn, innerH, capInn],
+    [out, outerH, capInn],
     [0, 0, 1],
     uvNorthFascia
   );
@@ -670,9 +678,10 @@ export function createKawaraStraightRoofGeometry({
     const b1L = pt(-hx, z1, -thickness);
     pushQuadOriented(positions, uvs, b0L, b0R, b1R, b1L, [0, -1, 0.35], uvTop);
 
-    // Side seam walls (occluded inside solid roof once neighboring corners snap in)
-    pushQuadOriented(positions, uvs, t0L, b0L, b1L, t1L, [-1, 0, 0], uvEdge);
-    pushQuadOriented(positions, uvs, t0R, t1R, b1R, b0R, [1, 0, 0], uvEdge);
+    // Side seam walls inset slightly inside ±hx so adjoining corner hips never z-fight
+    const capHx = hx - 0.002;
+    pushQuadOriented(positions, uvs, pt(-capHx, z0, 0), pt(-capHx, z0, -thickness), pt(-capHx, z1, -thickness), pt(-capHx, z1, 0), [-1, 0, 0], uvEdge);
+    pushQuadOriented(positions, uvs, pt(capHx, z0, 0), pt(capHx, z1, 0), pt(capHx, z1, -thickness), pt(capHx, z0, -thickness), [1, 0, 0], uvEdge);
   }
 
   // Outer curved eave fascia edge (at world z = -outerReach)
@@ -930,7 +939,396 @@ export function createMayanRoofCombGeometry({
 }
 
 /**
- * Per-level shared geometry cache for Connected Masonry blocks.
+ * Builds a seamless neighbor-aware pitched roof block geometry (Gable, 45° Hip/Valley L-Corner, or Shed)
+ * with zero air gaps, hidden internal gable/side wall culling, +0.02 exposed eave overhang,
+ * continuous apex ridge beam (faîtage), and true world-scale slope-arc UV projection.
+ *
+ * @param {number} w - Exact roof grid width (matches gridStepX)
+ * @param {number} h - Roof block height
+ * @param {number} d - Exact roof grid depth (matches gridStepZ)
+ * @param {number} mask - 4-bit horizontal roof neighbor bitmask (NEIGHBOR_PX/NX/PZ/NZ)
+ * @param {object} [opts]
+ * @param {'gable'|'shed'} [opts.style='gable'] - Double-pitched gable or single-pitched shed slope
+ * @param {'x'|'z'} [opts.defaultAxis='x'] - Default ridge orientation when isolated
+ * @param {number} [opts.eaveOverhang=0.02] - Slight eave extension on exposed outer edges
+ * @param {number} [opts.ridgeHeight=0.075] - Raised continuous ridge beam (faîtage) height
+ * @param {number} [opts.ridgeHalfW=0.07] - Raised continuous ridge beam half-width
+ * @returns {THREE.BufferGeometry}
+ */
+export function createConnectedPitchedRoofGeometry(
+  w = 0.96,
+  h = 0.64,
+  d = 0.96,
+  mask = 0,
+  {
+    style = 'gable',
+    defaultAxis = 'x',
+    eaveOverhang = 0.02,
+    ridgeHeight = 0.075,
+    ridgeHalfW = 0.07,
+  } = {}
+) {
+  const hasPX = (mask & NEIGHBOR_PX) !== 0;
+  const hasNX = (mask & NEIGHBOR_NX) !== 0;
+  const hasPZ = (mask & NEIGHBOR_PZ) !== 0;
+  const hasNZ = (mask & NEIGHBOR_NZ) !== 0;
+
+  const hx = w * 0.5;
+  const hy = h * 0.5;
+  const hz = d * 0.5;
+  const uvScale = Math.max(w, d, 0.96);
+
+  const positions = [];
+  const uvs = [];
+
+  // Small 0.004 weld tolerance on connected edges prevents hairline subpixel cracks on mobile GPUs
+  const weld = 0.004;
+  const xMin = hasNX ? -hx - weld : -hx - eaveOverhang;
+  const xMax = hasPX ? hx + weld : hx + eaveOverhang;
+  const zMin = hasNZ ? -hz - weld : -hz - eaveOverhang;
+  const zMax = hasPZ ? hz + weld : hz + eaveOverhang;
+
+  const yBot = -hy;
+  const yEave = -hy + h * 0.16;
+  const yPeak = hy + 0.06;
+
+  // World-scale planar / slope-arc UV helpers (prevents texture stretching on pitched roofs)
+  const uvSideX = (p) => [p[2] / uvScale + 0.5, (p[1] - yBot) / uvScale];
+  const uvSideZ = (p) => [p[0] / uvScale + 0.5, (p[1] - yBot) / uvScale];
+  const uvSlopeZ = (p) => [
+    p[0] / uvScale + 0.5,
+    Math.hypot(p[2], p[1] - yBot) / uvScale,
+  ];
+  const uvSlopeX = (p) => [
+    p[2] / uvScale + 0.5,
+    Math.hypot(p[0], p[1] - yBot) / uvScale,
+  ];
+  const uvFlat = (p) => [p[0] / uvScale + 0.5, p[2] / uvScale + 0.5];
+
+  if (style === 'shed') {
+    // Sloped corrugated zinc / shed roof: high along -Z, slopes gently down toward +Z
+    const yHigh = hy + 0.04;
+    const yLow = -hy + h * 0.34;
+    const yAtZ = (z) => {
+      const t = (z - -hz) / d; // 0 at -Z high crest, 1 at +Z low eave
+      return yHigh + (yLow - yHigh) * t;
+    };
+
+    const yZMin = yAtZ(zMin);
+    const yZMax = yAtZ(zMax);
+    const slopeUv = (p) => [
+      p[0] / uvScale + 0.5,
+      Math.hypot(p[2] - zMin, p[1] - yZMin) / uvScale,
+    ];
+
+    // Main sloped roof deck
+    pushQuadOriented(
+      positions,
+      uvs,
+      [xMin, yZMax, zMax],
+      [xMax, yZMax, zMax],
+      [xMax, yZMin, zMin],
+      [xMin, yZMin, zMin],
+      [0, 1, 0.35],
+      slopeUv
+    );
+
+    // Underside (offset slightly +0.002 above bottom to prevent z-fighting with lower wall top)
+    const yBase = yBot + 0.002;
+    pushQuadOriented(
+      positions,
+      uvs,
+      [xMin, yBase, zMin],
+      [xMax, yBase, zMin],
+      [xMax, yBase, zMax],
+      [xMin, yBase, zMax],
+      [0, -1, 0],
+      uvFlat
+    );
+
+    // Front (+Z) low eave fascia (always emitted unless connected along +Z)
+    if (!hasPZ) {
+      pushQuadOriented(
+        positions,
+        uvs,
+        [xMin, yBase, zMax],
+        [xMax, yBase, zMax],
+        [xMax, yZMax, zMax],
+        [xMin, yZMax, zMax],
+        [0, 0, 1],
+        uvSideZ
+      );
+    }
+
+    // Back (-Z) high crest wall (culled when connected along -Z)
+    if (!hasNZ) {
+      pushQuadOriented(
+        positions,
+        uvs,
+        [xMax, yBase, zMin],
+        [xMin, yBase, zMin],
+        [xMin, yZMin, zMin],
+        [xMax, yZMin, zMin],
+        [0, 0, -1],
+        uvSideZ
+      );
+    }
+
+    // Side trapezoidal end walls: ONLY emitted on exposed ends (culled between adjacent roof blocks!)
+    if (!hasNX) {
+      pushQuadOriented(
+        positions,
+        uvs,
+        [xMin, yBase, zMin],
+        [xMin, yBase, zMax],
+        [xMin, yZMax, zMax],
+        [xMin, yZMin, zMin],
+        [-1, 0, 0],
+        uvSideX
+      );
+    }
+    if (!hasPX) {
+      pushQuadOriented(
+        positions,
+        uvs,
+        [xMax, yBase, zMax],
+        [xMax, yBase, zMin],
+        [xMax, yZMin, zMin],
+        [xMax, yZMax, zMax],
+        [1, 0, 0],
+        uvSideX
+      );
+    }
+
+    // Continuous top crest ridge flashing beam (faîtage) along high -Z crest
+    if (!hasNZ) {
+      const rZ0 = zMin - 0.01;
+      const rZ1 = zMin + ridgeHalfW * 1.9;
+      const rY0 = yZMin - 0.01;
+      const rY1 = yZMin + ridgeHeight * 0.72;
+      pushQuadOriented(positions, uvs, [xMin, rY1, rZ1], [xMax, rY1, rZ1], [xMax, rY1, rZ0], [xMin, rY1, rZ0], [0, 1, 0], uvFlat);
+      pushQuadOriented(positions, uvs, [xMin, rY0, rZ1], [xMax, rY0, rZ1], [xMax, rY1, rZ1], [xMin, rY1, rZ1], [0, 0, 1], uvSideZ);
+      pushQuadOriented(positions, uvs, [xMax, rY0, rZ0], [xMin, rY0, rZ0], [xMin, rY1, rZ0], [xMax, rY1, rZ0], [0, 0, -1], uvSideZ);
+    }
+  } else {
+    // DOUBLE-PITCHED GABLE / HIP-CORNER ROOF (Level 5 Penitentiary Dark Slate & Generic Gable)
+    const hasX = hasPX || hasNX;
+    const hasZ = hasPZ || hasNZ;
+    const isCorner = hasX && hasZ;
+    const yBase = yBot + 0.002;
+
+    if (isCorner) {
+      // 45° Mitered Hip/Valley Roof Corner uniting perpendicular X-ridge & Z-ridge wings seamlessly!
+      // Determine which X direction and which Z direction have connected wings
+      const sx = hasPX ? 1 : -1;
+      const sz = hasPZ ? 1 : -1;
+      const xIn = sx > 0 ? hx + weld : -hx - weld;
+      const xOut = sx > 0 ? -hx - eaveOverhang : hx + eaveOverhang;
+      const zIn = sz > 0 ? hz + weld : -hz - weld;
+      const zOut = sz > 0 ? -hz - eaveOverhang : hz + eaveOverhang;
+
+      const apex = [0, yPeak, 0];
+      const ridgeX = [xIn, yPeak, 0];
+      const ridgeZ = [0, yPeak, zIn];
+
+      const eaveOuterCorner = [xOut, yEave, zOut];
+      const eaveOuterX = [xIn, yEave, zOut];
+      const eaveOuterZ = [xOut, yEave, zIn];
+      const eaveInnerValley = [xIn, yEave, zIn];
+
+      // 1. Outer slope facing -sz (along X wing outer side)
+      pushQuadOriented(
+        positions,
+        uvs,
+        eaveOuterCorner,
+        eaveOuterX,
+        ridgeX,
+        apex,
+        [0, 1, -sz * 0.65],
+        uvSlopeZ
+      );
+      // 2. Outer slope facing -sx (along Z wing outer side)
+      pushQuadOriented(
+        positions,
+        uvs,
+        eaveOuterZ,
+        eaveOuterCorner,
+        apex,
+        ridgeZ,
+        [-sx * 0.65, 1, 0],
+        uvSlopeX
+      );
+      // 3. Inner courtyard valley slope facing +sz (from X-wing ridge to inner valley)
+      pushTriOriented(positions, uvs, apex, ridgeX, eaveInnerValley, [0, 1, sz * 0.65], uvSlopeZ);
+      // 4. Inner courtyard valley slope facing +sx (from Z-wing ridge to inner valley)
+      pushTriOriented(positions, uvs, apex, eaveInnerValley, ridgeZ, [sx * 0.65, 1, 0], uvSlopeX);
+
+      // Outer exposed eave vertical fascias
+      const bOC = [xOut, yBase, zOut];
+      const bOX = [xIn, yBase, zOut];
+      const bOZ = [xOut, yBase, zIn];
+      pushQuadOriented(positions, uvs, bOX, bOC, eaveOuterCorner, eaveOuterX, [0, 0, -sz], uvSideZ);
+      pushQuadOriented(positions, uvs, bOC, bOZ, eaveOuterZ, eaveOuterCorner, [-sx, 0, 0], uvSideX);
+
+      // Underside sealing plate
+      pushQuadOriented(
+        positions,
+        uvs,
+        [Math.min(xOut, xIn), yBase, Math.min(zOut, zIn)],
+        [Math.max(xOut, xIn), yBase, Math.min(zOut, zIn)],
+        [Math.max(xOut, xIn), yBase, Math.max(zOut, zIn)],
+        [Math.min(xOut, xIn), yBase, Math.max(zOut, zIn)],
+        [0, -1, 0],
+        uvFlat
+      );
+
+      // Continuous L-shaped Apex Ridge Beam (Faîtage) + Diagonal Hip Ridge Cap
+      const rY0 = yPeak - 0.02;
+      const rY1 = yPeak + ridgeHeight;
+      const rx0 = Math.min(0, xIn);
+      const rx1 = Math.max(0, xIn);
+      const rz0 = Math.min(0, zIn);
+      const rz1 = Math.max(0, zIn);
+      // X-wing ridge cap
+      pushQuadOriented(positions, uvs, [rx0, rY1, ridgeHalfW], [rx1, rY1, ridgeHalfW], [rx1, rY1, -ridgeHalfW], [rx0, rY1, -ridgeHalfW], [0, 1, 0], uvFlat);
+      pushQuadOriented(positions, uvs, [rx0, rY0, ridgeHalfW], [rx1, rY0, ridgeHalfW], [rx1, rY1, ridgeHalfW], [rx0, rY1, ridgeHalfW], [0, 0, 1], uvSideZ);
+      pushQuadOriented(positions, uvs, [rx1, rY0, -ridgeHalfW], [rx0, rY0, -ridgeHalfW], [rx0, rY1, -ridgeHalfW], [rx1, rY1, -ridgeHalfW], [0, 0, -1], uvSideZ);
+      // Z-wing ridge cap
+      pushQuadOriented(positions, uvs, [-ridgeHalfW, rY1, rz1], [ridgeHalfW, rY1, rz1], [ridgeHalfW, rY1, rz0], [-ridgeHalfW, rY1, rz0], [0, 1, 0], uvFlat);
+      pushQuadOriented(positions, uvs, [ridgeHalfW, rY0, rz1], [ridgeHalfW, rY0, rz0], [ridgeHalfW, rY1, rz0], [ridgeHalfW, rY1, rz1], [1, 0, 0], uvSideX);
+      pushQuadOriented(positions, uvs, [-ridgeHalfW, rY0, rz0], [-ridgeHalfW, rY0, rz1], [-ridgeHalfW, rY1, rz1], [-ridgeHalfW, rY1, rz0], [-1, 0, 0], uvSideX);
+      // Hip apex cap pyramidion connecting both ridges seamlessly
+      pushQuadOriented(positions, uvs, [-ridgeHalfW, rY1 + 0.005, ridgeHalfW], [ridgeHalfW, rY1 + 0.005, ridgeHalfW], [ridgeHalfW, rY1 + 0.005, -ridgeHalfW], [-ridgeHalfW, rY1 + 0.005, -ridgeHalfW], [0, 1, 0], uvFlat);
+    } else {
+      // Straight Gable Wing (either along X-axis or along Z-axis)
+      const ridgeAlongZ = hasZ && !hasX ? true : hasX && !hasZ ? false : defaultAxis === 'z';
+
+      if (!ridgeAlongZ) {
+        // Ridge runs along X, pitched slopes descend toward -Z and +Z
+        const eZ0 = -hz - eaveOverhang;
+        const eZ1 = hz + eaveOverhang;
+
+        // South (+Z) roof slope
+        pushQuadOriented(positions, uvs, [xMin, yEave, eZ1], [xMax, yEave, eZ1], [xMax, yPeak, 0], [xMin, yPeak, 0], [0, 1, 0.7], uvSlopeZ);
+        // North (-Z) roof slope
+        pushQuadOriented(positions, uvs, [xMax, yEave, eZ0], [xMin, yEave, eZ0], [xMin, yPeak, 0], [xMax, yPeak, 0], [0, 1, -0.7], uvSlopeZ);
+        // Exposed eave fascias (+Z & -Z)
+        pushQuadOriented(positions, uvs, [xMin, yBase, eZ1], [xMax, yBase, eZ1], [xMax, yEave, eZ1], [xMin, yEave, eZ1], [0, 0, 1], uvSideZ);
+        pushQuadOriented(positions, uvs, [xMax, yBase, eZ0], [xMin, yBase, eZ0], [xMin, yEave, eZ0], [xMax, yEave, eZ0], [0, 0, -1], uvSideZ);
+        // Bottom plate
+        pushQuadOriented(positions, uvs, [xMin, yBase, eZ0], [xMax, yBase, eZ0], [xMax, yBase, eZ1], [xMin, yBase, eZ1], [0, -1, 0], uvFlat);
+
+        // Gable end triangles ONLY on exposed ends (culled when adjacent roof neighbor exists!)
+        if (!hasNX) {
+          pushQuadOriented(positions, uvs, [xMin, yBase, eZ0], [xMin, yBase, eZ1], [xMin, yEave, eZ1], [xMin, yEave, eZ0], [-1, 0, 0], uvSideX);
+          pushTriOriented(positions, uvs, [xMin, yEave, eZ0], [xMin, yEave, eZ1], [xMin, yPeak, 0], [-1, 0, 0], uvSideX);
+        }
+        if (!hasPX) {
+          pushQuadOriented(positions, uvs, [xMax, yBase, eZ1], [xMax, yBase, eZ0], [xMax, yEave, eZ0], [xMax, yEave, eZ1], [1, 0, 0], uvSideX);
+          pushTriOriented(positions, uvs, [xMax, yEave, eZ1], [xMax, yEave, eZ0], [xMax, yPeak, 0], [1, 0, 0], uvSideX);
+        }
+
+        // Continuous Apex Ridge Beam (Faîtage) running along X
+        const rY0 = yPeak - 0.02;
+        const rY1 = yPeak + ridgeHeight;
+        pushQuadOriented(positions, uvs, [xMin, rY1, ridgeHalfW], [xMax, rY1, ridgeHalfW], [xMax, rY1, -ridgeHalfW], [xMin, rY1, -ridgeHalfW], [0, 1, 0], uvFlat);
+        pushQuadOriented(positions, uvs, [xMin, rY0, ridgeHalfW], [xMax, rY0, ridgeHalfW], [xMax, rY1, ridgeHalfW], [xMin, rY1, ridgeHalfW], [0, 0, 1], uvSideZ);
+        pushQuadOriented(positions, uvs, [xMax, rY0, -ridgeHalfW], [xMin, rY0, -ridgeHalfW], [xMin, rY1, -ridgeHalfW], [xMax, rY1, -ridgeHalfW], [0, 0, -1], uvSideZ);
+      } else {
+        // Ridge runs along Z, pitched slopes descend toward -X and +X
+        const eX0 = -hx - eaveOverhang;
+        const eX1 = hx + eaveOverhang;
+
+        // East (+X) roof slope
+        pushQuadOriented(positions, uvs, [eX1, yEave, zMax], [eX1, yEave, zMin], [0, yPeak, zMin], [0, yPeak, zMax], [0.7, 1, 0], uvSlopeX);
+        // West (-X) roof slope
+        pushQuadOriented(positions, uvs, [eX0, yEave, zMin], [eX0, yEave, zMax], [0, yPeak, zMax], [0, yPeak, zMin], [-0.7, 1, 0], uvSlopeX);
+        // Exposed eave fascias (+X & -X)
+        pushQuadOriented(positions, uvs, [eX1, yBase, zMax], [eX1, yBase, zMin], [eX1, yEave, zMin], [eX1, yEave, zMax], [1, 0, 0], uvSideX);
+        pushQuadOriented(positions, uvs, [eX0, yBase, zMin], [eX0, yBase, zMax], [eX0, yEave, zMax], [eX0, yEave, zMin], [-1, 0, 0], uvSideX);
+        // Bottom plate
+        pushQuadOriented(positions, uvs, [eX0, yBase, zMin], [eX1, yBase, zMin], [eX1, yBase, zMax], [eX0, yBase, zMax], [0, -1, 0], uvFlat);
+
+        // Gable end triangles ONLY on exposed ends (culled when adjacent roof neighbor exists!)
+        if (!hasNZ) {
+          pushQuadOriented(positions, uvs, [eX1, yBase, zMin], [eX0, yBase, zMin], [eX0, yEave, zMin], [eX1, yEave, zMin], [0, 0, -1], uvSideZ);
+          pushTriOriented(positions, uvs, [eX1, yEave, zMin], [eX0, yEave, zMin], [0, yPeak, zMin], [0, 0, -1], uvSideZ);
+        }
+        if (!hasPZ) {
+          pushQuadOriented(positions, uvs, [eX0, yBase, zMax], [eX1, yBase, zMax], [eX1, yEave, zMax], [eX0, yEave, zMax], [0, 0, 1], uvSideZ);
+          pushTriOriented(positions, uvs, [eX0, yEave, zMax], [eX1, yEave, zMax], [0, yPeak, zMax], [0, 0, 1], uvSideZ);
+        }
+
+        // Continuous Apex Ridge Beam (Faîtage) running along Z
+        const rY0 = yPeak - 0.02;
+        const rY1 = yPeak + ridgeHeight;
+        pushQuadOriented(positions, uvs, [-ridgeHalfW, rY1, zMax], [ridgeHalfW, rY1, zMax], [ridgeHalfW, rY1, zMin], [-ridgeHalfW, rY1, zMin], [0, 1, 0], uvFlat);
+        pushQuadOriented(positions, uvs, [ridgeHalfW, rY0, zMax], [ridgeHalfW, rY0, zMin], [ridgeHalfW, rY1, zMin], [ridgeHalfW, rY1, zMax], [1, 0, 0], uvSideX);
+        pushQuadOriented(positions, uvs, [-ridgeHalfW, rY0, zMin], [-ridgeHalfW, rY0, zMax], [-ridgeHalfW, rY1, zMax], [-ridgeHalfW, rY1, zMin], [-1, 0, 0], uvSideX);
+      }
+    }
+  }
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geo.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+  geo.computeVertexNormals();
+  return geo;
+}
+
+/**
+ * Builds a seamless neighbor-aware flat architectural roof slab (e.g., Level 7 Modern Villa),
+ * welding connected edges flush with zero internal coplanar faces and extending exposed eaves +0.02.
+ */
+export function createConnectedFlatRoofGeometry(
+  w = 0.96,
+  h = 0.28,
+  d = 0.96,
+  mask = 0,
+  eaveOverhang = 0.02
+) {
+  const hasPX = (mask & NEIGHBOR_PX) !== 0;
+  const hasNX = (mask & NEIGHBOR_NX) !== 0;
+  const hasPZ = (mask & NEIGHBOR_PZ) !== 0;
+  const hasNZ = (mask & NEIGHBOR_NZ) !== 0;
+
+  const hx = w * 0.5;
+  const hy = h * 0.5;
+  const hz = d * 0.5;
+  const uvScale = Math.max(w, d, 0.96);
+
+  const x0 = hasNX ? -hx : -hx - eaveOverhang;
+  const x1 = hasPX ? hx : hx + eaveOverhang;
+  const z0 = hasNZ ? -hz : -hz - eaveOverhang;
+  const z1 = hasPZ ? hz : hz + eaveOverhang;
+  const y0 = -hy + 0.002; // 2mm clearance above lower wall top eliminates coplanar z-fighting
+  const y1 = hy;
+
+  const positions = [];
+  const uvs = [];
+  const uvTop = (p) => [p[0] / uvScale + 0.5, p[2] / uvScale + 0.5];
+  const uvX = (p) => [p[2] / uvScale + 0.5, p[1] / uvScale + 0.5];
+  const uvZ = (p) => [p[0] / uvScale + 0.5, p[1] / uvScale + 0.5];
+
+  // Top & Bottom flat slab faces
+  pushQuadOriented(positions, uvs, [x0, y1, z1], [x1, y1, z1], [x1, y1, z0], [x0, y1, z0], [0, 1, 0], uvTop);
+  pushQuadOriented(positions, uvs, [x0, y0, z0], [x1, y0, z0], [x1, y0, z1], [x0, y0, z1], [0, -1, 0], uvTop);
+
+  // Outer perimeter fascia faces ONLY where exposed (internal touching faces culled!)
+  if (!hasPX) pushQuadOriented(positions, uvs, [x1, y0, z1], [x1, y0, z0], [x1, y1, z0], [x1, y1, z1], [1, 0, 0], uvX);
+  if (!hasNX) pushQuadOriented(positions, uvs, [x0, y0, z0], [x0, y0, z1], [x0, y1, z1], [x0, y1, z0], [-1, 0, 0], uvX);
+  if (!hasPZ) pushQuadOriented(positions, uvs, [x0, y0, z1], [x1, y0, z1], [x1, y1, z1], [x0, y1, z1], [0, 0, 1], uvZ);
+  if (!hasNZ) pushQuadOriented(positions, uvs, [x1, y0, z0], [x0, y0, z0], [x0, y1, z0], [x1, y1, z0], [0, 0, -1], uvZ);
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geo.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+  geo.computeVertexNormals();
+  return geo;
+}
+
+/**
+ * Per-level shared geometry cache for Connected Masonry & Connected Roof blocks.
  * Guarantees < 0.2 ms neighbor updates and clean GPU disposal on scene exit.
  */
 export class ConnectedMasonryCache {
@@ -939,10 +1337,33 @@ export class ConnectedMasonryCache {
   }
 
   getBlockGeometry(w, h, d, mask = 0, bevel = 0.044) {
-    const key = `${w.toFixed(3)}_${h.toFixed(3)}_${d.toFixed(3)}_${bevel.toFixed(3)}_${mask}`;
+    const key = `m_${w.toFixed(3)}_${h.toFixed(3)}_${d.toFixed(3)}_${bevel.toFixed(3)}_${mask}`;
     let geo = this.cache.get(key);
     if (!geo) {
       geo = createConnectedMasonryGeometry(w, h, d, mask, bevel);
+      this.cache.set(key, geo);
+    }
+    return geo;
+  }
+
+  getPitchedRoofGeometry(w, h, d, mask = 0, opts = {}) {
+    const style = opts.style || 'gable';
+    const axis = opts.defaultAxis || 'x';
+    const eave = opts.eaveOverhang ?? 0.02;
+    const key = `pr_${style}_${axis}_${w.toFixed(3)}_${h.toFixed(3)}_${d.toFixed(3)}_${eave.toFixed(3)}_${mask}`;
+    let geo = this.cache.get(key);
+    if (!geo) {
+      geo = createConnectedPitchedRoofGeometry(w, h, d, mask, opts);
+      this.cache.set(key, geo);
+    }
+    return geo;
+  }
+
+  getFlatRoofGeometry(w, h, d, mask = 0, eaveOverhang = 0.02) {
+    const key = `fr_${w.toFixed(3)}_${h.toFixed(3)}_${d.toFixed(3)}_${eaveOverhang.toFixed(3)}_${mask}`;
+    let geo = this.cache.get(key);
+    if (!geo) {
+      geo = createConnectedFlatRoofGeometry(w, h, d, mask, eaveOverhang);
       this.cache.set(key, geo);
     }
     return geo;

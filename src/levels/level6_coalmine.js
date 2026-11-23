@@ -832,8 +832,8 @@ export class Level6CoalMine extends Level1Pyramid {
       });
 
       // Add twin metallic steel rails along the track corridor
-      const span = Math.abs(sled.endVal - sled.startVal) + 2.4;
-      const midV = (sled.startVal + sled.endVal) * 0.5;
+      const span = Math.abs(sled.endPos - sled.startPos) + 2.4;
+      const midV = (sled.startPos + sled.endPos) * 0.5;
       const railGeo = this._trackGeo(
         isZ ? new THREE.BoxGeometry(0.075, 0.08, span) : new THREE.BoxGeometry(span, 0.08, 0.075)
       );
@@ -1256,8 +1256,7 @@ export class Level6CoalMine extends Level1Pyramid {
       slot &&
         slot.block &&
         slot.pieceType !== 'roof_zinc' &&
-        slot.pieceType !== 'pulley_wheel' &&
-        slot.pieceType !== 'headframe'
+        slot.pieceType !== 'pulley_wheel'
     );
   }
 
@@ -1314,13 +1313,13 @@ export class Level6CoalMine extends Level1Pyramid {
   }
 
   carveWorkbenchBlock(swipeVec) {
-    const handled = super.carveWorkbenchBlock(swipeVec);
+    const stillRaw = super.carveWorkbenchBlock(swipeVec);
     const block = this.workbenchSlot ? this.workbenchSlot.block : null;
-    if (handled && block && block.kind === 'carved') {
+    if (block && block.kind === 'carved' && !stillRaw) {
       const pieceType = this._pickNextCarvedPieceType();
       this._applyCoalMinePieceVisual(block, pieceType, false);
     }
-    return handled;
+    return stillRaw;
   }
 
   _clearCustomBlockAttachments(block) {
@@ -1379,36 +1378,135 @@ export class Level6CoalMine extends Level1Pyramid {
     block.mesh.material = this.coal.materials.concrete;
   }
 
+  _isRoofSlot(slot) {
+    return Boolean(slot && slot.block && slot.pieceType === 'roof_zinc');
+  }
+
+  _computeRoofNeighborMask(slot) {
+    if (!this._isRoofSlot(slot)) return 0;
+    const { gridX: gx, gridY: gy, gridZ: gz } = slot;
+    let mask = 0;
+    if (this._isRoofSlot(this.slotGridMap.get(`${gx + 1},${gy},${gz}`))) mask |= NEIGHBOR_PX;
+    if (this._isRoofSlot(this.slotGridMap.get(`${gx - 1},${gy},${gz}`))) mask |= NEIGHBOR_NX;
+    if (this._isRoofSlot(this.slotGridMap.get(`${gx},${gy},${gz + 1}`))) mask |= NEIGHBOR_PZ;
+    if (this._isRoofSlot(this.slotGridMap.get(`${gx},${gy},${gz - 1}`))) mask |= NEIGHBOR_NZ;
+    return mask;
+  }
+
+  _applyConnectedRoof(slot) {
+    if (!this._isRoofSlot(slot)) return;
+    const mask = this._computeRoofNeighborMask(slot);
+    slot.block.roofMask = mask;
+    slot.block.mesh.geometry = this.masonryCache.getPitchedRoofGeometry(
+      BLOCK_W,
+      BLOCK_H,
+      BLOCK_D,
+      mask,
+      { style: 'shed', eaveOverhang: 0.02 }
+    );
+  }
+
+  _applyHeadframeBracing(slot) {
+    if (!slot || !slot.block || slot.pieceType !== 'headframe') return;
+    const block = slot.block;
+    this._clearCustomBlockAttachments(block);
+
+    const { gridX: gx, gridY: gy, gridZ: gz } = slot;
+    const nPX = this.slotGridMap.get(`${gx + 1},${gy},${gz}`);
+    const nNX = this.slotGridMap.get(`${gx - 1},${gy},${gz}`);
+    const nPZ = this.slotGridMap.get(`${gx},${gy},${gz + 1}`);
+    const nNZ = this.slotGridMap.get(`${gx},${gy},${gz - 1}`);
+    const hasPX = Boolean(nPX && nPX.block);
+    const hasNX = Boolean(nNX && nNX.block);
+    const hasPZ = Boolean(nPZ && nPZ.block);
+    const hasNZ = Boolean(nNZ && nNZ.block);
+
+    const braceGroup = new THREE.Group();
+    if (!this.geos.headframeStrut) {
+      this.geos.headframeStrut = this._trackGeo(new THREE.BoxGeometry(0.085, BLOCK_H * 0.96, 0.085));
+    }
+    if (!this.geos.headframeDiag) {
+      this.geos.headframeDiag = this._trackGeo(new THREE.BoxGeometry(BLOCK_W * 0.84, 0.062, 0.022));
+    }
+
+    // Exposed outer corner iron flanges only (zero overlap inside welded ConnectedMasonry seams!)
+    const corners = [
+      [-0.43, -0.43, !hasNX && !hasNZ],
+      [0.43, -0.43, !hasPX && !hasNZ],
+      [-0.43, 0.43, !hasNX && !hasPZ],
+      [0.43, 0.43, !hasPX && !hasPZ],
+    ];
+    for (let i = 0; i < corners.length; i++) {
+      const [ox, oz, exposed] = corners[i];
+      if (!exposed) continue;
+      const post = new THREE.Mesh(this.geos.headframeStrut, this.coal.materials.rivetedIron);
+      post.position.set(ox, 0, oz);
+      post.castShadow = true;
+      braceGroup.add(post);
+    }
+
+    // Diagonal steel X-bracing ONLY on exposed ±Z outer faces, staggered cleanly proud (zero z-fighting!)
+    const exposedSigns = [];
+    if (!hasPZ) exposedSigns.push(1);
+    if (!hasNZ) exposedSigns.push(-1);
+    for (let i = 0; i < exposedSigns.length; i++) {
+      const sign = exposedSigns[i];
+      const d1 = new THREE.Mesh(this.geos.headframeDiag, this.coal.materials.pulleySteel);
+      d1.position.set(0, 0, sign * 0.491);
+      d1.rotation.z = 0.46;
+      braceGroup.add(d1);
+
+      const d2 = new THREE.Mesh(this.geos.headframeDiag, this.coal.materials.pulleySteel);
+      d2.position.set(0, 0, sign * 0.503);
+      d2.rotation.z = -0.46;
+      braceGroup.add(d2);
+    }
+
+    block.mesh.add(braceGroup);
+    block.customAttach = braceGroup;
+  }
+
+  _updateConnectedRoofAround(slot) {
+    if (!slot) return;
+    const { gridX: gx, gridY: gy, gridZ: gz } = slot;
+    const candidates = [
+      slot,
+      this.slotGridMap.get(`${gx + 1},${gy},${gz}`),
+      this.slotGridMap.get(`${gx - 1},${gy},${gz}`),
+      this.slotGridMap.get(`${gx},${gy},${gz + 1}`),
+      this.slotGridMap.get(`${gx},${gy},${gz - 1}`),
+    ];
+    for (let i = 0; i < candidates.length; i++) {
+      const c = candidates[i];
+      if (!c || !c.block) continue;
+      if (c.pieceType === 'roof_zinc') {
+        this._applyConnectedRoof(c);
+      } else if (c.pieceType === 'headframe') {
+        this._applyHeadframeBracing(c);
+      }
+    }
+  }
+
   /**
-   * Adds open riveted cast-iron cross-truss ribs & corner flanges to placed Headframe blocks
-   * so the Chevalement reads unmistakably as an industrial lattice steel tower!
+   * Adds exposed-face riveted cast-iron cross-truss ribs & corner flanges to placed Headframe blocks.
    */
   _attachHeadframeLatticeBracing(block) {
+    if (block && block.slot) {
+      this._applyHeadframeBracing(block.slot);
+      return;
+    }
     const braceGroup = new THREE.Group();
-    const strutGeo = this._trackGeo(new THREE.BoxGeometry(0.11, BLOCK_H * 1.18, 0.11));
-    [-0.38, 0.38].forEach((ox) => {
-      [-0.38, 0.38].forEach((oz) => {
-        const post = new THREE.Mesh(strutGeo, this.coal.materials.rivetedIron);
+    if (!this.geos.headframeStrut) {
+      this.geos.headframeStrut = this._trackGeo(new THREE.BoxGeometry(0.09, BLOCK_H * 0.98, 0.09));
+    }
+    [-0.42, 0.42].forEach((ox) => {
+      [-0.42, 0.42].forEach((oz) => {
+        const post = new THREE.Mesh(this.geos.headframeStrut, this.coal.materials.rivetedIron);
         post.position.set(ox, 0, oz);
         post.castShadow = true;
         braceGroup.add(post);
       });
     });
-
-    // Diagonal steel X-bracing flanges on front/back faces
-    const diagGeo = this._trackGeo(new THREE.BoxGeometry(BLOCK_W * 1.05, 0.08, 0.07));
-    [-0.46, 0.46].forEach((fz) => {
-      const d1 = new THREE.Mesh(diagGeo, this.coal.materials.pulleySteel);
-      d1.position.set(0, 0, fz);
-      d1.rotation.z = 0.56;
-      braceGroup.add(d1);
-
-      const d2 = new THREE.Mesh(diagGeo, this.coal.materials.pulleySteel);
-      d2.position.set(0, 0, fz);
-      d2.rotation.z = -0.56;
-      braceGroup.add(d2);
-    });
-
     block.mesh.add(braceGroup);
     block.customAttach = braceGroup;
   }

@@ -221,7 +221,7 @@ function getSoftParticleTexture() {
   g.addColorStop(1.0, 'rgba(255,255,255,0.0)');
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, size, size);
-  _softParticleTex = applyCrispTextureSettings(new THREE.CanvasTexture(c), { isColor: true });
+  _softParticleTex = applyCrispTextureSettings(new THREE.CanvasTexture(c), { isColor: true, wrap: false });
   return _softParticleTex;
 }
 

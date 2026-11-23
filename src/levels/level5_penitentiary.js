@@ -1551,6 +1551,52 @@ export class Level5Penitentiary extends Level1Pyramid {
     return mask;
   }
 
+  _isRoofSlot(slot) {
+    return Boolean(slot && slot.block && slot.pieceType === 'slate_roof');
+  }
+
+  _computeRoofNeighborMask(slot) {
+    if (!this._isRoofSlot(slot)) return 0;
+    const { gridX: gx, layer, gridZ: gz } = slot;
+    let mask = 0;
+    if (this._isRoofSlot(this._getGridSlot(gx + 1, layer, gz))) mask |= NEIGHBOR_PX;
+    if (this._isRoofSlot(this._getGridSlot(gx - 1, layer, gz))) mask |= NEIGHBOR_NX;
+    if (this._isRoofSlot(this._getGridSlot(gx, layer, gz + 1))) mask |= NEIGHBOR_PZ;
+    if (this._isRoofSlot(this._getGridSlot(gx, layer, gz - 1))) mask |= NEIGHBOR_NZ;
+    return mask;
+  }
+
+  _applyConnectedRoof(slot) {
+    if (!this._isRoofSlot(slot)) return;
+    const mask = this._computeRoofNeighborMask(slot);
+    const defaultAxis = slot.gridZ === -2 ? 'x' : 'z';
+    slot.block.roofMask = mask;
+    slot.block.mesh.rotation.set(0, 0, 0);
+    slot.block.mesh.geometry = this.masonryCache.getPitchedRoofGeometry(
+      BLOCK_W,
+      BLOCK_H,
+      BLOCK_D,
+      mask,
+      { style: 'gable', defaultAxis, eaveOverhang: 0.02 }
+    );
+  }
+
+  _updateConnectedRoofAround(slot) {
+    if (!slot || slot.gridX === undefined || slot.gridZ === undefined) return;
+    if (slot.pieceType !== 'slate_roof') return;
+    const { gridX: gx, layer, gridZ: gz } = slot;
+    const candidates = [
+      slot,
+      this._getGridSlot(gx + 1, layer, gz),
+      this._getGridSlot(gx - 1, layer, gz),
+      this._getGridSlot(gx, layer, gz + 1),
+      this._getGridSlot(gx, layer, gz - 1),
+    ];
+    for (let i = 0; i < candidates.length; i++) {
+      if (candidates[i]) this._applyConnectedRoof(candidates[i]);
+    }
+  }
+
   _onConnectedMasonryUpdated(_slot) {
     // Stage 2 done -> reveal granite buttresses (contreforts) & wrought-iron sallyport gate
     const stage2Done = this.pyramidSlots

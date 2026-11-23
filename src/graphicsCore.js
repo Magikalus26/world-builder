@@ -14,11 +14,11 @@
 
 import * as THREE from 'three';
 
-let _globalMaxAnisotropy = 8;
+let _globalMaxAnisotropy = 4;
 
 export function setGlobalMaxAnisotropy(val) {
   if (typeof val === 'number' && Number.isFinite(val) && val >= 1) {
-    _globalMaxAnisotropy = val;
+    _globalMaxAnisotropy = Math.min(4, Math.floor(val));
   }
 }
 
@@ -28,16 +28,19 @@ export function getGlobalMaxAnisotropy() {
 
 /**
  * Global crisp texture utility called automatically on EVERY created texture across the project.
- * Enforces max hardware anisotropy, trilinear mipmap filtering, and crisp magnification.
+ * Enforces anisotropy <= 4 (optimal for iPhone 16e Safari 60 FPS), trilinear mipmap filtering,
+ * RepeatWrapping, and sRGB color space for Albedo maps.
  */
 export function applyCrispTextureSettings(
   texture,
-  { isColor = true, repeat = null, wrap = false, anisotropy = null } = {}
+  { isColor = true, repeat = null, wrap = true, anisotropy = null } = {}
 ) {
   if (!texture) return texture;
 
   texture.anisotropy =
-    typeof anisotropy === 'number' && anisotropy >= 1 ? anisotropy : _globalMaxAnisotropy;
+    typeof anisotropy === 'number' && anisotropy >= 1
+      ? Math.min(4, anisotropy)
+      : _globalMaxAnisotropy;
   texture.minFilter = THREE.LinearMipmapLinearFilter;
   texture.magFilter = THREE.LinearFilter;
   texture.generateMipmaps = true;
@@ -86,10 +89,10 @@ export function createUnifiedRenderer(
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   }
 
-  // Register hardware max anisotropy globally for all textures created afterward
+  // Register hardware anisotropy capped at 4 globally for crisp iPhone 16e Safari 60 FPS
   const hwAniso = renderer.capabilities && typeof renderer.capabilities.getMaxAnisotropy === 'function'
-    ? renderer.capabilities.getMaxAnisotropy()
-    : 8;
+    ? Math.min(4, renderer.capabilities.getMaxAnisotropy())
+    : 4;
   setGlobalMaxAnisotropy(hwAniso);
 
   return renderer;

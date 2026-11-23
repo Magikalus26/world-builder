@@ -1309,13 +1309,13 @@ export class Level7Modern extends Level1Pyramid {
   }
 
   carveWorkbenchBlock(swipeVec) {
-    const handled = super.carveWorkbenchBlock(swipeVec);
+    const stillRaw = super.carveWorkbenchBlock(swipeVec);
     const block = this.workbenchSlot ? this.workbenchSlot.block : null;
-    if (handled && block && block.kind === 'carved') {
+    if (block && block.kind === 'carved' && !stillRaw) {
       const pieceType = this._pickNextCarvedPieceType();
       this._applyModernPieceVisual(block, pieceType, false);
     }
-    return handled;
+    return stillRaw;
   }
 
   _clearCustomBlockAttachments(block) {
@@ -1365,10 +1365,115 @@ export class Level7Modern extends Level1Pyramid {
     block.mesh.material = this.modern.materials.whiteConcrete;
   }
 
+  _isRoofSlot(slot) {
+    return Boolean(
+      slot && slot.block && (slot.pieceType === 'roof_slab' || slot.pieceType === 'roof_pergola')
+    );
+  }
+
+  _computeRoofNeighborMask(slot) {
+    if (!this._isRoofSlot(slot)) return 0;
+    const { gridX: gx, gridY: gy, gridZ: gz } = slot;
+    let mask = 0;
+    if (this._isRoofSlot(this.slotGridMap.get(`${gx + 1},${gy},${gz}`))) mask |= NEIGHBOR_PX;
+    if (this._isRoofSlot(this.slotGridMap.get(`${gx - 1},${gy},${gz}`))) mask |= NEIGHBOR_NX;
+    if (this._isRoofSlot(this.slotGridMap.get(`${gx},${gy},${gz + 1}`))) mask |= NEIGHBOR_PZ;
+    if (this._isRoofSlot(this.slotGridMap.get(`${gx},${gy},${gz - 1}`))) mask |= NEIGHBOR_NZ;
+    return mask;
+  }
+
+  _applyConnectedRoof(slot) {
+    if (!this._isRoofSlot(slot)) return;
+    const mask = this._computeRoofNeighborMask(slot);
+    const block = slot.block;
+    block.roofMask = mask;
+    block.mesh.geometry = this.masonryCache.getFlatRoofGeometry(
+      BLOCK_W,
+      BLOCK_H * 0.44,
+      BLOCK_D,
+      mask,
+      0.02
+    );
+
+    // Rebuild exposed-edge-only dark anodized aluminum fascia parapet (zero overlap between adjacent roof slabs!)
+    this._clearCustomBlockAttachments(block);
+    const group = new THREE.Group();
+    const hasPX = (mask & NEIGHBOR_PX) !== 0;
+    const hasNX = (mask & NEIGHBOR_NX) !== 0;
+    const hasPZ = (mask & NEIGHBOR_PZ) !== 0;
+    const hasNZ = (mask & NEIGHBOR_NZ) !== 0;
+
+    const eave = 0.02;
+    const hx = BLOCK_W * 0.5;
+    const hz = BLOCK_D * 0.5;
+    const x0 = hasNX ? -hx : -hx - eave;
+    const x1 = hasPX ? hx : hx + eave;
+    const z0 = hasNZ ? -hz : -hz - eave;
+    const z1 = hasPZ ? hz : hz + eave;
+    const spanX = x1 - x0;
+    const spanZ = z1 - z0;
+    const midX = (x0 + x1) * 0.5;
+    const midZ = (z0 + z1) * 0.5;
+    const fasciaY = BLOCK_H * 0.22 - 0.03; // Crisp upper edge lip, proud by +0.004
+
+    if (!hasPZ) {
+      const m = new THREE.Mesh(this.geos.unitBox, this.modern.materials.darkAluminum);
+      m.scale.set(spanX + 0.008, 0.085, 0.035);
+      m.position.set(midX, fasciaY, z1 + 0.004);
+      group.add(m);
+    }
+    if (!hasNZ) {
+      const m = new THREE.Mesh(this.geos.unitBox, this.modern.materials.darkAluminum);
+      m.scale.set(spanX + 0.008, 0.085, 0.035);
+      m.position.set(midX, fasciaY, z0 - 0.004);
+      group.add(m);
+    }
+    if (!hasPX) {
+      const m = new THREE.Mesh(this.geos.unitBox, this.modern.materials.darkAluminum);
+      m.scale.set(0.035, 0.083, spanZ + 0.004);
+      m.position.set(x1 + 0.004, fasciaY, midZ);
+      group.add(m);
+    }
+    if (!hasNX) {
+      const m = new THREE.Mesh(this.geos.unitBox, this.modern.materials.darkAluminum);
+      m.scale.set(0.035, 0.083, spanZ + 0.004);
+      m.position.set(x0 - 0.004, fasciaY, midZ);
+      group.add(m);
+    }
+
+    if (slot.pieceType === 'roof_pergola') {
+      for (let i = -2; i <= 2; i++) {
+        const slat = new THREE.Mesh(this.geos.louverSlat, this.modern.materials.darkAluminum);
+        slat.position.set(0, 0.168, i * 0.19);
+        slat.castShadow = true;
+        group.add(slat);
+      }
+    }
+
+    block.mesh.add(group);
+    block.customAttach = group;
+  }
+
+  _updateConnectedRoofAround(slot) {
+    if (!slot || (slot.pieceType !== 'roof_slab' && slot.pieceType !== 'roof_pergola')) return;
+    const { gridX: gx, gridY: gy, gridZ: gz } = slot;
+    const candidates = [
+      slot,
+      this.slotGridMap.get(`${gx + 1},${gy},${gz}`),
+      this.slotGridMap.get(`${gx - 1},${gy},${gz}`),
+      this.slotGridMap.get(`${gx},${gy},${gz + 1}`),
+      this.slotGridMap.get(`${gx},${gy},${gz - 1}`),
+    ];
+    for (let i = 0; i < candidates.length; i++) {
+      if (candidates[i]) this._applyConnectedRoof(candidates[i]);
+    }
+  }
+
   _attachAluminumMullions(block) {
     const group = new THREE.Group();
-    const halfW = BLOCK_W * 0.485;
-    const halfD = BLOCK_D * 0.485;
+    // Inset slightly inside outer glass silhouette so adjacent blocks never have overlapping coplanar mullion faces
+    const halfW = BLOCK_W * 0.472;
+    const halfD = BLOCK_D * 0.472;
     [
       [-halfW, -halfD],
       [halfW, -halfD],
@@ -1393,13 +1498,9 @@ export class Level7Modern extends Level1Pyramid {
 
   _attachPergolaLouvers(block) {
     const group = new THREE.Group();
-    const trim = new THREE.Mesh(this.geos.fasciaTrim, this.modern.materials.darkAluminum);
-    trim.position.y = 0.08;
-    group.add(trim);
-
     for (let i = -2; i <= 2; i++) {
       const slat = new THREE.Mesh(this.geos.louverSlat, this.modern.materials.darkAluminum);
-      slat.position.set(0, 0.165, i * 0.19);
+      slat.position.set(0, 0.168, i * 0.19);
       slat.castShadow = true;
       group.add(slat);
     }

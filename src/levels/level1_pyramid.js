@@ -1962,11 +1962,13 @@ export class Level1Pyramid {
 
     if (stage === 1) {
       block.mesh.geometry = this.geos.stage1Block;
-      block.mesh.material = this.textures.materials.carvingStage1;
+      block.mesh.material = this._getCarvingStageMaterial(1);
+      block.mesh.userData.state = 'carving_stage1';
       this._triggerSquashBounce(block.mesh, 1.16, 0.82);
     } else if (stage === 2) {
       block.mesh.geometry = this.geos.stage2Block;
-      block.mesh.material = this.textures.materials.carvingStage2;
+      block.mesh.material = this._getCarvingStageMaterial(2);
+      block.mesh.userData.state = 'carving_stage2';
       this._triggerSquashBounce(block.mesh, 1.14, 0.85);
     } else if (stage >= 3) {
       const makeCapstone = this._shouldForgeCapstone();
@@ -2399,6 +2401,14 @@ export class Level1Pyramid {
     // Subclass hook (e.g. Level2Rome continuous cornice & roof bonding updates)
   }
 
+  _updateConnectedRoofAround(_slot) {
+    // Subclass hook for seamless neighbor-aware roof slope, ridge & parapet merging
+  }
+
+  _getCarvingStageMaterial(stage) {
+    return stage === 1 ? this.textures.materials.carvingStage1 : this.textures.materials.carvingStage2;
+  }
+
   _updateConnectedMasonryAround(slot) {
     if (!slot || slot.gridX === undefined || slot.gridZ === undefined) return;
     const { gridX: gx, layer, gridZ: gz } = slot;
@@ -2427,6 +2437,7 @@ export class Level1Pyramid {
 
     // Automatically bond this block flush into all occupied horizontal & vertical neighbors
     this._updateConnectedMasonryAround(slot);
+    this._updateConnectedRoofAround(slot);
 
     this._spawnParticles(slot.position, {
       count: slot.isCapstone ? 28 : 12,
