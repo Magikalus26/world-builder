@@ -603,6 +603,106 @@ export const ROGUELIKE_THEMES = [
       },
     ],
   },
+  {
+    id: 'modern',
+    levelNum: 7,
+    shortName: 'Ère Moderne',
+    title: 'Niveau 7 : Ère Moderne — Villa & Architecture',
+    biomeLabel: 'Béton Blanc, Brique Moderne & Baies Vitrées',
+    skyColor: '#dfeef7',
+    terrainTint: '#c8dfba',
+    stoneTint: '#f2f0eb',
+    accentColor: '#48b8d6',
+    rewardRangeLabel: '+30 à +55 Éclats',
+    structures: [
+      {
+        id: 'modern_villa_cantilever',
+        name: 'La Villa Cubique en Porte-à-Faux',
+        subtitle: 'Volume suspendu en béton blanc & baies panoramiques',
+        // 16 + 10 + 6 + 2 = 34 blocks
+        layers: [
+          { cells: makeRectCells(4, 4) },
+          {
+            cells: [
+              [-1.5, -1.5], [-0.5, -1.5], [0.5, -1.5], [1.5, -1.5],
+              [-1.5, 1.5], [-0.5, 1.5], [0.5, 1.5], [1.5, 1.5],
+              [-1.5, -0.5], [1.5, 0.5],
+            ],
+          },
+          { cells: makeRectCells(3, 2) },
+          { cells: [[-0.5, 0], [0.5, 0]] },
+        ],
+      },
+      {
+        id: 'modern_glass_brick_pavilion',
+        name: 'Le Pavillon de Verre & Brique',
+        subtitle: 'Façade en briques modernes & verrière contemporaine',
+        // 12 + 8 + 6 + 2 = 28 blocks
+        layers: [
+          { cells: makeRectCells(4, 3) },
+          {
+            cells: [
+              [-1.5, -1], [-0.5, -1], [0.5, -1], [1.5, -1],
+              [-1.5, 1], [-0.5, 1], [0.5, 1], [1.5, 1],
+            ],
+          },
+          { cells: makeRectCells(3, 2) },
+          { cells: [[-0.5, 0], [0.5, 0]] },
+        ],
+      },
+      {
+        id: 'modern_art_gallery',
+        name: "La Galerie d'Art Contemporain",
+        subtitle: 'Halle en béton blanc étagé & verrière zénithale',
+        // 14 + 10 + 6 + 2 = 32 blocks
+        layers: [
+          { cells: makeRectCells(5, 3).filter(([x, z]) => !(x === 0 && z === 0)) },
+          {
+            cells: [
+              [-2, -1], [-1, -1], [0, -1], [1, -1], [2, -1],
+              [-2, 1], [-1, 1], [0, 1], [1, 1], [2, 1],
+            ],
+          },
+          {
+            cells: [
+              [-1.5, -0.5], [-0.5, -0.5], [0.5, -0.5], [1.5, -0.5],
+              [-0.5, 0.5], [0.5, 0.5],
+            ],
+          },
+          { cells: [[-0.5, 0], [0.5, 0]] },
+        ],
+      },
+      {
+        id: 'modern_industrial_loft',
+        name: 'Le Loft Industriel Réhabilité',
+        subtitle: 'Briques rouges & grandes verrières à cadres noirs',
+        // 12 + 10 + 6 + 2 = 30 blocks
+        layers: [
+          { cells: makeRectCells(4, 3) },
+          {
+            cells: [
+              ...makeRectCells(4, 2),
+              [-1.5, 1.5], [1.5, 1.5],
+            ],
+          },
+          { cells: makeRectCells(3, 2) },
+          { cells: [[-0.5, 0], [0.5, 0]] },
+        ],
+      },
+      {
+        id: 'modern_beach_house',
+        name: 'La Maison de Plage à Terrasse Panoramique',
+        subtitle: 'Résidence côtière en béton blanc & terrasse ouverte',
+        // 12 + 8 + 4 + 2 = 26 blocks
+        layers: [
+          { cells: makeRectCells(4, 3) },
+          { cells: makeRectCells(4, 2) },
+          { cells: makeRectCells(2, 2) },
+          { cells: [[-0.5, 0], [0.5, 0]] },
+        ],
+      },
+    ],
+  },
 ];
 
 /** 4 randomized gameplay run modifiers */

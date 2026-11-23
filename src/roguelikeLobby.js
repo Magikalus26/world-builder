@@ -296,6 +296,77 @@ function buildMiniatureIsland(themeId) {
     return root;
   }
 
+  if (themeId === 'modern') {
+    const lawnMat = new THREE.MeshStandardMaterial({ color: '#64a34a', roughness: 0.88 });
+    const concreteMat = new THREE.MeshStandardMaterial({ color: '#f2f0ea', roughness: 0.48 });
+    const brickMat = new THREE.MeshStandardMaterial({ color: '#a84e36', roughness: 0.8 });
+    const glassMat = new THREE.MeshStandardMaterial({
+      color: '#7cd8f0',
+      roughness: 0.14,
+      metalness: 0.22,
+      transparent: true,
+      opacity: 0.86,
+    });
+    const frameMat = new THREE.MeshStandardMaterial({ color: '#242930', roughness: 0.36, metalness: 0.82 });
+    const poolMat = new THREE.MeshStandardMaterial({ color: '#26c4d8', roughness: 0.12, metalness: 0.1 });
+    const cyMat = new THREE.MeshStandardMaterial({ color: '#376c3f', roughness: 0.84 });
+
+    const island = new THREE.Mesh(new THREE.CylinderGeometry(0.98, 1.14, 0.28, 18), lawnMat);
+    island.position.y = 0.12;
+    island.receiveShadow = true;
+    root.add(island);
+
+    // Sleek turquoise infinity pool + white coping
+    const pool = new THREE.Mesh(new THREE.BoxGeometry(0.56, 0.07, 0.42), poolMat);
+    pool.position.set(0.38, 0.27, -0.34);
+    root.add(pool);
+
+    // Tier 1 white-concrete foundation terrace
+    const base = new THREE.Mesh(new THREE.BoxGeometry(0.96, 0.12, 0.78), concreteMat);
+    base.position.set(-0.08, 0.31, 0.14);
+    base.castShadow = true;
+    root.add(base);
+
+    // Tier 2 modern brick wing + panoramic glass living bay
+    const brickWing = new THREE.Mesh(new THREE.BoxGeometry(0.36, 0.28, 0.62), brickMat);
+    brickWing.position.set(-0.34, 0.51, 0.12);
+    brickWing.castShadow = true;
+    root.add(brickWing);
+
+    const glassBay = new THREE.Mesh(new THREE.BoxGeometry(0.48, 0.26, 0.56), glassMat);
+    glassBay.position.set(0.08, 0.5, 0.12);
+    root.add(glassBay);
+
+    // Tier 3 cantilevered white-concrete upper volume (porte-à-faux)
+    const upper = new THREE.Mesh(new THREE.BoxGeometry(0.76, 0.26, 0.58), concreteMat);
+    upper.position.set(-0.04, 0.77, 0.08);
+    upper.castShadow = true;
+    root.add(upper);
+
+    const upperGlass = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.18, 0.6), glassMat);
+    upperGlass.position.set(-0.02, 0.76, 0.08);
+    root.add(upperGlass);
+
+    // Flat roof overhang + dark aluminum pergola trim
+    const roof = new THREE.Mesh(new THREE.BoxGeometry(0.86, 0.06, 0.68), concreteMat);
+    roof.position.set(-0.04, 0.93, 0.08);
+    root.add(roof);
+
+    const trim = new THREE.Mesh(new THREE.BoxGeometry(0.88, 0.03, 0.7), frameMat);
+    trim.position.set(-0.04, 0.96, 0.08);
+    root.add(trim);
+
+    // Pair of sleek miniature cypress trees
+    [[-0.64, -0.34], [-0.46, -0.48]].forEach(([cx, cz]) => {
+      const cy = new THREE.Mesh(new THREE.ConeGeometry(0.1, 0.44, 7), cyMat);
+      cy.position.set(cx, 0.48, cz);
+      cy.castShadow = true;
+      root.add(cy);
+    });
+
+    return root;
+  }
+
   // 'china': Terraced Jade Mountain Island + 3-Roof Red & Gold Pagoda + Bamboo
   const jadeGrass = new THREE.MeshStandardMaterial({ color: '#7ea870', roughness: 0.84 });
   const rockMat = new THREE.MeshStandardMaterial({ color: '#9ea89e', roughness: 0.88 });

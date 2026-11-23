@@ -91,7 +91,19 @@ export const THEME_PALETTES = {
     metal: { base: '#2d333b', mortar: '#161a1f', roughness: 0.38, metalness: 0.86, pattern: 'metal' },
     accent: { base: '#d99838', mortar: '#7c5318', roughness: 0.34, metalness: 0.78, pattern: 'metal' },
   },
-  // Future biome presets ready for Levels 7–100!
+  modern: {
+    id: 'modern',
+    groundBase: '#6ea84d',
+    groundDetail: '#dfd9cf',
+    strataColors: ['#639b47', '#dfd8cc', '#b8684e', '#7f7265'],
+    stone: { base: '#f0eee9', mortar: '#c9c4ba', roughness: 0.48, metalness: 0.04, pattern: 'ashlar' },
+    brick: { base: '#a64d36', mortar: '#c6bfb4', roughness: 0.76, metalness: 0.04, pattern: 'brick' },
+    wood: { base: '#9e6d42', mortar: '#664324', roughness: 0.74, metalness: 0.04, pattern: 'wood' },
+    roof: { base: '#eceae4', mortar: '#32373d', roughness: 0.42, metalness: 0.08, pattern: 'ashlar' },
+    metal: { base: '#242930', mortar: '#111418', roughness: 0.34, metalness: 0.84, pattern: 'metal' },
+    accent: { base: '#6bc4dc', mortar: '#1f262d', roughness: 0.14, metalness: 0.22, pattern: 'ashlar' },
+  },
+  // Future biome presets ready for Levels 8–100!
   viking: {
     id: 'viking',
     groundBase: '#687e78',

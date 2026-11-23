@@ -968,6 +968,22 @@ export class Level1Pyramid {
       return;
     }
 
+    if (themeId === 'modern') {
+      const { tree, crown } = buildStylizedFrontierPine({
+        x,
+        z,
+        groundY,
+        scale: scale * 0.94,
+        seed: Math.abs(Math.round(x * 17 + z * 23)) + 13,
+        barkMat: this.textures.materials.palmTrunk,
+        foliageMat,
+        trackGeo: (g) => this._trackGeo(g),
+      });
+      this.palmFronds.push({ group: crown, phase: x * 0.65 + z * 0.35 });
+      parent.add(tree);
+      return;
+    }
+
     const group = new THREE.Group();
     group.position.set(x, groundY - 0.04, z);
     group.scale.setScalar(scale);

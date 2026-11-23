@@ -31,6 +31,7 @@ import { Level3Japan } from './levels/level3_japan.js';
 import { Level4Maya } from './levels/level4_maya.js';
 import { Level5Penitentiary } from './levels/level5_penitentiary.js';
 import { Level6CoalMine } from './levels/level6_coalmine.js';
+import { Level7Modern } from './levels/level7_modern.js';
 import { RoguelikeLevel, generateRoguelikeConfig } from './levels/roguelike_level.js';
 
 const LEVEL_REGISTRY = [
@@ -40,6 +41,7 @@ const LEVEL_REGISTRY = [
   Level4Maya,
   Level5Penitentiary,
   Level6CoalMine,
+  Level7Modern,
 ];
 
 class WorkdBuilderApp {

@@ -127,6 +127,25 @@ export const BIOME_ATMOSPHERES = {
     particleStyle: 'dust',
     particleCount: 40,
   },
+  modern: {
+    id: 'modern',
+    skyTop: '#56a2de',
+    skyHorizon: '#e4f2fb',
+    skyBottom: '#c5dfc4',
+    fogColor: '#dfeef7',
+    fogNear: 48,
+    fogFar: 102,
+    sunColor: '#fff6e0',
+    sunIntensity: 2.18,
+    hemiSky: '#f7fcff',
+    hemiGround: '#7ca362',
+    hemiIntensity: 0.94,
+    rimColor: '#98e2f8',
+    rimIntensity: 0.52,
+    particleColor: '#fff7d4',
+    particleStyle: 'dust',
+    particleCount: 36,
+  },
   worldmap: {
     id: 'worldmap',
     skyTop: '#67add6',
@@ -176,6 +195,7 @@ export function resolveBiomeConfig(levelIdOrTheme = 'egypt', overrides = null) {
     else if (s.includes('maya') || s.includes('kukul')) key = 'maya';
     else if (s.includes('penitentiary') || s.includes('prison') || s.includes('1800')) key = 'penitentiary';
     else if (s.includes('coal') || s.includes('mine') || s.includes('charbon')) key = 'coalmine';
+    else if (s.includes('modern') || s.includes('villa') || s.includes('contemp')) key = 'modern';
     else if (s.includes('worldmap')) key = 'worldmap';
     else if (s.includes('menu')) key = 'menu';
     else if (BIOME_ATMOSPHERES[s]) key = s;

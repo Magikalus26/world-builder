@@ -727,19 +727,20 @@ export class WorldMapScene {
    *    - Levels 10, 20, ..., 100: Grand 2.2x Village / City Milestone Islands
    * ========================================================================== */
   _buildAll100Nodes() {
-    // 1. Build the 6 full 3D Playable Hero Islands (Levels 1–6)
+    // 1. Build the 7 full 3D Playable Hero Islands (Levels 1–7)
     this._buildHeroEgyptIsland(this.levelCoords[0]);
     this._buildHeroRomeIsland(this.levelCoords[1]);
     this._buildHeroJapanIsland(this.levelCoords[2]);
     this._buildHeroMayaIsland(this.levelCoords[3]);
     this._buildHeroPenitentiaryIsland(this.levelCoords[4]);
     this._buildHeroCoalMineIsland(this.levelCoords[5]);
+    this._buildHeroModernVillaIsland(this.levelCoords[6]);
 
-    // 2. Collect regular "Bientôt" nodes (84) and Milestone Village/City nodes (10)
+    // 2. Collect regular "Bientôt" nodes (83) and Milestone Village/City nodes (10)
     const regularEntries = [];
     const milestoneEntries = [];
 
-    for (let i = 6; i < 100; i++) {
+    for (let i = 7; i < 100; i++) {
       const levelNum = i + 1;
       const chapterIdx = Math.floor(i / 10);
       const chapter = WORLD_CHAPTERS[chapterIdx];
@@ -1652,7 +1653,206 @@ export class WorldMapScene {
   }
 
   /**
-   * Builds all 86 regular "Bientôt" islands using shared InstancedMesh batches
+   * Level 7 — Modern Contemporary Era: "La Villa Moderne (Brique, Béton Blanc & Verre)"
+   * Miniature 3D manicured coastal lawn island with turquoise infinity swimming pool & teak deck,
+   * white-concrete cantilevered 2-story villa with modern red-brown brick wing, sky-tinted panoramic
+   * glass walls, flat pergola roof, and stylized Mediterranean cypresses.
+   */
+  _buildHeroModernVillaIsland(coord) {
+    const pos = new THREE.Vector3(coord.x, 0, coord.z);
+    const group = new THREE.Group();
+    group.position.copy(pos);
+    this.root.add(group);
+
+    this._addShoreFoamRing(group, 2.38, 2.18, 8.4);
+    this._addUnlockedGoldRing(group, 'level7_modern', 2.46, 2.26, 8.4);
+
+    const lawnMat = this._trackMat(
+      new THREE.MeshStandardMaterial({ color: '#65a24a', roughness: 0.88, metalness: 0.0 })
+    );
+    const whiteConcreteMat = this._trackMat(
+      new THREE.MeshStandardMaterial({ color: '#f2f0ea', roughness: 0.48, metalness: 0.04 })
+    );
+    const brickMat = this._trackMat(
+      new THREE.MeshStandardMaterial({ color: '#a84e36', roughness: 0.8, metalness: 0.04 })
+    );
+    const glassMat = this._trackMat(
+      new THREE.MeshStandardMaterial({
+        color: '#80dbf2',
+        roughness: 0.14,
+        metalness: 0.22,
+        transparent: true,
+        opacity: 0.86,
+      })
+    );
+    const darkAluMat = this._trackMat(
+      new THREE.MeshStandardMaterial({ color: '#242930', roughness: 0.36, metalness: 0.82 })
+    );
+    const poolWaterMat = this._trackMat(
+      new THREE.MeshStandardMaterial({ color: '#25c4d8', roughness: 0.12, metalness: 0.1 })
+    );
+    const teakMat = this._trackMat(
+      new THREE.MeshStandardMaterial({ color: '#ab7949', roughness: 0.76, metalness: 0.04 })
+    );
+
+    const island = new THREE.Mesh(
+      this._trackGeo(createIslandMoundGeometry(2.3, 2.1, 0.72, 11.3)),
+      lawnMat
+    );
+    island.castShadow = true;
+    island.receiveShadow = true;
+    group.add(island);
+
+    // Miniature turquoise Infinity Swimming Pool & Honey-Teak Sun-Deck
+    const poolFrame = new THREE.Mesh(
+      this._trackGeo(new THREE.BoxGeometry(0.92, 0.1, 0.68)),
+      whiteConcreteMat
+    );
+    poolFrame.position.set(0.66, 0.73, -0.58);
+    poolFrame.castShadow = true;
+    group.add(poolFrame);
+
+    const poolWater = new THREE.Mesh(
+      this._trackGeo(new THREE.BoxGeometry(0.82, 0.09, 0.58)),
+      poolWaterMat
+    );
+    poolWater.position.set(0.68, 0.745, -0.58);
+    group.add(poolWater);
+
+    const teakDeck = new THREE.Mesh(
+      this._trackGeo(new THREE.BoxGeometry(0.42, 0.08, 0.76)),
+      teakMat
+    );
+    teakDeck.position.set(0.02, 0.73, -0.56);
+    group.add(teakDeck);
+
+    // Miniature Contemporary Villa (White Concrete, Brick & Panoramic Glass)
+    const villa = new THREE.Group();
+    villa.position.set(-0.18, 0.69, 0.22);
+    villa.rotation.y = 0.18;
+
+    // Tier 1 poured white-concrete terrace slab
+    const terrace = new THREE.Mesh(
+      this._trackGeo(new THREE.BoxGeometry(1.54, 0.14, 1.18)),
+      whiteConcreteMat
+    );
+    terrace.position.y = 0.07;
+    terrace.castShadow = true;
+    terrace.receiveShadow = true;
+    villa.add(terrace);
+
+    // Tier 2 warm modern brick wing + panoramic floor-to-ceiling glass bay
+    const brickWing = new THREE.Mesh(
+      this._trackGeo(new THREE.BoxGeometry(0.54, 0.44, 0.94)),
+      brickMat
+    );
+    brickWing.position.set(-0.44, 0.36, -0.02);
+    brickWing.castShadow = true;
+    villa.add(brickWing);
+
+    const glassWall = new THREE.Mesh(
+      this._trackGeo(new THREE.BoxGeometry(0.78, 0.42, 0.86)),
+      glassMat
+    );
+    glassWall.position.set(0.18, 0.35, -0.02);
+    villa.add(glassWall);
+
+    // Tier 3 cantilevered white-concrete upper floor (porte-à-faux) + wrap-around corner glass
+    const upperConcrete = new THREE.Mesh(
+      this._trackGeo(new THREE.BoxGeometry(1.24, 0.42, 0.92)),
+      whiteConcreteMat
+    );
+    upperConcrete.position.set(-0.08, 0.78, -0.06);
+    upperConcrete.castShadow = true;
+    villa.add(upperConcrete);
+
+    const upperGlass = new THREE.Mesh(
+      this._trackGeo(new THREE.BoxGeometry(0.72, 0.28, 0.95)),
+      glassMat
+    );
+    upperGlass.position.set(-0.04, 0.77, -0.06);
+    villa.add(upperGlass);
+
+    // Tier 4 sleek flat white-concrete roof overhang & dark anodized aluminum pergola trim
+    const roofSlab = new THREE.Mesh(
+      this._trackGeo(new THREE.BoxGeometry(1.38, 0.1, 1.04)),
+      whiteConcreteMat
+    );
+    roofSlab.position.set(-0.08, 1.04, -0.06);
+    roofSlab.castShadow = true;
+    villa.add(roofSlab);
+
+    const roofTrim = new THREE.Mesh(
+      this._trackGeo(new THREE.BoxGeometry(1.42, 0.04, 1.08)),
+      darkAluMat
+    );
+    roofTrim.position.set(-0.08, 1.1, -0.06);
+    villa.add(roofTrim);
+
+    group.add(villa);
+
+    // Sculpted Mediterranean Cypresses flanking the modern villa island
+    const modernFoliageMat = this._trackMat(createMatteFoliageMaterial());
+    const cypressGeo = this._trackGeo(
+      createIrregularConiferTierGeo({
+        radiusBottom: 0.16,
+        radiusTop: 0.025,
+        height: 0.78,
+        radialSegments: 8,
+        heightSegments: 3,
+        jaggedness: 0.18,
+        droop: 0.03,
+        seed: 77,
+        baseColor: '#21472c',
+        midColor: '#3a7242',
+        topColor: '#78b25a',
+      })
+    );
+    [
+      [-1.18, 0.84, -0.52],
+      [-0.86, 0.82, -0.82],
+      [1.18, 0.82, 0.54],
+    ].forEach(([px, py, pz], idx) => {
+      const cy = new THREE.Mesh(cypressGeo, modernFoliageMat);
+      cy.position.set(px, py, pz);
+      cy.rotation.set(0.03 * (idx % 2 ? 1 : -1), idx * 1.1, 0.02);
+      cy.castShadow = true;
+      group.add(cy);
+    });
+
+    const hitbox = new THREE.Mesh(
+      this._trackGeo(new THREE.CylinderGeometry(2.45, 2.55, 2.4, 10)),
+      this.mats.hitbox
+    );
+    hitbox.position.y = 1.1;
+    group.add(hitbox);
+
+    const node = {
+      id: 'level7_modern',
+      levelIndex: 6,
+      levelNum: 7,
+      chapter: WORLD_CHAPTERS[0],
+      unlocked: true,
+      isMilestone: false,
+      title: 'Niveau 7 : La Villa Moderne (54 blocs)',
+      shortLabel: 'Villa Moderne',
+      labelText: 'Niveau 7 • Jouable',
+      position: pos,
+      labelAnchor: new THREE.Vector3(pos.x, 2.5, pos.z),
+      focusDistance: 17.5,
+      focusElevation: 42,
+      focusAzimuth: -0.14,
+      group,
+      hitbox,
+      bounceTime: 0,
+    };
+
+    hitbox.userData.interact = { type: 'map-node', node };
+    this.nodes.push(node);
+  }
+
+  /**
+   * Builds all 83 regular "Bientôt" islands using shared InstancedMesh batches
    * (mounds, shoreline foam, stone foundation plinths, timber scaffolding, soft mist, biome props).
    */
   _buildInstancedRegularIslands(entries) {

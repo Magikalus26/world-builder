@@ -2132,6 +2132,203 @@ export function createTextureLibrary(renderer) {
     return coalMinePack;
   }
 
+  // Lazy-cached Level 7 (Modern Contemporary Villa: Béton Blanc, Brique & Verre) 512x512 PBR pack
+  let modernPack = null;
+  const modernTextures = [];
+  const modernMaterials = [];
+
+  function ensureModernPack() {
+    if (modernPack) return modernPack;
+
+    const lawnGrass = buildModernLawnGrassPBR(anisotropy);
+    const concreteDrive = buildModernConcreteDrivewayPBR(anisotropy);
+    const quarryAgg = buildModernQuarryAggregatePBR(anisotropy);
+    const poolTeak = buildModernPoolTeakDeckPBR(anisotropy);
+
+    const whiteConcrete = buildModernWhiteConcretePBR(anisotropy);
+    const modernBrick = buildModernBrickWallPBR(anisotropy);
+    const glassPanel = buildModernPanoramicGlassPBR(anisotropy);
+    const rawAggregate = buildModernRawAggregateBlockPBR(anisotropy);
+    const darkAluminum = buildModernDarkAluminumPBR(anisotropy);
+
+    [
+      lawnGrass,
+      concreteDrive,
+      quarryAgg,
+      poolTeak,
+      whiteConcrete,
+      modernBrick,
+      glassPanel,
+      rawAggregate,
+      darkAluminum,
+    ].forEach((set) => {
+      if (set.map) modernTextures.push(set.map);
+      if (set.normalMap) modernTextures.push(set.normalMap);
+      if (set.roughnessMap) modernTextures.push(set.roughnessMap);
+    });
+
+    const mMats = {
+      terrainLawn: new THREE.MeshStandardMaterial({
+        map: lawnGrass.map,
+        normalMap: lawnGrass.normalMap,
+        normalScale: new THREE.Vector2(0.85, 0.85),
+        roughness: 0.9,
+        metalness: 0.0,
+      }),
+      terrainConcrete: new THREE.MeshStandardMaterial({
+        map: concreteDrive.map,
+        normalMap: concreteDrive.normalMap,
+        normalScale: new THREE.Vector2(0.95, 0.95),
+        roughness: 0.9,
+        metalness: 0.0,
+      }),
+      terrainQuarry: new THREE.MeshStandardMaterial({
+        map: quarryAgg.map,
+        normalMap: quarryAgg.normalMap,
+        normalScale: new THREE.Vector2(1.15, 1.15),
+        roughness: 0.9,
+        metalness: 0.0,
+      }),
+      terrainTeak: new THREE.MeshStandardMaterial({
+        map: poolTeak.map,
+        normalMap: poolTeak.normalMap,
+        normalScale: new THREE.Vector2(1.05, 1.05),
+        roughness: 0.86,
+        metalness: 0.0,
+      }),
+      rawAggregate: new THREE.MeshStandardMaterial({
+        map: rawAggregate.map,
+        normalMap: rawAggregate.normalMap,
+        normalScale: new THREE.Vector2(1.4, 1.4),
+        roughnessMap: rawAggregate.roughnessMap,
+        roughness: 0.88,
+        metalness: 0.04,
+      }),
+      quarryLimestone: new THREE.MeshStandardMaterial({
+        map: rawAggregate.map,
+        normalMap: rawAggregate.normalMap,
+        normalScale: new THREE.Vector2(1.35, 1.35),
+        color: new THREE.Color('#eae6dd'),
+        roughness: 0.86,
+        metalness: 0.03,
+      }),
+      quarryClay: new THREE.MeshStandardMaterial({
+        map: rawAggregate.map,
+        normalMap: rawAggregate.normalMap,
+        normalScale: new THREE.Vector2(1.25, 1.25),
+        color: new THREE.Color('#c2684b'),
+        roughness: 0.9,
+        metalness: 0.02,
+      }),
+      whiteConcrete: new THREE.MeshStandardMaterial({
+        map: whiteConcrete.map,
+        normalMap: whiteConcrete.normalMap,
+        normalScale: new THREE.Vector2(0.72, 0.72),
+        roughnessMap: whiteConcrete.roughnessMap,
+        roughness: 0.54,
+        metalness: 0.04,
+      }),
+      whiteConcreteRoof: new THREE.MeshStandardMaterial({
+        map: whiteConcrete.map,
+        normalMap: whiteConcrete.normalMap,
+        normalScale: new THREE.Vector2(0.65, 0.65),
+        roughnessMap: whiteConcrete.roughnessMap,
+        color: new THREE.Color('#f7f6f2'),
+        roughness: 0.46,
+        metalness: 0.06,
+      }),
+      modernBrick: new THREE.MeshStandardMaterial({
+        map: modernBrick.map,
+        normalMap: modernBrick.normalMap,
+        normalScale: new THREE.Vector2(1.38, 1.38),
+        roughnessMap: modernBrick.roughnessMap,
+        roughness: 0.8,
+        metalness: 0.04,
+      }),
+      panoramicGlass: new THREE.MeshStandardMaterial({
+        map: glassPanel.map,
+        normalMap: glassPanel.normalMap,
+        normalScale: new THREE.Vector2(0.8, 0.8),
+        roughnessMap: glassPanel.roughnessMap,
+        color: new THREE.Color('#c6eefc'),
+        roughness: 0.14,
+        metalness: 0.28,
+        envMapIntensity: 1.55,
+        transparent: true,
+        opacity: 0.88,
+      }),
+      balconyGlass: new THREE.MeshStandardMaterial({
+        color: new THREE.Color('#a4e3f6'),
+        roughness: 0.1,
+        metalness: 0.22,
+        envMapIntensity: 1.5,
+        transparent: true,
+        opacity: 0.58,
+      }),
+      darkAluminum: new THREE.MeshStandardMaterial({
+        map: darkAluminum.map,
+        normalMap: darkAluminum.normalMap,
+        normalScale: new THREE.Vector2(0.7, 0.7),
+        roughnessMap: darkAluminum.roughnessMap,
+        roughness: 0.36,
+        metalness: 0.84,
+      }),
+      brushedSteel: new THREE.MeshStandardMaterial({
+        color: new THREE.Color('#bfc7cf'),
+        roughness: 0.32,
+        metalness: 0.86,
+      }),
+      teakDeck: new THREE.MeshStandardMaterial({
+        map: poolTeak.map,
+        normalMap: poolTeak.normalMap,
+        normalScale: new THREE.Vector2(1.0, 1.0),
+        roughness: 0.72,
+        metalness: 0.04,
+      }),
+      safetyYellow: new THREE.MeshStandardMaterial({
+        color: new THREE.Color('#f4c425'),
+        roughness: 0.36,
+        metalness: 0.22,
+      }),
+      bollardGlow: new THREE.MeshStandardMaterial({
+        color: new THREE.Color('#fff5d6'),
+        emissive: new THREE.Color('#ffca68'),
+        emissiveIntensity: 1.5,
+        roughness: 0.25,
+      }),
+      infinityPoolWater: new THREE.MeshStandardMaterial({
+        color: new THREE.Color('#28c2d6'),
+        normalMap: waterNormal,
+        normalScale: new THREE.Vector2(0.45, 0.45),
+        roughness: 0.1,
+        metalness: 0.18,
+        envMapIntensity: 1.45,
+        transparent: true,
+        opacity: 0.88,
+      }),
+      poolTileLiner: new THREE.MeshStandardMaterial({
+        color: new THREE.Color('#198ea8'),
+        roughness: 0.38,
+        metalness: 0.08,
+      }),
+      hedgeGreen: new THREE.MeshStandardMaterial({
+        color: new THREE.Color('#3b7338'),
+        roughness: 0.88,
+        metalness: 0.0,
+      }),
+      interiorFloorGlow: new THREE.MeshStandardMaterial({
+        color: new THREE.Color('#f5e5c8'),
+        emissive: new THREE.Color('#ffdca4'),
+        emissiveIntensity: 0.26,
+        roughness: 0.65,
+      }),
+    };
+
+    Object.values(mMats).forEach((m) => modernMaterials.push(m));
+    modernPack = { materials: mMats };
+    return modernPack;
+  }
+
   return {
     maps: {
       blueprint: blueprintMap,
@@ -2146,6 +2343,7 @@ export function createTextureLibrary(renderer) {
     ensureMayaPack,
     ensurePenitentiaryPack,
     ensureCoalMinePack,
+    ensureModernPack,
     dispose() {
       textures.forEach((t) => t.dispose());
       Object.values(materials).forEach((m) => m.dispose());
@@ -2159,6 +2357,8 @@ export function createTextureLibrary(renderer) {
       penitentiaryMaterials.forEach((m) => m.dispose());
       coalMineTextures.forEach((t) => t.dispose());
       coalMineMaterials.forEach((m) => m.dispose());
+      modernTextures.forEach((t) => t.dispose());
+      modernMaterials.forEach((m) => m.dispose());
       materialFactory.dispose();
     },
   };
@@ -4655,3 +4855,508 @@ function buildReinforcedConcretePBR(anisotropy) {
   };
 }
 
+/* ============================================================================
+ * LEVEL 7 (MODERN CONTEMPORARY VILLA) — 512x512 ARCHITECTURAL PBR TEXTURES
+ * ========================================================================== */
+
+/** 512x512 Manicured Vibrant Coastal Lawn Grass with subtle mowed stripe & golden clover */
+function buildModernLawnGrassPBR(anisotropy) {
+  const size = 512;
+  const albedoCanvas = makeCanvas(size);
+  const ctx = albedoCanvas.getContext('2d');
+  const img = ctx.createImageData(size, size);
+  const height = new Float32Array(size * size);
+
+  for (let y = 0; y < size; y++) {
+    const v = y / size;
+    for (let x = 0; x < size; x++) {
+      const u = x / size;
+      const i = y * size + x;
+      const macro = tileFBM(u, v, 5, 3, 7103);
+      const blades = tileFBM(u * 2, v * 2, 22, 2, 7121);
+      const micro = hash2i(x, y, 7151);
+      // Subtle diagonal architectural lawn mower stripe
+      const stripe = Math.sin((u + v) * Math.PI * 6) * 0.5 + 0.5;
+      const sunTip = smoothstep(0.66, 0.88, macro);
+
+      height[i] = clamp01(0.42 + (blades - 0.5) * 0.36 + (micro - 0.5) * 0.14);
+
+      const r = 74 + macro * 26 + sunTip * 22 + stripe * 8 + (micro - 0.5) * 10;
+      const g = 136 + macro * 30 + sunTip * 18 + stripe * 12 + (blades - 0.5) * 14;
+      const b = 58 + macro * 14 + stripe * 5 + (micro - 0.5) * 8;
+
+      const idx = i * 4;
+      img.data[idx] = Math.min(255, Math.max(0, Math.round(r)));
+      img.data[idx + 1] = Math.min(255, Math.max(0, Math.round(g)));
+      img.data[idx + 2] = Math.min(255, Math.max(0, Math.round(b)));
+      img.data[idx + 3] = 255;
+    }
+  }
+
+  ctx.putImageData(img, 0, 0);
+  const normalCanvas = buildSobelNormalCanvas(height, size, 2.2);
+  return {
+    map: wrapTexture(albedoCanvas, { isColor: true, anisotropy }),
+    normalMap: wrapTexture(normalCanvas, { isColor: false, anisotropy }),
+  };
+}
+
+/** 512x512 Smooth Poured Concrete Driveway & Dark Slate Stepping Pavers */
+function buildModernConcreteDrivewayPBR(anisotropy) {
+  const size = 512;
+  const albedoCanvas = makeCanvas(size);
+  const ctx = albedoCanvas.getContext('2d');
+  const img = ctx.createImageData(size, size);
+  const height = new Float32Array(size * size);
+
+  for (let y = 0; y < size; y++) {
+    const v = y / size;
+    const cellV = (v * 4) % 1;
+    for (let x = 0; x < size; x++) {
+      const u = x / size;
+      const i = y * size + x;
+      const cellU = (u * 4) % 1;
+      const joint = cellU < 0.032 || cellU > 0.968 || cellV < 0.032 || cellV > 0.968;
+      const macro = tileFBM(u, v, 6, 3, 7207);
+      const grain = tileFBM(u, v, 24, 2, 7219);
+      const micro = hash2i(x, y, 7243);
+
+      const tileId = hash2i(Math.floor(u * 4), Math.floor(v * 4), 7253);
+      const lum = joint
+        ? 112 + (micro - 0.5) * 14
+        : 184 + (tileId - 0.5) * 16 + (macro - 0.5) * 18 + (grain - 0.5) * 12 + (micro - 0.5) * 8;
+
+      height[i] = clamp01((joint ? 0.16 : 0.62) + (grain - 0.5) * 0.12 + (micro - 0.5) * 0.06);
+
+      const idx = i * 4;
+      img.data[idx] = Math.min(255, Math.max(0, Math.round(lum * 0.98)));
+      img.data[idx + 1] = Math.min(255, Math.max(0, Math.round(lum * 0.99)));
+      img.data[idx + 2] = Math.min(255, Math.max(0, Math.round(lum * 1.02)));
+      img.data[idx + 3] = 255;
+    }
+  }
+
+  ctx.putImageData(img, 0, 0);
+  const normalCanvas = buildSobelNormalCanvas(height, size, 2.5);
+  return {
+    map: wrapTexture(albedoCanvas, { isColor: true, anisotropy }),
+    normalMap: wrapTexture(normalCanvas, { isColor: false, anisotropy }),
+  };
+}
+
+/** 512x512 Crushed White Limestone Aggregate & Red-Clay Quarry Dust */
+function buildModernQuarryAggregatePBR(anisotropy) {
+  const size = 512;
+  const albedoCanvas = makeCanvas(size);
+  const ctx = albedoCanvas.getContext('2d');
+  const img = ctx.createImageData(size, size);
+  const height = new Float32Array(size * size);
+
+  for (let y = 0; y < size; y++) {
+    const v = y / size;
+    for (let x = 0; x < size; x++) {
+      const u = x / size;
+      const i = y * size + x;
+      const clayPatch = smoothstep(0.46, 0.72, tileFBM(u, v, 4, 3, 7309));
+      const gravel = tileFBM(u, v, 20, 3, 7321);
+      const chip = hash2i(x, y, 7349);
+
+      height[i] = clamp01(0.36 + (gravel - 0.5) * 0.44 + (chip - 0.5) * 0.18);
+
+      // Blend crisp crushed white limestone dust with terracotta-red clay pockets
+      const limeR = 218 + (gravel - 0.5) * 28 + (chip - 0.5) * 14;
+      const limeG = 212 + (gravel - 0.5) * 26 + (chip - 0.5) * 14;
+      const limeB = 200 + (gravel - 0.5) * 24 + (chip - 0.5) * 14;
+
+      const clayR = 178 + (gravel - 0.5) * 24 + (chip - 0.5) * 12;
+      const clayG = 104 + (gravel - 0.5) * 20 + (chip - 0.5) * 10;
+      const clayB = 78 + (gravel - 0.5) * 16 + (chip - 0.5) * 10;
+
+      const idx = i * 4;
+      img.data[idx] = Math.min(255, Math.max(0, Math.round(limeR * (1 - clayPatch) + clayR * clayPatch)));
+      img.data[idx + 1] = Math.min(255, Math.max(0, Math.round(limeG * (1 - clayPatch) + clayG * clayPatch)));
+      img.data[idx + 2] = Math.min(255, Math.max(0, Math.round(limeB * (1 - clayPatch) + clayB * clayPatch)));
+      img.data[idx + 3] = 255;
+    }
+  }
+
+  ctx.putImageData(img, 0, 0);
+  const normalCanvas = buildSobelNormalCanvas(height, size, 3.1);
+  return {
+    map: wrapTexture(albedoCanvas, { isColor: true, anisotropy }),
+    normalMap: wrapTexture(normalCanvas, { isColor: false, anisotropy }),
+  };
+}
+
+/** 512x512 Warm Honey-Teak Slatted Sun-Deck Planks (Poolside Terrace) */
+function buildModernPoolTeakDeckPBR(anisotropy) {
+  const size = 512;
+  const albedoCanvas = makeCanvas(size);
+  const ctx = albedoCanvas.getContext('2d');
+  const img = ctx.createImageData(size, size);
+  const height = new Float32Array(size * size);
+
+  const planks = 10;
+  for (let y = 0; y < size; y++) {
+    const v = y / size;
+    const pRow = Math.floor(v * planks);
+    const pFrac = (v * planks) % 1;
+    const isGap = pFrac < 0.07 || pFrac > 0.93;
+    const rowTone = (hash2i(pRow, 7, 7411) - 0.5) * 22;
+
+    for (let x = 0; x < size; x++) {
+      const u = x / size;
+      const i = y * size + x;
+      const grain = tileFBM(u * 0.7, v * 5.0, 12, 2, 7433);
+      const micro = hash2i(x, y, 7451);
+
+      height[i] = clamp01(isGap ? 0.1 : 0.68 + (grain - 0.5) * 0.16 + (micro - 0.5) * 0.05);
+
+      const shade = isGap ? 0.42 : 1.0;
+      const r = (176 + rowTone + (grain - 0.5) * 24 + (micro - 0.5) * 8) * shade;
+      const g = (126 + rowTone * 0.8 + (grain - 0.5) * 18 + (micro - 0.5) * 6) * shade;
+      const b = (78 + rowTone * 0.5 + (grain - 0.5) * 12 + (micro - 0.5) * 5) * shade;
+
+      const idx = i * 4;
+      img.data[idx] = Math.min(255, Math.max(0, Math.round(r)));
+      img.data[idx + 1] = Math.min(255, Math.max(0, Math.round(g)));
+      img.data[idx + 2] = Math.min(255, Math.max(0, Math.round(b)));
+      img.data[idx + 3] = 255;
+    }
+  }
+
+  ctx.putImageData(img, 0, 0);
+  const normalCanvas = buildSobelNormalCanvas(height, size, 3.0);
+  return {
+    map: wrapTexture(albedoCanvas, { isColor: true, anisotropy }),
+    normalMap: wrapTexture(normalCanvas, { isColor: false, anisotropy }),
+  };
+}
+
+/** 512x512 Smooth Architectural White Concrete (Béton Blanc) PBR */
+function buildModernWhiteConcretePBR(anisotropy) {
+  const size = 512;
+  const albedoCanvas = makeCanvas(size);
+  const roughCanvas = makeCanvas(size);
+  const ctx = albedoCanvas.getContext('2d');
+  const rCtx = roughCanvas.getContext('2d');
+  const img = ctx.createImageData(size, size);
+  const rImg = rCtx.createImageData(size, size);
+  const height = new Float32Array(size * size);
+
+  // Architectural formwork tie-hole coordinates (clean modernist grid)
+  const holes = [
+    [0.25, 0.25], [0.75, 0.25],
+    [0.25, 0.75], [0.75, 0.75],
+  ];
+
+  for (let y = 0; y < size; y++) {
+    const v = y / size;
+    const seamH = Math.abs(((v * 2) % 1) - 0.5) > 0.491;
+    for (let x = 0; x < size; x++) {
+      const u = x / size;
+      const i = y * size + x;
+      const seamV = Math.abs(((u * 2) % 1) - 0.5) > 0.491;
+      const seam = seamH || seamV;
+
+      let tieHole = 0;
+      for (let h = 0; h < holes.length; h++) {
+        const d = Math.hypot(u - holes[h][0], v - holes[h][1]);
+        if (d < 0.022) tieHole = Math.max(tieHole, smoothstep(0.022, 0.008, d));
+      }
+
+      const cloud = tileFBM(u, v, 5, 3, 7507);
+      const satin = tileFBM(u, v, 24, 2, 7523);
+      const micro = hash2i(x, y, 7541);
+
+      height[i] = clamp01(
+        (seam ? 0.24 : 0.68) - tieHole * 0.44 + (satin - 0.5) * 0.08 + (micro - 0.5) * 0.03
+      );
+
+      // Luminous architectural warm-white satin concrete (#F2F0EB)
+      const base =
+        (241 + (cloud - 0.5) * 14 + (satin - 0.5) * 8 + (micro - 0.5) * 5) *
+        (seam ? 0.86 : 1.0) *
+        (1.0 - tieHole * 0.24);
+
+      const idx = i * 4;
+      img.data[idx] = Math.min(255, Math.max(0, Math.round(base * 1.0)));
+      img.data[idx + 1] = Math.min(255, Math.max(0, Math.round(base * 0.992)));
+      img.data[idx + 2] = Math.min(255, Math.max(0, Math.round(base * 0.976)));
+      img.data[idx + 3] = 255;
+
+      const rv = Math.round(clamp01(0.48 + (0.5 - cloud) * 0.14 + (seam ? 0.2 : 0)) * 255);
+      rImg.data[idx] = rv;
+      rImg.data[idx + 1] = rv;
+      rImg.data[idx + 2] = rv;
+      rImg.data[idx + 3] = 255;
+    }
+  }
+
+  ctx.putImageData(img, 0, 0);
+  rCtx.putImageData(rImg, 0, 0);
+  const normalCanvas = buildSobelNormalCanvas(height, size, 2.2);
+  return {
+    map: wrapTexture(albedoCanvas, { isColor: true, anisotropy }),
+    normalMap: wrapTexture(normalCanvas, { isColor: false, anisotropy }),
+    roughnessMap: wrapTexture(roughCanvas, { isColor: false, anisotropy }),
+  };
+}
+
+/** 512x512 Warm Textured Contemporary Red-Brown Brick (Brique Moderne) PBR */
+function buildModernBrickWallPBR(anisotropy) {
+  const size = 512;
+  const albedoCanvas = makeCanvas(size);
+  const roughCanvas = makeCanvas(size);
+  const ctx = albedoCanvas.getContext('2d');
+  const rCtx = roughCanvas.getContext('2d');
+  const img = ctx.createImageData(size, size);
+  const rImg = rCtx.createImageData(size, size);
+  const height = new Float32Array(size * size);
+
+  const rows = 10;
+  const cols = 4;
+
+  for (let y = 0; y < size; y++) {
+    const v = y / size;
+    const rowId = Math.floor(v * rows);
+    const rowF = (v * rows) % 1;
+    const stagger = (rowId % 2) * 0.5;
+    const mortarH = rowF < 0.085 || rowF > 0.915;
+
+    for (let x = 0; x < size; x++) {
+      const u = x / size;
+      const i = y * size + x;
+      const su = (u * cols + stagger) % cols;
+      const colId = Math.floor(su);
+      const colF = su % 1;
+      const mortarV = colF < 0.045 || colF > 0.955;
+      const isMortar = mortarH || mortarV;
+
+      const brickSeed = hash2i(colId, rowId, 7603);
+      const kilnTone = hash2i(colId + 17, rowId + 31, 7621);
+      const clayGrain = tileFBM(u, v, 20, 3, 7643);
+      const micro = hash2i(x, y, 7669);
+
+      let r, g, b, h, rv;
+      if (isMortar) {
+        // Crisp recessed modern warm-grey mortar
+        const m = 196 + (clayGrain - 0.5) * 16 + (micro - 0.5) * 10;
+        r = m * 0.99;
+        g = m * 0.97;
+        b = m * 0.93;
+        h = 0.2 + (micro - 0.5) * 0.06;
+        rv = 0.92;
+      } else {
+        // Sleek contemporary burnt-sienna / warm architectural terracotta-brown brick
+        const edgeBevel = Math.min(
+          smoothstep(0.085, 0.14, rowF),
+          smoothstep(0.915, 0.86, rowF),
+          smoothstep(0.045, 0.085, colF),
+          smoothstep(0.955, 0.915, colF)
+        );
+        const shade = 0.84 + brickSeed * 0.28 + (clayGrain - 0.5) * 0.14;
+        r = (176 + (kilnTone - 0.5) * 28) * shade + (micro - 0.5) * 9;
+        g = (88 + (kilnTone - 0.5) * 18) * shade + (micro - 0.5) * 7;
+        b = (62 + (kilnTone - 0.5) * 14) * shade + (micro - 0.5) * 6;
+        h = clamp01(0.54 + edgeBevel * 0.28 + (clayGrain - 0.5) * 0.14 + (micro - 0.5) * 0.05);
+        rv = clamp01(0.76 + (0.5 - clayGrain) * 0.16);
+      }
+
+      height[i] = h;
+      const idx = i * 4;
+      img.data[idx] = Math.min(255, Math.max(0, Math.round(r)));
+      img.data[idx + 1] = Math.min(255, Math.max(0, Math.round(g)));
+      img.data[idx + 2] = Math.min(255, Math.max(0, Math.round(b)));
+      img.data[idx + 3] = 255;
+
+      const rByte = Math.round(rv * 255);
+      rImg.data[idx] = rByte;
+      rImg.data[idx + 1] = rByte;
+      rImg.data[idx + 2] = rByte;
+      rImg.data[idx + 3] = 255;
+    }
+  }
+
+  ctx.putImageData(img, 0, 0);
+  rCtx.putImageData(rImg, 0, 0);
+  const normalCanvas = buildSobelNormalCanvas(height, size, 3.6);
+  return {
+    map: wrapTexture(albedoCanvas, { isColor: true, anisotropy }),
+    normalMap: wrapTexture(normalCanvas, { isColor: false, anisotropy }),
+    roughnessMap: wrapTexture(roughCanvas, { isColor: false, anisotropy }),
+  };
+}
+
+/** 512x512 Reflective Sky-Tinted Architectural Panoramic Glass (Baies Vitrées) with Black Aluminum Mullions */
+function buildModernPanoramicGlassPBR(anisotropy) {
+  const size = 512;
+  const albedoCanvas = makeCanvas(size);
+  const roughCanvas = makeCanvas(size);
+  const ctx = albedoCanvas.getContext('2d');
+  const rCtx = roughCanvas.getContext('2d');
+  const img = ctx.createImageData(size, size);
+  const rImg = rCtx.createImageData(size, size);
+  const height = new Float32Array(size * size);
+
+  for (let y = 0; y < size; y++) {
+    const v = y / size;
+    const isTopBotFrame = v < 0.068 || v > 0.932;
+    const isTransom = Math.abs(v - 0.24) < 0.016;
+    for (let x = 0; x < size; x++) {
+      const u = x / size;
+      const i = y * size + x;
+      const isSideFrame = u < 0.055 || u > 0.945;
+      const isCenterMullion = Math.abs(u - 0.5) < 0.02;
+      const isFrame = isTopBotFrame || isSideFrame || isCenterMullion || isTransom;
+
+      let r, g, b, h, rv;
+      if (isFrame) {
+        // Sleek matte anodized charcoal-black architectural aluminum mullion
+        const grain = hash2i(x, y, 7703);
+        r = 34 + (grain - 0.5) * 6;
+        g = 38 + (grain - 0.5) * 6;
+        b = 44 + (grain - 0.5) * 7;
+        h = 0.88;
+        rv = 0.36;
+      } else {
+        // Sky-tinted reflective architectural glazing with diagonal sunlit specular bands
+        const skyGrad = 1.0 - v * 0.42;
+        const diag1 = Math.exp(-Math.pow((u * 0.92 + v * 0.55 - 0.58) * 7.5, 2));
+        const diag2 = Math.exp(-Math.pow((u * 0.92 + v * 0.55 - 0.78) * 14.0, 2));
+        const glint = clamp01(diag1 * 0.55 + diag2 * 0.35);
+
+        // Warm interior glow subtly showing through lower half of the glass bay
+        const warmInterior = smoothstep(0.45, 0.92, v) * 0.28;
+        r = 128 * skyGrad + glint * 110 + warmInterior * 95;
+        g = 198 * skyGrad + glint * 62 + warmInterior * 62;
+        b = 228 * skyGrad + glint * 34 + warmInterior * 18;
+        h = 0.28;
+        rv = clamp01(0.08 + (1.0 - glint) * 0.06);
+      }
+
+      height[i] = h;
+      const idx = i * 4;
+      img.data[idx] = Math.min(255, Math.max(0, Math.round(r)));
+      img.data[idx + 1] = Math.min(255, Math.max(0, Math.round(g)));
+      img.data[idx + 2] = Math.min(255, Math.max(0, Math.round(b)));
+      img.data[idx + 3] = 255;
+
+      const rByte = Math.round(rv * 255);
+      rImg.data[idx] = rByte;
+      rImg.data[idx + 1] = rByte;
+      rImg.data[idx + 2] = rByte;
+      rImg.data[idx + 3] = 255;
+    }
+  }
+
+  ctx.putImageData(img, 0, 0);
+  rCtx.putImageData(rImg, 0, 0);
+  const normalCanvas = buildSobelNormalCanvas(height, size, 3.4);
+  return {
+    map: wrapTexture(albedoCanvas, { isColor: true, anisotropy }),
+    normalMap: wrapTexture(normalCanvas, { isColor: false, anisotropy }),
+    roughnessMap: wrapTexture(roughCanvas, { isColor: false, anisotropy }),
+  };
+}
+
+/** 512x512 Raw Limestone, Silica Sand & Red-Clay Quarry Block PBR */
+function buildModernRawAggregateBlockPBR(anisotropy) {
+  const size = 512;
+  const albedoCanvas = makeCanvas(size);
+  const roughCanvas = makeCanvas(size);
+  const ctx = albedoCanvas.getContext('2d');
+  const rCtx = roughCanvas.getContext('2d');
+  const img = ctx.createImageData(size, size);
+  const rImg = rCtx.createImageData(size, size);
+  const height = new Float32Array(size * size);
+
+  for (let y = 0; y < size; y++) {
+    const v = y / size;
+    for (let x = 0; x < size; x++) {
+      const u = x / size;
+      const i = y * size + x;
+      const strata = tileFBM(u * 0.8, v * 2.2, 6, 3, 7817);
+      const rock = tileFBM(u, v, 18, 3, 7841);
+      const grit = hash2i(x, y, 7867);
+      const clayVein = smoothstep(0.58, 0.78, strata);
+
+      height[i] = clamp01(0.35 + (rock - 0.5) * 0.48 + (grit - 0.5) * 0.14);
+
+      const baseR = 224 + (rock - 0.5) * 30 + (grit - 0.5) * 14;
+      const baseG = 216 + (rock - 0.5) * 28 + (grit - 0.5) * 14;
+      const baseB = 204 + (rock - 0.5) * 26 + (grit - 0.5) * 14;
+
+      const clayR = 186 + (rock - 0.5) * 24;
+      const clayG = 102 + (rock - 0.5) * 20;
+      const clayB = 76 + (rock - 0.5) * 16;
+
+      const idx = i * 4;
+      img.data[idx] = Math.min(255, Math.max(0, Math.round(baseR * (1 - clayVein) + clayR * clayVein)));
+      img.data[idx + 1] = Math.min(255, Math.max(0, Math.round(baseG * (1 - clayVein) + clayG * clayVein)));
+      img.data[idx + 2] = Math.min(255, Math.max(0, Math.round(baseB * (1 - clayVein) + clayB * clayVein)));
+      img.data[idx + 3] = 255;
+
+      const rv = Math.round(clamp01(0.84 + (0.5 - rock) * 0.14) * 255);
+      rImg.data[idx] = rv;
+      rImg.data[idx + 1] = rv;
+      rImg.data[idx + 2] = rv;
+      rImg.data[idx + 3] = 255;
+    }
+  }
+
+  ctx.putImageData(img, 0, 0);
+  rCtx.putImageData(rImg, 0, 0);
+  const normalCanvas = buildSobelNormalCanvas(height, size, 3.4);
+  return {
+    map: wrapTexture(albedoCanvas, { isColor: true, anisotropy }),
+    normalMap: wrapTexture(normalCanvas, { isColor: false, anisotropy }),
+    roughnessMap: wrapTexture(roughCanvas, { isColor: false, anisotropy }),
+  };
+}
+
+/** 512x512 Brushed Matte Anodized Charcoal-Black Aluminum (Pergola & Mullions) PBR */
+function buildModernDarkAluminumPBR(anisotropy) {
+  const size = 512;
+  const albedoCanvas = makeCanvas(size);
+  const roughCanvas = makeCanvas(size);
+  const ctx = albedoCanvas.getContext('2d');
+  const rCtx = roughCanvas.getContext('2d');
+  const img = ctx.createImageData(size, size);
+  const rImg = rCtx.createImageData(size, size);
+  const height = new Float32Array(size * size);
+
+  for (let y = 0; y < size; y++) {
+    const v = y / size;
+    for (let x = 0; x < size; x++) {
+      const u = x / size;
+      const i = y * size + x;
+      const brush = tileFBM(u * 0.5, v * 12.0, 14, 2, 7907);
+      const micro = hash2i(x, y, 7927);
+
+      height[i] = clamp01(0.5 + (brush - 0.5) * 0.18 + (micro - 0.5) * 0.06);
+
+      const lum = 40 + (brush - 0.5) * 14 + (micro - 0.5) * 6;
+      const idx = i * 4;
+      img.data[idx] = Math.min(255, Math.max(0, Math.round(lum * 0.96)));
+      img.data[idx + 1] = Math.min(255, Math.max(0, Math.round(lum * 1.0)));
+      img.data[idx + 2] = Math.min(255, Math.max(0, Math.round(lum * 1.08)));
+      img.data[idx + 3] = 255;
+
+      const rv = Math.round(clamp01(0.36 + (0.5 - brush) * 0.14) * 255);
+      rImg.data[idx] = rv;
+      rImg.data[idx + 1] = rv;
+      rImg.data[idx + 2] = rv;
+      rImg.data[idx + 3] = 255;
+    }
+  }
+
+  ctx.putImageData(img, 0, 0);
+  rCtx.putImageData(rImg, 0, 0);
+  const normalCanvas = buildSobelNormalCanvas(height, size, 1.8);
+  return {
+    map: wrapTexture(albedoCanvas, { isColor: true, anisotropy }),
+    normalMap: wrapTexture(normalCanvas, { isColor: false, anisotropy }),
+    roughnessMap: wrapTexture(roughCanvas, { isColor: false, anisotropy }),
+  };
+}
