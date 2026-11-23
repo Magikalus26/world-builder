@@ -15,11 +15,21 @@
  */
 
 import * as THREE from 'three';
+import {
+  ConnectedMasonryCache,
+  createConnectedMasonryGeometry,
+  NEIGHBOR_PX,
+  NEIGHBOR_NX,
+  NEIGHBOR_PZ,
+  NEIGHBOR_NZ,
+  NEIGHBOR_PY,
+  NEIGHBOR_NY,
+} from './connectedMasonry.js';
 
 const BLOCK_W = 0.96;
 const BLOCK_H = 0.68;
 const BLOCK_D = 0.96;
-const PYRAMID_STEP = 1.01;
+const PYRAMID_STEP = BLOCK_W; // Exact zero-gap horizontal grid step matching block width/depth
 const PYRAMID_CENTER = new THREE.Vector3(3.6, 0, -0.75);
 const FOUNDATION_Y = 0.28;
 
@@ -375,6 +385,10 @@ export class Level1Pyramid {
     this.particles = [];
     this.particleCursor = 0;
 
+    // Connected Masonry & Neighbor-Aware Geometry Cache (O(1) neighbor lookup & < 0.2 ms updates)
+    this.masonryCache = new ConnectedMasonryCache();
+    this.slotGridMap = new Map();
+
     this._beforeBuild();
     this._initSharedGeometries();
     this._buildDioramaBase();
@@ -398,6 +412,27 @@ export class Level1Pyramid {
     // Subclass hook for fitting carved blocks into specialized slot geometries (columns, sloped roofs)
   }
 
+  _getMasonryBlockDimensions() {
+    return { w: BLOCK_W, h: BLOCK_H, d: BLOCK_D, bevel: 0.044 };
+  }
+
+  _isConnectableMasonrySlot(slot) {
+    return Boolean(slot && slot.block && !slot.isCapstone && slot.pieceType !== 'column' && slot.pieceType !== 'roof');
+  }
+
+  _gridKey(gx, layer, gz) {
+    return `${Math.round(gx * 2)}_${layer}_${Math.round(gz * 2)}`;
+  }
+
+  _registerSlotInGrid(slot) {
+    if (slot.gridX === undefined || slot.gridZ === undefined) return;
+    this.slotGridMap.set(this._gridKey(slot.gridX, slot.layer, slot.gridZ), slot);
+  }
+
+  _getGridSlot(gx, layer, gz) {
+    return this.slotGridMap.get(this._gridKey(gx, layer, gz)) || null;
+  }
+
   _mx(x) {
     return x * this.mirrorX;
   }
@@ -416,8 +451,8 @@ export class Level1Pyramid {
     this.geos = {
       rawBlock: this._trackGeo(createRoughStoneGeometry(0.92, 0.66, 0.92, 0.14, 17)),
       stage1Block: this._trackGeo(createRoughStoneGeometry(0.93, 0.67, 0.93, 0.08, 29)),
-      stage2Block: this._trackGeo(createBeveledBlockGeometry(0.95, 0.67, 0.95, 0.07)),
-      carvedBlock: this._trackGeo(createBeveledBlockGeometry(BLOCK_W, BLOCK_H, BLOCK_D, 0.05)),
+      stage2Block: this._trackGeo(createBeveledBlockGeometry(0.95, 0.67, 0.95, 0.06)),
+      carvedBlock: this._trackGeo(createConnectedMasonryGeometry(BLOCK_W, BLOCK_H, BLOCK_D, 0, 0.044)),
       capstone: this._trackGeo(
         (() => {
           const g = new THREE.ConeGeometry(BLOCK_W / Math.SQRT2, 0.82, 4);
@@ -425,10 +460,10 @@ export class Level1Pyramid {
           return g;
         })()
       ),
-      ghostBox: this._trackGeo(new THREE.BoxGeometry(BLOCK_W * 0.89, BLOCK_H * 0.92, BLOCK_D * 0.89)),
+      ghostBox: this._trackGeo(new THREE.BoxGeometry(BLOCK_W * 0.96, BLOCK_H * 0.96, BLOCK_D * 0.96)),
       ghostBoxEdges: this._trackGeo(
         (() => {
-          const g = new THREE.BoxGeometry(BLOCK_W * 0.9, BLOCK_H * 0.93, BLOCK_D * 0.9);
+          const g = new THREE.BoxGeometry(BLOCK_W * 0.97, BLOCK_H * 0.97, BLOCK_D * 0.97);
           const edges = new THREE.EdgesGeometry(g);
           g.dispose();
           return edges;
@@ -1516,11 +1551,13 @@ export class Level1Pyramid {
         ghostGroup.visible = layer === 0;
         site.add(ghostGroup);
 
-        this.pyramidSlots.push({
+        const slot = {
           id: `pyramid_L${layer}_${cellIdx}`,
           index: slotIdx++,
           zoneType: 'pyramid',
           layer,
+          gridX: dx,
+          gridZ: dz,
           isCapstone,
           accepts: ['carved', 'capstone'],
           position: new THREE.Vector3(wx, centerY, wz),
@@ -1529,7 +1566,9 @@ export class Level1Pyramid {
           ghostMesh,
           ghostLines,
           block: null,
-        });
+        };
+        this.pyramidSlots.push(slot);
+        this._registerSlotInGrid(slot);
       });
     });
 
@@ -2085,11 +2124,85 @@ export class Level1Pyramid {
   }
 
   /* ============================================================================
-   * 11. PYRAMID PROGRESSION & GOLDEN SUNBEAM COMPLETION SEQUENCE
+   * 11. CONNECTED MASONRY BONDING, PROGRESSION & GOLDEN SUNBEAM COMPLETION
    * ========================================================================== */
+  _computeMasonryNeighborMask(slot) {
+    if (!this._isConnectableMasonrySlot(slot)) return 0;
+
+    let mask = 0;
+    const { gridX: gx, layer, gridZ: gz } = slot;
+
+    // 4 Horizontal neighbors (+X, -X, +Z, -Z) on the exact same tier
+    if (this._isConnectableMasonrySlot(this._getGridSlot(gx + 1, layer, gz))) mask |= NEIGHBOR_PX;
+    if (this._isConnectableMasonrySlot(this._getGridSlot(gx - 1, layer, gz))) mask |= NEIGHBOR_NX;
+    if (this._isConnectableMasonrySlot(this._getGridSlot(gx, layer, gz + 1))) mask |= NEIGHBOR_PZ;
+    if (this._isConnectableMasonrySlot(this._getGridSlot(gx, layer, gz - 1))) mask |= NEIGHBOR_NZ;
+
+    // Vertical +Y neighbor (exact stacked wall/column block directly above)
+    if (this._isConnectableMasonrySlot(this._getGridSlot(gx, layer + 1, gz))) {
+      mask |= NEIGHBOR_PY;
+    }
+
+    // Vertical -Y neighbor (exact stacked block below OR half-offset pyramid tier support below)
+    if (layer > 0) {
+      if (this._isConnectableMasonrySlot(this._getGridSlot(gx, layer - 1, gz))) {
+        mask |= NEIGHBOR_NY;
+      } else {
+        // Stepped pyramid half-offset support check: flatten bottom seam when supported by lower course
+        const hasLowerSupport =
+          this._isConnectableMasonrySlot(this._getGridSlot(gx - 0.5, layer - 1, gz - 0.5)) &&
+          this._isConnectableMasonrySlot(this._getGridSlot(gx + 0.5, layer - 1, gz - 0.5)) &&
+          this._isConnectableMasonrySlot(this._getGridSlot(gx - 0.5, layer - 1, gz + 0.5)) &&
+          this._isConnectableMasonrySlot(this._getGridSlot(gx + 0.5, layer - 1, gz + 0.5));
+        if (hasLowerSupport) mask |= NEIGHBOR_NY;
+      }
+    }
+
+    return mask;
+  }
+
+  _applyConnectedMasonry(slot) {
+    if (!this._isConnectableMasonrySlot(slot)) return;
+    const mask = this._computeMasonryNeighborMask(slot);
+    if (slot.block.masonryMask === mask) return;
+
+    const { w, h, d, bevel } = this._getMasonryBlockDimensions();
+    slot.block.masonryMask = mask;
+    slot.block.mesh.geometry = this.masonryCache.getBlockGeometry(w, h, d, mask, bevel);
+  }
+
+  _onConnectedMasonryUpdated(_slot) {
+    // Subclass hook (e.g. Level2Rome continuous cornice & roof bonding updates)
+  }
+
+  _updateConnectedMasonryAround(slot) {
+    if (!slot || slot.gridX === undefined || slot.gridZ === undefined) return;
+    const { gridX: gx, layer, gridZ: gz } = slot;
+
+    // Update this block + 4 horizontal + 2 vertical neighbors in O(1) (< 0.2 ms)
+    const candidates = [
+      slot,
+      this._getGridSlot(gx + 1, layer, gz),
+      this._getGridSlot(gx - 1, layer, gz),
+      this._getGridSlot(gx, layer, gz + 1),
+      this._getGridSlot(gx, layer, gz - 1),
+      this._getGridSlot(gx, layer + 1, gz),
+      this._getGridSlot(gx, layer - 1, gz),
+    ];
+
+    for (let i = 0; i < candidates.length; i++) {
+      if (candidates[i]) this._applyConnectedMasonry(candidates[i]);
+    }
+
+    this._onConnectedMasonryUpdated(slot);
+  }
+
   _onPyramidBlockPlaced(slot) {
     this.placedCount += 1;
     this.audio.playBlueprintSnap(slot.layer);
+
+    // Automatically bond this block flush into all occupied horizontal & vertical neighbors
+    this._updateConnectedMasonryAround(slot);
 
     this._spawnParticles(slot.position, {
       count: slot.isCapstone ? 28 : 12,
@@ -2440,6 +2553,10 @@ export class Level1Pyramid {
     this.palmFronds.length = 0;
     this.carvingPips.length = 0;
     this.auraRingMesh = null;
+    this.slotGridMap.clear();
+    if (this.masonryCache) {
+      this.masonryCache.dispose();
+    }
 
     // Restore shared terrain splat color to neutral white
     this.textures.materials.terrainSplat.color.setHex(0xffffff);

@@ -10,11 +10,22 @@
 
 import * as THREE from 'three';
 import { Level1Pyramid } from './level1_pyramid.js';
+import {
+  createConnectedMasonryGeometry,
+  createCompluviumStraightRoofGeometry,
+  createCompluviumCornerRoofGeometry,
+  NEIGHBOR_PX,
+  NEIGHBOR_NX,
+  NEIGHBOR_PZ,
+  NEIGHBOR_NZ,
+  NEIGHBOR_PY,
+  NEIGHBOR_NY,
+} from './connectedMasonry.js';
 
 const BLOCK_W = 0.96;
-const BLOCK_H = 0.62;
+const BLOCK_H = 0.64;
 const BLOCK_D = 0.96;
-const DOMUS_STEP = 1.04;
+const DOMUS_STEP = BLOCK_W; // Exact zero-gap horizontal grid step matching block width/depth
 const DOMUS_CENTER = new THREE.Vector3(3.6, 0, -0.8);
 const FOUNDATION_Y = 0.24;
 
@@ -155,19 +166,17 @@ function computeRomanSplatWeights(x, z, h) {
 }
 
 /**
- * Builds an inward-sloping terracotta roof wedge geometry (tegulae compluvium slope).
- * Slopes downward toward +Z (rotated per slot around Y so every roof section slopes toward the central impluvium!).
+ * Builds a compact sloped terracotta roof tile preview for workbench carving & dragging.
  */
-function createCompluviumRoofGeometry(width, height, depth) {
+function createRoofPreviewGeometry(width, height, depth) {
   const geo = new THREE.BoxGeometry(width, height, depth, 2, 1, 2);
   const pos = geo.attributes.position;
   for (let i = 0; i < pos.count; i++) {
     const y = pos.getY(i);
     const z = pos.getZ(i);
     if (y > 0) {
-      // Higher outer eave at -Z, lower inner compluvium drip edge at +Z
-      const t = (z + depth * 0.5) / depth; // 0 at outer edge, 1 at inner edge
-      pos.setY(i, height * 0.5 + (1 - t) * 0.34 - t * 0.08);
+      const t = (z + depth * 0.5) / depth;
+      pos.setY(i, height * 0.5 + (1 - t) * 0.26 - t * 0.06);
     }
   }
   geo.computeVertexNormals();
@@ -175,18 +184,19 @@ function createCompluviumRoofGeometry(width, height, depth) {
 }
 
 /**
- * Builds a classical fluted Roman marble column geometry with base plinth & Doric capital.
+ * Builds a classical fluted Roman marble column geometry with sturdy base plinth & Doric capital.
  */
 function createFlutedColumnGeometry(height) {
   const pts = [
     new THREE.Vector2(0.0, -height * 0.5),
     new THREE.Vector2(0.36, -height * 0.5),
-    new THREE.Vector2(0.36, -height * 0.38),
-    new THREE.Vector2(0.27, -height * 0.34),
-    new THREE.Vector2(0.24, height * 0.32),
-    new THREE.Vector2(0.33, height * 0.4),
-    new THREE.Vector2(0.36, height * 0.42),
-    new THREE.Vector2(0.36, height * 0.5),
+    new THREE.Vector2(0.36, -height * 0.43),
+    new THREE.Vector2(0.28, -height * 0.4),
+    new THREE.Vector2(0.24, -height * 0.36),
+    new THREE.Vector2(0.21, height * 0.36),
+    new THREE.Vector2(0.29, height * 0.42),
+    new THREE.Vector2(0.38, height * 0.45),
+    new THREE.Vector2(0.38, height * 0.5),
     new THREE.Vector2(0.0, height * 0.5),
   ];
   const geo = new THREE.LatheGeometry(pts, 16);
@@ -195,11 +205,13 @@ function createFlutedColumnGeometry(height) {
 }
 
 /**
- * Defines the 48-block, 4-tier Classical Roman Domus Blueprint:
- *   Tier 1 (16 blocks): Perimeter travertine foundation around mosaic atrium & impluvium
- *   Tier 2 (14 blocks): 10 perimeter Roman Ashlar walls (with front doorway & garden arch) + 4 fluted marble atrium columns
- *   Tier 3 (10 blocks): Carved stone lintels, architrave beams & upper frieze
- *   Tier 4 (8 blocks):  Sloped terracotta-red compluvium roof sections sloping inward toward the central impluvium
+ * Defines the 48-block, 4-tier Classical Roman Domus Blueprint (zero-gap DOMUS_STEP = 0.96):
+ *   Tier 1 (16 blocks): Full 5x5 perimeter travertine foundation around mosaic atrium & impluvium
+ *   Tier 2 (14 blocks): 10 perimeter Roman Ashlar walls (with front doorway, garden vista & side loggia arches)
+ *                       + 4 tall fluted marble atrium columns rising flush from mosaic floor to roof soffit
+ *   Tier 3 (10 blocks): Carved stone entablature lintels bridging doorway, garden vista & side bays
+ *                       (automatically bonding corner/pier cornice stones into a continuous upper wall ring)
+ *   Tier 4 (8 blocks):  4 straight eaves + 4 mitered 45-degree corner hip terracotta compluvium roof sections
  */
 function buildDomusBlueprintTiers() {
   // Tier 1: 5x5 outer perimeter ring = 16 blocks
@@ -212,7 +224,7 @@ function buildDomusBlueprintTiers() {
     }
   }
 
-  // Tier 2: 10 perimeter Ashlar walls (South doorway [0,2] & North garden vista [0,-2] open) + 4 fluted columns = 14 blocks
+  // Tier 2: 10 perimeter Ashlar walls + 4 full-height fluted marble atrium columns = 14 blocks
   const tier2Walls = [
     [-2, -2], [-1, -2], [1, -2], [2, -2],
     [-2, 0], [2, 0],
@@ -225,7 +237,7 @@ function buildDomusBlueprintTiers() {
 
   const tier2 = [...tier2Walls, ...tier2Columns];
 
-  // Tier 3: Entablature lintels bridging the doorway, garden arch & side peristyle = 10 blocks
+  // Tier 3: Entablature lintels bridging the doorway, garden vista & side peristyle bays = 10 blocks
   const tier3 = [
     [-1, -2], [0, -2], [1, -2],
     [-2, -1], [2, -1],
@@ -233,20 +245,30 @@ function buildDomusBlueprintTiers() {
     [-1, 2], [0, 2], [1, 2],
   ].map(([dx, dz]) => ({ dx, dz, pieceType: 'ashlar', rotY: 0 }));
 
-  // Tier 4: 8 sloped terracotta compluvium roof sections sloping inward toward (0,0)
+  // Tier 4: 8 welded terracotta compluvium roof sections (4 straight eaves + 4 mitered 45° hip corners)
   const tier4 = [
-    { dx: -1, dz: -1, pieceType: 'roof', rotY: 0 }, // North slope -> toward +Z
-    { dx: 0, dz: -1, pieceType: 'roof', rotY: 0 },
-    { dx: 1, dz: -1, pieceType: 'roof', rotY: 0 },
-    { dx: 1, dz: 0, pieceType: 'roof', rotY: -Math.PI * 0.5 }, // East slope -> toward -X
-    { dx: 1, dz: 1, pieceType: 'roof', rotY: Math.PI }, // South slope -> toward -Z
-    { dx: 0, dz: 1, pieceType: 'roof', rotY: Math.PI },
-    { dx: -1, dz: 1, pieceType: 'roof', rotY: Math.PI },
-    { dx: -1, dz: 0, pieceType: 'roof', rotY: Math.PI * 0.5 }, // West slope -> toward +X
+    { dx: -1, dz: -1, pieceType: 'roof', roofVariant: 'corner', rotY: 0 }, // NW 45° hip
+    { dx: 0, dz: -1, pieceType: 'roof', roofVariant: 'straight', rotY: 0 }, // North slope
+    { dx: 1, dz: -1, pieceType: 'roof', roofVariant: 'corner', rotY: -Math.PI * 0.5 }, // NE 45° hip
+    { dx: 1, dz: 0, pieceType: 'roof', roofVariant: 'straight', rotY: -Math.PI * 0.5 }, // East slope
+    { dx: 1, dz: 1, pieceType: 'roof', roofVariant: 'corner', rotY: Math.PI }, // SE 45° hip
+    { dx: 0, dz: 1, pieceType: 'roof', roofVariant: 'straight', rotY: Math.PI }, // South slope
+    { dx: -1, dz: 1, pieceType: 'roof', roofVariant: 'corner', rotY: Math.PI * 0.5 }, // SW 45° hip
+    { dx: -1, dz: 0, pieceType: 'roof', roofVariant: 'straight', rotY: Math.PI * 0.5 }, // West slope
   ];
 
   return [tier1, tier2, tier3, tier4];
 }
+
+// 6 perimeter corner/center pier positions on Tier 3 that bond automatically when adjacent lintels lock in
+const CORNICE_BONDER_CELLS = [
+  { dx: -2, dz: -2, triggers: [[-1, -2], [-2, -1]] },
+  { dx: 2, dz: -2, triggers: [[1, -2], [2, -1]] },
+  { dx: -2, dz: 2, triggers: [[-1, 2], [-2, 1]] },
+  { dx: 2, dz: 2, triggers: [[1, 2], [2, 1]] },
+  { dx: -2, dz: 0, triggers: [[-2, -1], [-2, 1]] },
+  { dx: 2, dz: 0, triggers: [[2, -1], [2, 1]] },
+];
 
 export class Level2Rome extends Level1Pyramid {
   static meta = {
@@ -273,6 +295,8 @@ export class Level2Rome extends Level1Pyramid {
     this.rome = this.textures.ensureRomePack();
     this.totalGoal = Level2Rome.meta.totalGoal;
     this.hudLabel = Level2Rome.meta.hudLabel;
+    this.corniceBonders = new Map();
+    this.corniceTrimMeshes = [];
 
     // Upgrade Roman ashlar material with Royal Gold sheen if player purchased the upgrade
     if (this.upgrades.royal_gold_stone) {
@@ -290,17 +314,53 @@ export class Level2Rome extends Level1Pyramid {
     return this.rome.materials.rawTravertine;
   }
 
+  _getMasonryBlockDimensions() {
+    return { w: BLOCK_W, h: BLOCK_H, d: BLOCK_D, bevel: 0.04 };
+  }
+
   _initSharedGeometries() {
     super._initSharedGeometries();
 
-    // Roman specialized architectural geometries (Fluted Column + Sloped Compluvium Roof Tile)
-    this.geos.romanColumn = this._trackGeo(createFlutedColumnGeometry(BLOCK_H * 1.18));
-    this.geos.ghostColumn = this._trackGeo(new THREE.CylinderGeometry(0.32, 0.34, BLOCK_H * 1.16, 12));
+    // Override carved masonry block & ghost boxes to exact Level 2 height (BLOCK_H = 0.64)
+    this.geos.carvedBlock = this._trackGeo(
+      createConnectedMasonryGeometry(BLOCK_W, BLOCK_H, BLOCK_D, 0, 0.04)
+    );
+    this.geos.ghostBox = this._trackGeo(
+      new THREE.BoxGeometry(BLOCK_W * 0.96, BLOCK_H * 0.96, BLOCK_D * 0.96)
+    );
+    this.geos.ghostBoxEdges = this._trackGeo(
+      (() => {
+        const g = new THREE.BoxGeometry(BLOCK_W * 0.97, BLOCK_H * 0.97, BLOCK_D * 0.97);
+        const edges = new THREE.EdgesGeometry(g);
+        g.dispose();
+        return edges;
+      })()
+    );
+
+    // Fluted Roman Marble Columns: compact workbench preview + full 3-tier atrium shaft (flush floor -> roof)
+    const fullColH = BLOCK_H * 3.0;
+    this.geos.romanColumnPreview = this._trackGeo(createFlutedColumnGeometry(BLOCK_H * 1.25));
+    this.geos.romanColumn = this._trackGeo(createFlutedColumnGeometry(fullColH));
+    this.geos.ghostColumn = this._trackGeo(new THREE.CylinderGeometry(0.32, 0.34, fullColH * 0.98, 12));
     this.geos.ghostColumnEdges = this._trackGeo(new THREE.EdgesGeometry(this.geos.ghostColumn));
 
-    this.geos.romanRoof = this._trackGeo(createCompluviumRoofGeometry(BLOCK_W * 1.06, BLOCK_H * 0.72, BLOCK_D * 1.06));
-    this.geos.ghostRoof = this._trackGeo(createCompluviumRoofGeometry(BLOCK_W * 1.02, BLOCK_H * 0.7, BLOCK_D * 1.02));
-    this.geos.ghostRoofEdges = this._trackGeo(new THREE.EdgesGeometry(this.geos.ghostRoof));
+    // Welded Roman Compluvium Terracotta Roof (compact workbench tile + exact straight & 45° mitered corner)
+    const roofSpec = {
+      tileStep: BLOCK_W,
+      innerSpan: BLOCK_W * 0.5, // 0.48 -> frames exact 0.96x0.96 sunlit impluvium opening
+      outerSpan: BLOCK_W * 1.5 + 0.2, // 1.64 -> extends 0.20 eave overhang past outer ±2.40 stone walls
+      innerH: 0.14,
+      outerH: 0.68,
+    };
+    this.geos.romanRoofPreview = this._trackGeo(createRoofPreviewGeometry(BLOCK_W * 0.96, BLOCK_H * 0.65, BLOCK_D * 0.96));
+    this.geos.romanRoofStraight = this._trackGeo(createCompluviumStraightRoofGeometry(roofSpec));
+    this.geos.romanRoofCorner = this._trackGeo(createCompluviumCornerRoofGeometry(roofSpec));
+    this.geos.romanRoof = this.geos.romanRoofPreview;
+
+    this.geos.ghostRoofStraight = this.geos.romanRoofStraight;
+    this.geos.ghostRoofStraightEdges = this._trackGeo(new THREE.EdgesGeometry(this.geos.romanRoofStraight, 22));
+    this.geos.ghostRoofCorner = this.geos.romanRoofCorner;
+    this.geos.ghostRoofCornerEdges = this._trackGeo(new THREE.EdgesGeometry(this.geos.romanRoofCorner, 22));
 
     // Pale travertine dust particle color for Roman chipping
     this.mats.dustLimestone.color.set('#f4efe4');
@@ -799,9 +859,9 @@ export class Level2Rome extends Level1Pyramid {
 
     const dc = this.pyramidCenter;
 
-    // Raised Travertine Domus Construction Terrace
+    // Raised Travertine Domus Construction Terrace (exact apron around 4.80x4.80 zero-gap Domus walls)
     const basePlatform = new THREE.Mesh(
-      this._trackGeo(new THREE.BoxGeometry(5.9, FOUNDATION_Y, 5.9)),
+      this._trackGeo(new THREE.BoxGeometry(5.48, FOUNDATION_Y, 5.48)),
       this.rome.materials.travertineCliff
     );
     basePlatform.position.set(dc.x, FOUNDATION_Y * 0.5, dc.z);
@@ -811,7 +871,7 @@ export class Level2Rome extends Level1Pyramid {
 
     // Geometric Roman Mosaic Atrium Floor inside the Domus footprint
     const mosaicFloor = new THREE.Mesh(
-      this._trackGeo(new THREE.PlaneGeometry(5.2, 5.2)),
+      this._trackGeo(new THREE.PlaneGeometry(4.8, 4.8)),
       this.rome.materials.mosaicFloor
     );
     mosaicFloor.rotation.x = -Math.PI / 2;
@@ -821,7 +881,7 @@ export class Level2Rome extends Level1Pyramid {
 
     // Central Sunken Roman Impluvium Pool (carved marble curb + shimmering turquoise rainwater)
     const impRim = new THREE.Mesh(
-      this._trackGeo(new THREE.BoxGeometry(1.78, 0.12, 1.78)),
+      this._trackGeo(new THREE.BoxGeometry(1.56, 0.12, 1.56)),
       this.rome.materials.travertineCliff
     );
     impRim.position.set(dc.x, FOUNDATION_Y + 0.05, dc.z);
@@ -829,7 +889,7 @@ export class Level2Rome extends Level1Pyramid {
     site.add(impRim);
 
     const impWater = new THREE.Mesh(
-      this._trackGeo(new THREE.PlaneGeometry(1.42, 1.42)),
+      this._trackGeo(new THREE.PlaneGeometry(1.22, 1.22)),
       this.textures.materials.oasisWater
     );
     impWater.rotation.x = -Math.PI / 2;
@@ -840,10 +900,10 @@ export class Level2Rome extends Level1Pyramid {
     const postGeo = this._trackGeo(new THREE.CylinderGeometry(0.08, 0.11, 0.72, 8));
     const capGeo = this._trackGeo(new THREE.SphereGeometry(0.11, 8, 8));
     [
-      [-2.85, -2.85],
-      [2.85, -2.85],
-      [-2.85, 2.85],
-      [2.85, 2.85],
+      [-2.62, -2.62],
+      [2.62, -2.62],
+      [-2.62, 2.62],
+      [2.62, 2.62],
     ].forEach(([ox, oz]) => {
       const post = new THREE.Mesh(postGeo, this.rome.materials.travertineCliff);
       post.position.set(dc.x + ox, FOUNDATION_Y + 0.34, dc.z + oz);
@@ -857,7 +917,7 @@ export class Level2Rome extends Level1Pyramid {
 
     // Aura du Pyramidion upgrade support (golden glowing construction halo)
     if (this.upgrades.pyramidion_aura) {
-      const auraGeo = this._trackGeo(new THREE.RingGeometry(3.38, 3.68, 40));
+      const auraGeo = this._trackGeo(new THREE.RingGeometry(3.15, 3.45, 40));
       auraGeo.rotateX(-Math.PI / 2);
       const auraMat = this._trackMat(
         new THREE.MeshBasicMaterial({
@@ -904,7 +964,55 @@ export class Level2Rome extends Level1Pyramid {
       });
     });
 
-    // Build all 48 progressive blueprint slots across the 4 Roman Domus tiers
+    // Pre-build the 6 automatic Tier 3 Cornice Bonding Stones over the 4 corners & 2 E/W piers
+    // They bond seamlessly when adjacent Tier 3 lintels lock in so the upper entablature is 100% solid under the roof!
+    const tier3CenterY = FOUNDATION_Y + 2 * BLOCK_H + BLOCK_H * 0.5;
+    CORNICE_BONDER_CELLS.forEach((spec) => {
+      const wx = dc.x + spec.dx * DOMUS_STEP;
+      const wz = dc.z + spec.dz * DOMUS_STEP;
+      const mesh = new THREE.Mesh(this.geos.carvedBlock, this.carvedBlockMat);
+      mesh.position.set(wx, tier3CenterY, wz);
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      mesh.visible = false;
+      site.add(mesh);
+
+      const key = this._gridKey(spec.dx, 2, spec.dz);
+      this.corniceBonders.set(key, {
+        gridX: spec.dx,
+        layer: 2,
+        gridZ: spec.dz,
+        triggers: spec.triggers,
+        mesh,
+        active: false,
+        masonryMask: -1,
+      });
+    });
+
+    // Subtle continuous molded travertine eaves cornice trim around top of Tier 3 (revealed when Tier 3 bonds)
+    const trimY = FOUNDATION_Y + 3 * BLOCK_H - 0.045;
+    const trimLen = 5 * BLOCK_W + 0.14;
+    const trimH = 0.09;
+    const trimThick = 0.12;
+    const trimEdge = 2.5 * BLOCK_W + 0.02;
+    const trimNSGeo = this._trackGeo(new THREE.BoxGeometry(trimLen, trimH, trimThick));
+    const trimEWGeo = this._trackGeo(new THREE.BoxGeometry(trimThick, trimH, trimLen));
+    [
+      [trimNSGeo, 0, -trimEdge],
+      [trimNSGeo, 0, trimEdge],
+      [trimEWGeo, -trimEdge, 0],
+      [trimEWGeo, trimEdge, 0],
+    ].forEach(([geo, ox, oz]) => {
+      const m = new THREE.Mesh(geo, this.rome.materials.travertineCliff);
+      m.position.set(dc.x + ox, trimY, dc.z + oz);
+      m.castShadow = true;
+      m.receiveShadow = true;
+      m.visible = false;
+      site.add(m);
+      this.corniceTrimMeshes.push(m);
+    });
+
+    // Build all 48 progressive blueprint slots across the 4 Roman Domus tiers (zero-gap DOMUS_STEP = 0.96)
     const tiers = buildDomusBlueprintTiers();
     this.maxLayerIndex = tiers.length - 1;
     let slotIdx = 0;
@@ -917,10 +1025,14 @@ export class Level2Rome extends Level1Pyramid {
         const wz = dc.z + cell.dz * DOMUS_STEP;
         const isColumn = cell.pieceType === 'column';
         const isRoof = cell.pieceType === 'roof';
+        const isCornerRoof = isRoof && cell.roofVariant === 'corner';
+
+        // Columns span flush from mosaic floor (FOUNDATION_Y) to roof underside (FOUNDATION_Y + 3*BLOCK_H).
+        // Roof sections have flat underside at local y = 0, sitting flush on Tier 3 cornice & columns (layerBaseY).
         const centerY = isColumn
-          ? layerBaseY + BLOCK_H * 0.59
+          ? FOUNDATION_Y + BLOCK_H * 1.5
           : isRoof
-          ? layerBaseY + BLOCK_H * 0.36
+          ? layerBaseY
           : layerBaseY + BLOCK_H * 0.5;
 
         const ghostGroup = new THREE.Group();
@@ -930,12 +1042,16 @@ export class Level2Rome extends Level1Pyramid {
         const gGeo = isColumn
           ? this.geos.ghostColumn
           : isRoof
-          ? this.geos.ghostRoof
+          ? isCornerRoof
+            ? this.geos.ghostRoofCorner
+            : this.geos.ghostRoofStraight
           : this.geos.ghostBox;
         const gEdges = isColumn
           ? this.geos.ghostColumnEdges
           : isRoof
-          ? this.geos.ghostRoofEdges
+          ? isCornerRoof
+            ? this.geos.ghostRoofCornerEdges
+            : this.geos.ghostRoofStraightEdges
           : this.geos.ghostBoxEdges;
 
         const ghostMesh = new THREE.Mesh(gGeo, this.mats.ghostNormal);
@@ -945,22 +1061,27 @@ export class Level2Rome extends Level1Pyramid {
         ghostGroup.visible = layer === 0;
         site.add(ghostGroup);
 
-        this.pyramidSlots.push({
+        const slot = {
           id: `domus_L${layer}_${cellIdx}`,
           index: slotIdx++,
           zoneType: 'pyramid',
           layer,
+          gridX: cell.dx,
+          gridZ: cell.dz,
           isCapstone: false,
           pieceType: cell.pieceType,
+          roofVariant: cell.roofVariant || null,
           rotY: cell.rotY || 0,
           accepts: ['carved', 'capstone'],
           position: new THREE.Vector3(wx, centerY, wz),
-          dropIndicatorY: layerBaseY + 0.01,
+          dropIndicatorY: isColumn ? FOUNDATION_Y + 0.02 : layerBaseY + 0.01,
           ghostGroup,
           ghostMesh,
           ghostLines,
           block: null,
-        });
+        };
+        this.pyramidSlots.push(slot);
+        this._registerSlotInGrid(slot);
       });
     });
 
@@ -968,10 +1089,99 @@ export class Level2Rome extends Level1Pyramid {
   }
 
   /* ============================================================================
-   * 5. ROMAN STONECUTTING (ASHLAR / FLUTED COLUMN / TERRACOTTA ROOF CORNICE)
+   * 5. CONNECTED ROMAN MASONRY, CORNICE BONDING & WELDED TERRACOTTA ROOF
    * ========================================================================== */
+  _hasOccupiedMasonryAt(gx, layer, gz) {
+    const slot = this._getGridSlot(gx, layer, gz);
+    if (this._isConnectableMasonrySlot(slot)) return true;
+    const bonder = this.corniceBonders ? this.corniceBonders.get(this._gridKey(gx, layer, gz)) : null;
+    return Boolean(bonder && bonder.active);
+  }
+
+  _computeMasonryNeighborMask(slot) {
+    if (!this._isConnectableMasonrySlot(slot)) return 0;
+    const { gridX: gx, layer, gridZ: gz } = slot;
+    let mask = 0;
+
+    if (this._hasOccupiedMasonryAt(gx + 1, layer, gz)) mask |= NEIGHBOR_PX;
+    if (this._hasOccupiedMasonryAt(gx - 1, layer, gz)) mask |= NEIGHBOR_NX;
+    if (this._hasOccupiedMasonryAt(gx, layer, gz + 1)) mask |= NEIGHBOR_PZ;
+    if (this._hasOccupiedMasonryAt(gx, layer, gz - 1)) mask |= NEIGHBOR_NZ;
+    if (this._hasOccupiedMasonryAt(gx, layer + 1, gz)) mask |= NEIGHBOR_PY;
+    if (layer > 0 && this._hasOccupiedMasonryAt(gx, layer - 1, gz)) mask |= NEIGHBOR_NY;
+
+    return mask;
+  }
+
+  _refreshCorniceBonderGeometry(bonder) {
+    if (!bonder || !bonder.active) return;
+    const { gridX: gx, layer, gridZ: gz } = bonder;
+    let mask = 0;
+    if (this._hasOccupiedMasonryAt(gx + 1, layer, gz)) mask |= NEIGHBOR_PX;
+    if (this._hasOccupiedMasonryAt(gx - 1, layer, gz)) mask |= NEIGHBOR_NX;
+    if (this._hasOccupiedMasonryAt(gx, layer, gz + 1)) mask |= NEIGHBOR_PZ;
+    if (this._hasOccupiedMasonryAt(gx, layer, gz - 1)) mask |= NEIGHBOR_NZ;
+    if (this._hasOccupiedMasonryAt(gx, layer - 1, gz)) mask |= NEIGHBOR_NY;
+
+    if (bonder.masonryMask === mask) return;
+    bonder.masonryMask = mask;
+    const { w, h, d, bevel } = this._getMasonryBlockDimensions();
+    bonder.mesh.geometry = this.masonryCache.getBlockGeometry(w, h, d, mask, bevel);
+  }
+
+  _onConnectedMasonryUpdated(slot) {
+    if (!this.corniceBonders || !slot) return;
+
+    // Activate any Tier 3 cornice bonding pier once an adjacent Tier 3 lintel snaps next to it
+    let anyBonderChanged = false;
+    this.corniceBonders.forEach((bonder) => {
+      if (!bonder.active) {
+        const pierBelowOccupied = this._hasOccupiedMasonryAt(bonder.gridX, 1, bonder.gridZ);
+        const adjacentLintelPlaced = bonder.triggers.some(([tx, tz]) =>
+          this._hasOccupiedMasonryAt(tx, 2, tz)
+        );
+        if (pierBelowOccupied && adjacentLintelPlaced) {
+          bonder.active = true;
+          bonder.mesh.visible = true;
+          this._triggerSquashBounce(bonder.mesh, 1.08, 0.92);
+          anyBonderChanged = true;
+        }
+      }
+      if (bonder.active) {
+        this._refreshCorniceBonderGeometry(bonder);
+      }
+    });
+
+    // Re-bond adjacent Tier 2 piers & Tier 3 lintels whenever a cornice bonding pier activates
+    if (anyBonderChanged) {
+      this.corniceBonders.forEach((bonder) => {
+        if (!bonder.active) return;
+        const { gridX: gx, layer, gridZ: gz } = bonder;
+        [
+          this._getGridSlot(gx + 1, layer, gz),
+          this._getGridSlot(gx - 1, layer, gz),
+          this._getGridSlot(gx, layer, gz + 1),
+          this._getGridSlot(gx, layer, gz - 1),
+          this._getGridSlot(gx, layer - 1, gz),
+        ].forEach((nb) => {
+          if (nb) this._applyConnectedMasonry(nb);
+        });
+      });
+    }
+
+    // Reveal the continuous molded travertine Roman cornice band once Tier 3 entablature completes
+    const tier3Done = this.pyramidSlots
+      .filter((s) => s.layer === 2)
+      .every((s) => Boolean(s.block));
+    if (tier3Done && this.corniceTrimMeshes.length > 0 && !this.corniceTrimMeshes[0].visible) {
+      this.corniceTrimMeshes.forEach((m) => {
+        m.visible = true;
+      });
+    }
+  }
+
   _shouldForgeCapstone() {
-    // Level 2 finishes with terracotta compluvium roof tiles instead of an Egyptian golden pyramidion
+    // Level 2 finishes with welded terracotta compluvium roof tiles instead of an Egyptian pyramidion
     return false;
   }
 
@@ -987,18 +1197,27 @@ export class Level2Rome extends Level1Pyramid {
     const block = this.workbenchSlot ? this.workbenchSlot.block : null;
     if (block && block.kind === 'carved' && !stillRaw) {
       const pieceType = this._pickNextCarvedPieceType();
-      this._applyRomanPieceVisual(block, pieceType);
+      this._applyRomanPieceVisual(block, pieceType, null);
     }
     return stillRaw;
   }
 
-  _applyRomanPieceVisual(block, pieceType) {
+  _applyRomanPieceVisual(block, pieceType, slot = null) {
     block.pieceType = pieceType;
     if (pieceType === 'column') {
-      block.mesh.geometry = this.geos.romanColumn;
+      // Compact column on workbench/sled -> full 3-tier atrium shaft when snapped into Domus slot
+      block.mesh.geometry = slot ? this.geos.romanColumn : this.geos.romanColumnPreview;
       block.mesh.material = this.rome.materials.flutedColumn;
     } else if (pieceType === 'roof') {
-      block.mesh.geometry = this.geos.romanRoof;
+      // Compact terracotta tile on workbench/sled -> welded full-eave straight or 45° mitered corner roof
+      if (slot) {
+        block.mesh.geometry =
+          slot.roofVariant === 'corner'
+            ? this.geos.romanRoofCorner
+            : this.geos.romanRoofStraight;
+      } else {
+        block.mesh.geometry = this.geos.romanRoofPreview;
+      }
       block.mesh.material = this.rome.materials.terracottaRoof;
     } else {
       block.mesh.geometry = this.geos.carvedBlock;
@@ -1008,7 +1227,13 @@ export class Level2Rome extends Level1Pyramid {
 
   _fitPlacedBlock(block, slot) {
     if (!slot || !slot.pieceType) return;
-    this._applyRomanPieceVisual(block, slot.pieceType);
+    this._applyRomanPieceVisual(block, slot.pieceType, slot);
+  }
+
+  dispose() {
+    if (this.corniceBonders) this.corniceBonders.clear();
+    if (this.corniceTrimMeshes) this.corniceTrimMeshes.length = 0;
+    super.dispose();
   }
 
   /* ============================================================================
