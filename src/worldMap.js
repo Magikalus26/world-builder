@@ -205,6 +205,39 @@ export class WorldMapScene {
           roughness: 0.68,
         })
       ),
+      sakuraPink: this._trackMat(
+        new THREE.MeshStandardMaterial({
+          color: new THREE.Color('#f7b4c8'),
+          roughness: 0.72,
+        })
+      ),
+      sakuraLight: this._trackMat(
+        new THREE.MeshStandardMaterial({
+          color: new THREE.Color('#ffd9e5'),
+          roughness: 0.68,
+        })
+      ),
+      shojiCream: this._trackMat(
+        new THREE.MeshStandardMaterial({
+          color: new THREE.Color('#f5ead1'),
+          emissive: new THREE.Color('#5a421c'),
+          emissiveIntensity: 0.16,
+          roughness: 0.65,
+        })
+      ),
+      cedarDark: this._trackMat(
+        new THREE.MeshStandardMaterial({
+          color: new THREE.Color('#4f3324'),
+          roughness: 0.8,
+        })
+      ),
+      kawaraSlate: this._trackMat(
+        new THREE.MeshStandardMaterial({
+          color: new THREE.Color('#344254'),
+          roughness: 0.5,
+          metalness: 0.18,
+        })
+      ),
       lockStone: this._trackMat(
         new THREE.MeshStandardMaterial({
           color: new THREE.Color('#9e978b'),
@@ -800,7 +833,7 @@ export class WorldMapScene {
   }
 
   /**
-   * Level 3 — Chine : La Pagode Céleste (LOCKED PREVIEW)
+   * Level 3 — Japon : La Maison Ancienne (UNLOCKED & PLAYABLE — 46 blocs)
    */
   _buildChinaIsland() {
     const pos = new THREE.Vector3(-1.65, 0, -4.35);
@@ -808,7 +841,7 @@ export class WorldMapScene {
     group.position.copy(pos);
     this.root.add(group);
 
-    // Terraced jade mountain island
+    // Mossy emerald Japanese mountain garden island
     const moundGeo = this._trackGeo(createIslandMoundGeometry(2.5, 2.3, 0.68, 6.4));
     const mound = new THREE.Mesh(moundGeo, this.mats.jadeMountain);
     mound.position.y = 0.14;
@@ -817,82 +850,158 @@ export class WorldMapScene {
     group.add(mound);
     this._addShoreFoamRing(group, 2.62, 2.42);
 
-    // Stepped mountain terrace beneath the Celestial Pagoda
+    // Glowing golden base ring indicating UNLOCKED & PLAYABLE
+    const ringGeo = this._trackGeo(new THREE.RingGeometry(2.8, 3.06, 36));
+    ringGeo.rotateX(-Math.PI / 2);
+    const ringMesh = new THREE.Mesh(ringGeo, this.mats.goldRing);
+    ringMesh.position.y = 0.11;
+    ringMesh.scale.set(1, 1, 2.56 / 2.8);
+    group.add(ringMesh);
+
+    const haloGeo = this._trackGeo(new THREE.RingGeometry(3.06, 3.44, 36));
+    haloGeo.rotateX(-Math.PI / 2);
+    const haloMesh = new THREE.Mesh(haloGeo, this.mats.goldHalo);
+    haloMesh.position.y = 0.095;
+    haloMesh.scale.set(1, 1, 2.56 / 2.8);
+    group.add(haloMesh);
+
+    this.unlockedRings.push({
+      nodeId: 'level3_japan',
+      ringMesh,
+      haloMesh,
+      ratioZ: 2.56 / 2.8,
+      phase: 3.1,
+    });
+
+    // Stepped Zen stone garden terrace beneath the traditional Japanese Minka house
     const terrace = new THREE.Mesh(
-      this._trackGeo(new THREE.CylinderGeometry(1.22, 1.62, 0.44, 8)),
+      this._trackGeo(new THREE.CylinderGeometry(1.26, 1.66, 0.36, 8)),
       this.mats.jadeMountain
     );
-    terrace.position.set(0.15, 0.72, -0.15);
+    terrace.position.set(0.1, 0.68, -0.1);
     terrace.castShadow = true;
     terrace.receiveShadow = true;
     group.add(terrace);
 
-    // Tiny stone mountain stairs ascending to the pagoda
-    for (let s = 0; s < 4; s++) {
-      const stair = new THREE.Mesh(
-        this._trackGeo(new THREE.BoxGeometry(0.42, 0.09, 0.22)),
-        this.mats.romanMarble
-      );
-      stair.position.set(0.15, 0.56 + s * 0.1, 1.38 - s * 0.16);
-      group.add(stair);
-    }
+    // Tiny miniature turquoise koi pond on East flank
+    const miniPond = new THREE.Mesh(
+      this._trackGeo(new THREE.CircleGeometry(0.46, 14)),
+      this.textures.materials.oasisWater
+    );
+    miniPond.rotation.x = -Math.PI / 2;
+    miniPond.position.set(1.25, 0.71, 0.55);
+    group.add(miniPond);
 
-    // 3-Tiered Vermilion-Red & Golden-Trim Celestial Pagoda
-    const pagoda = new THREE.Group();
-    pagoda.position.set(0.15, 0.94, -0.15);
+    // Miniature 3D Traditional Japanese Minka House (Ishigaki plinth + Engawa + Shoji walls + Curved Kawara Roof)
+    const minka = new THREE.Group();
+    minka.position.set(0.1, 0.86, -0.1);
+    minka.rotation.y = 0.16;
 
-    const tiers = [
-      { wallW: 0.92, wallH: 0.36, roofR: 1.02, roofH: 0.24 },
-      { wallW: 0.68, wallH: 0.3, roofR: 0.78, roofH: 0.2 },
-      { wallW: 0.46, wallH: 0.26, roofR: 0.56, roofH: 0.19 },
-    ];
-    let curY = 0;
-    tiers.forEach((t) => {
-      const wall = new THREE.Mesh(
-        this._trackGeo(new THREE.BoxGeometry(t.wallW, t.wallH, t.wallW)),
-        this.mats.pagodaRed
-      );
-      wall.position.y = curY + t.wallH * 0.5;
-      wall.castShadow = true;
-      pagoda.add(wall);
+    // Grey Ishigaki stone base + warm wooden Engawa veranda
+    const stoneBase = new THREE.Mesh(
+      this._trackGeo(new THREE.BoxGeometry(1.18, 0.18, 1.08)),
+      this.mats.lockStone
+    );
+    stoneBase.position.y = 0.09;
+    stoneBase.castShadow = true;
+    minka.add(stoneBase);
 
-      const roof = new THREE.Mesh(
-        this._trackGeo(new THREE.ConeGeometry(t.roofR, t.roofH, 4)),
-        this.mats.pagodaRoof
-      );
-      roof.position.y = curY + t.wallH + t.roofH * 0.45;
-      roof.rotation.y = Math.PI / 4;
-      roof.castShadow = true;
-      pagoda.add(roof);
+    const engawa = new THREE.Mesh(
+      this._trackGeo(new THREE.BoxGeometry(1.3, 0.06, 1.2)),
+      this.textures.materials.timber
+    );
+    engawa.position.y = 0.19;
+    minka.add(engawa);
 
-      // Gleaming golden eaves rim beneath each curved pagoda roof
-      const eave = new THREE.Mesh(
-        this._trackGeo(new THREE.BoxGeometry(t.roofR * 1.42, 0.045, t.roofR * 1.42)),
-        this.textures.materials.capstoneGold
-      );
-      eave.position.y = curY + t.wallH + 0.02;
-      pagoda.add(eave);
+    // Glowing cream Shoji walls framed by dark cedar corner posts
+    const walls = new THREE.Mesh(
+      this._trackGeo(new THREE.BoxGeometry(0.98, 0.44, 0.88)),
+      this.mats.shojiCream
+    );
+    walls.position.y = 0.43;
+    walls.castShadow = true;
+    minka.add(walls);
 
-      curY += t.wallH + t.roofH * 0.78;
+    const postGeo = this._trackGeo(new THREE.BoxGeometry(0.08, 0.46, 0.08));
+    [
+      [-0.48, -0.43],
+      [0.48, -0.43],
+      [-0.48, 0.43],
+      [0.48, 0.43],
+    ].forEach(([px, pz]) => {
+      const p = new THREE.Mesh(postGeo, this.mats.cedarDark);
+      p.position.set(px, 0.43, pz);
+      minka.add(p);
     });
 
-    // Golden celestial spire finial
-    const spire = new THREE.Mesh(
-      this._trackGeo(new THREE.ConeGeometry(0.06, 0.42, 6)),
-      this.textures.materials.capstoneGold
+    // Sweeping dark slate-blue Kawara hip-and-gable roof + carved ridge beam & onigawara tips
+    const lowerRoof = new THREE.Mesh(
+      this._trackGeo(new THREE.ConeGeometry(1.12, 0.48, 4)),
+      this.mats.kawaraSlate
     );
-    spire.position.y = curY + 0.22;
-    pagoda.add(spire);
-    group.add(pagoda);
+    lowerRoof.position.y = 0.85;
+    lowerRoof.rotation.y = Math.PI / 4;
+    lowerRoof.scale.set(1.06, 1.0, 0.96);
+    lowerRoof.castShadow = true;
+    minka.add(lowerRoof);
+
+    const ridge = new THREE.Mesh(
+      this._trackGeo(new THREE.BoxGeometry(0.68, 0.1, 0.12)),
+      this.mats.kawaraSlate
+    );
+    ridge.position.y = 1.07;
+    minka.add(ridge);
+
+    const oniGeo = this._trackGeo(new THREE.ConeGeometry(0.065, 0.16, 4));
+    [-0.36, 0.36].forEach((ox) => {
+      const oni = new THREE.Mesh(oniGeo, this.mats.kawaraSlate);
+      oni.position.set(ox, 1.13, 0);
+      oni.rotation.z = ox < 0 ? 0.25 : -0.25;
+      minka.add(oni);
+    });
+
+    group.add(minka);
+
+    // 2 Blooming Pink Cherry Blossom (Sakura) Trees framing the Japanese Minka house
+    const sTrunkGeo = this._trackGeo(new THREE.CylinderGeometry(0.055, 0.09, 0.56, 6));
+    const sPuffGeo = this._trackGeo(new THREE.IcosahedronGeometry(0.32, 1));
+    [
+      [1.22, 0.72, -0.68, 1.08],
+      [-1.02, 0.72, -0.78, 0.92],
+    ].forEach(([sx, sy, sz, sc], idx) => {
+      const sak = new THREE.Group();
+      sak.position.set(sx, sy, sz);
+      sak.scale.setScalar(sc);
+
+      const tr = new THREE.Mesh(sTrunkGeo, this.mats.cedarDark);
+      tr.position.y = 0.26;
+      tr.castShadow = true;
+      sak.add(tr);
+
+      [
+        [0, 0.62, 0, 1.05, 0.72, 1.05, false],
+        [-0.24, 0.52, 0.14, 0.78, 0.58, 0.78, true],
+        [0.24, 0.54, -0.1, 0.74, 0.55, 0.74, false],
+      ].forEach(([px, py, pz, rx, ry, rz, isLight]) => {
+        const pf = new THREE.Mesh(sPuffGeo, isLight ? this.mats.sakuraLight : this.mats.sakuraPink);
+        pf.position.set(px, py, pz);
+        pf.scale.set(rx, ry, rz);
+        pf.castShadow = true;
+        sak.add(pf);
+      });
+
+      this.animatedProps.push({ obj: sak, type: 'sway', phase: 1.9 + idx });
+      group.add(sak);
+    });
 
     // Swaying Emerald Bamboo Grove on the mountain flank
     const bambooGroup = new THREE.Group();
-    bambooGroup.position.set(-1.35, 0.56, 0.35);
+    bambooGroup.position.set(-1.35, 0.56, 0.42);
     const stalkGeo = this._trackGeo(new THREE.CylinderGeometry(0.032, 0.042, 1.05, 5));
     const leafGeo = this._trackGeo(new THREE.ConeGeometry(0.14, 0.36, 4));
-    for (let b = 0; b < 8; b++) {
-      const angle = (b / 8) * Math.PI * 2;
-      const rad = 0.2 + (b % 3) * 0.22;
+    for (let b = 0; b < 7; b++) {
+      const angle = (b / 7) * Math.PI * 2;
+      const rad = 0.2 + (b % 3) * 0.2;
       const bx = Math.cos(angle) * rad;
       const bz = Math.sin(angle) * rad;
       const hScale = 0.78 + (b % 3) * 0.22;
@@ -911,11 +1020,8 @@ export class WorldMapScene {
     this.animatedProps.push({ obj: bambooGroup, type: 'sway', phase: 2.7 });
     group.add(bambooGroup);
 
-    // Subtle 3D Stone Padlock Badge
-    const lock = this._addPadlockBadge(group, 0, 1.05, 1.55);
-
-    // Floating label
-    const badge = this._addIslandBadge(group, 'Niveau 3 • Bientôt', false, 3.25);
+    // Floating crisp diegetic label
+    const badge = this._addIslandBadge(group, 'Niveau 3 • Jouable', true, 2.85);
 
     // Generous touch hitbox
     const hitGeo = this._trackGeo(new THREE.CylinderGeometry(2.65, 2.75, 2.6, 12));
@@ -924,17 +1030,16 @@ export class WorldMapScene {
     group.add(hitbox);
 
     const node = {
-      id: 'level3_china',
+      id: 'level3_japan',
       levelIndex: 2,
-      unlocked: false,
-      title: 'Niveau 3 : La Pagode Céleste',
-      shortLabel: 'Chine',
+      unlocked: true,
+      title: 'Niveau 3 : La Maison Ancienne Japonaise (46 blocs)',
+      shortLabel: 'Japon',
       position: pos,
-      focusDistance: 23.0,
-      focusElevation: 46,
-      focusAzimuth: 0.1,
+      focusDistance: 17.5,
+      focusElevation: 40,
+      focusAzimuth: 0.14,
       group,
-      lock,
       badge,
       hitbox,
       bounceTime: 0,
@@ -975,13 +1080,13 @@ export class WorldMapScene {
       this.textures.materials.foundation
     );
 
-    // Road Segment 2: Rome -> Chine
+    // Road Segment 2: Rome -> Japon (UNLOCKED)
     layCurve(
       new THREE.Vector3(1.45, 0, -1.75),
       new THREE.Vector3(1.15, 0, -3.55),
       new THREE.Vector3(-0.05, 0, -3.95),
       6,
-      this.mats.lockStone
+      this.textures.materials.foundation
     );
   }
 

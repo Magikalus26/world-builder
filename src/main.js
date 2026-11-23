@@ -20,9 +20,10 @@ import { DecorationSystem } from './decorationSystem.js';
 import { RoguelikeLobbyController } from './roguelikeLobby.js';
 import { Level1Pyramid } from './levels/level1_pyramid.js';
 import { Level2Rome } from './levels/level2_rome.js';
+import { Level3Japan } from './levels/level3_japan.js';
 import { RoguelikeLevel, generateRoguelikeConfig } from './levels/roguelike_level.js';
 
-const LEVEL_REGISTRY = [Level1Pyramid, Level2Rome];
+const LEVEL_REGISTRY = [Level1Pyramid, Level2Rome, Level3Japan];
 
 class WorkdBuilderApp {
   constructor() {

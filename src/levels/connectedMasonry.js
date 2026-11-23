@@ -590,6 +590,222 @@ export function createCompluviumCornerRoofGeometry({
 }
 
 /**
+ * Shared concave Japanese Sori roof heightfield (world coordinates relative to Minka house center).
+ * Guarantees bit-for-bit vertex welding between all 4 straight bays and all 4 upturned corner hips.
+ */
+function sampleKawaraRoofY(wx, wz, outerReach, peakH, eaveH, cornerLift) {
+  const ax = Math.abs(wx);
+  const az = Math.abs(wz);
+  const d = Math.max(ax, az);
+  const u = Math.min(1, Math.max(0, d / outerReach));
+  // Concave Japanese sori curve swooping from central peak down to deep overhanging eaves
+  const base = eaveH + (peakH - eaveH) * Math.pow(1 - u, 1.42);
+  // Upturned corner eave flare (zero along straight bay edges |wx| <= 0.48 or |wz| <= 0.48!)
+  const s = (v) => {
+    const t = Math.min(1, Math.max(0, (v - 1.25) / (outerReach - 1.25)));
+    return t * t * (3 - 2 * t);
+  };
+  return base + cornerLift * s(ax) * s(az);
+}
+
+/**
+ * Builds a seamless curved Japanese Kawara straight roof bay (canonical North bay centered at (0, -tileStep)).
+ * Subdivided into 5 concave sori bands welding flush to adjacent 45-degree corner hips and central peak.
+ */
+export function createKawaraStraightRoofGeometry({
+  tileStep = 0.96,
+  outerReach = 2.82,
+  peakH = 1.64,
+  eaveH = 0.14,
+  cornerLift = 0.24,
+  thickness = 0.14,
+} = {}) {
+  const hx = tileStep * 0.5;
+  const localOffsetZ = -tileStep; // Slot sits at world z = -tileStep
+  const bands = 5;
+
+  // Radial Z stops from apex (0.0) -> inner hip corner (-hx) -> 5 concave bands to outer eave (-outerReach)
+  const wzStops = [0.0, -hx];
+  for (let i = 1; i <= bands; i++) {
+    wzStops.push(-hx - ((outerReach - hx) * i) / bands);
+  }
+
+  const positions = [];
+  const uvs = [];
+
+  const uvTop = (p) => [p[0] / tileStep + 0.5, (p[2] - (-outerReach - localOffsetZ)) / tileStep];
+  const uvEdge = (p) => [p[0] / tileStep + 0.5, p[1] / 0.5];
+
+  const pt = (wx, wz, yShift = 0) => [
+    wx,
+    sampleKawaraRoofY(wx, wz, outerReach, peakH, eaveH, cornerLift) + yShift,
+    wz - localOffsetZ,
+  ];
+
+  // Segment 0: Apex triangle meeting the 3 other straight roof bays at exact center (0, 0)
+  const apexTop = pt(0, 0, 0);
+  const innerLTop = pt(-hx, -hx, 0);
+  const innerRTop = pt(hx, -hx, 0);
+  pushTriOriented(positions, uvs, apexTop, innerLTop, innerRTop, [0, 1, -0.35], uvTop);
+
+  const apexBot = pt(0, 0, -thickness);
+  const innerLBot = pt(-hx, -hx, -thickness);
+  const innerRBot = pt(hx, -hx, -thickness);
+  pushTriOriented(positions, uvs, apexBot, innerRBot, innerLBot, [0, -1, 0.35], uvTop);
+
+  // Segments 1..bands: Concave curved eave slope welding vertex-for-vertex with NW & NE corner hips
+  for (let i = 1; i < wzStops.length - 1; i++) {
+    const z0 = wzStops[i];
+    const z1 = wzStops[i + 1];
+
+    const t0L = pt(-hx, z0, 0);
+    const t0R = pt(hx, z0, 0);
+    const t1R = pt(hx, z1, 0);
+    const t1L = pt(-hx, z1, 0);
+    pushQuadOriented(positions, uvs, t0L, t1L, t1R, t0R, [0, 1, -0.35], uvTop);
+
+    const b0L = pt(-hx, z0, -thickness);
+    const b0R = pt(hx, z0, -thickness);
+    const b1R = pt(hx, z1, -thickness);
+    const b1L = pt(-hx, z1, -thickness);
+    pushQuadOriented(positions, uvs, b0L, b0R, b1R, b1L, [0, -1, 0.35], uvTop);
+
+    // Side seam walls (occluded inside solid roof once neighboring corners snap in)
+    pushQuadOriented(positions, uvs, t0L, b0L, b1L, t1L, [-1, 0, 0], uvEdge);
+    pushQuadOriented(positions, uvs, t0R, t1R, b1R, b0R, [1, 0, 0], uvEdge);
+  }
+
+  // Outer curved eave fascia edge (at world z = -outerReach)
+  const zOut = -outerReach;
+  pushQuadOriented(
+    positions,
+    uvs,
+    pt(-hx, zOut, 0),
+    pt(-hx, zOut, -thickness),
+    pt(hx, zOut, -thickness),
+    pt(hx, zOut, 0),
+    [0, 0, -1],
+    uvEdge
+  );
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geo.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+  geo.computeVertexNormals();
+  return geo;
+}
+
+/**
+ * Builds a seamless 45-degree mitered Japanese Kawara corner hip roof tile with upturned eaves
+ * (canonical NW corner centered at (-tileStep, -tileStep)).
+ * Welds vertex-for-vertex with adjacent North & West straight Kawara bays and includes a sculpted diagonal hip ridge.
+ */
+export function createKawaraCornerRoofGeometry({
+  tileStep = 0.96,
+  outerReach = 2.82,
+  peakH = 1.64,
+  eaveH = 0.14,
+  cornerLift = 0.24,
+  thickness = 0.14,
+} = {}) {
+  const hx = tileStep * 0.5;
+  const ox = -tileStep;
+  const oz = -tileStep;
+  const bands = 5;
+
+  const stops = [];
+  for (let i = 0; i <= bands; i++) {
+    stops.push(-hx - ((outerReach - hx) * i) / bands);
+  }
+
+  const positions = [];
+  const uvs = [];
+
+  const uvNorth = (p) => [(p[0] - (hx + ox)) / tileStep, (p[2] - (-outerReach - oz)) / tileStep];
+  const uvWest = (p) => [(p[2] - (hx + oz)) / tileStep, (p[0] - (-outerReach - ox)) / tileStep];
+  const uvFascia = (p) => [(p[0] + p[2]) / tileStep, p[1] / 0.5];
+
+  const pt = (wx, wz, yShift = 0) => [
+    wx - ox,
+    sampleKawaraRoofY(wx, wz, outerReach, peakH, eaveH, cornerLift) + yShift,
+    wz - oz,
+  ];
+
+  // Build 5 concentric mitered bands along both the North wing and West wing meeting at diagonal wx === wz
+  for (let i = 0; i < bands; i++) {
+    const r0 = stops[i]; // closer to center (e.g. -0.48)
+    const r1 = stops[i + 1]; // further out (e.g. -0.95)
+
+    // 1. North wing trapezoid: (r0, r0) -> (-hx, r0) -> (-hx, r1) -> (r1, r1)
+    const nT0 = pt(r0, r0, 0);
+    const nT1 = pt(-hx, r0, 0);
+    const nT2 = pt(-hx, r1, 0);
+    const nT3 = pt(r1, r1, 0);
+    pushQuadOriented(positions, uvs, nT0, nT1, nT2, nT3, [0, 1, -0.35], uvNorth);
+
+    const nB0 = pt(r0, r0, -thickness);
+    const nB1 = pt(-hx, r0, -thickness);
+    const nB2 = pt(-hx, r1, -thickness);
+    const nB3 = pt(r1, r1, -thickness);
+    pushQuadOriented(positions, uvs, nB0, nB3, nB2, nB1, [0, -1, 0.35], uvNorth);
+
+    // 2. West wing trapezoid: (r0, r0) -> (r1, r1) -> (r1, -hx) -> (r0, -hx)
+    const wT0 = pt(r0, r0, 0);
+    const wT1 = pt(r1, r1, 0);
+    const wT2 = pt(r1, -hx, 0);
+    const wT3 = pt(r0, -hx, 0);
+    pushQuadOriented(positions, uvs, wT0, wT1, wT2, wT3, [-0.35, 1, 0], uvWest);
+
+    const wB0 = pt(r0, r0, -thickness);
+    const wB1 = pt(r1, r1, -thickness);
+    const wB2 = pt(r1, -hx, -thickness);
+    const wB3 = pt(r0, -hx, -thickness);
+    pushQuadOriented(positions, uvs, wB0, wB3, wB2, wB1, [0.35, -1, 0], uvWest);
+
+    // Raised slate-blue 45-degree diagonal hip ridge rib (kudari-mune) along wx === wz
+    const rw = 0.06;
+    const rh = 0.05;
+    const h0L = pt(r0 - rw, r0 + rw, 0);
+    const h0R = pt(r0 + rw, r0 - rw, 0);
+    const h0C = pt(r0, r0, rh);
+    const h1L = pt(r1 - rw, r1 + rw, 0);
+    const h1R = pt(r1 + rw, r1 - rw, 0);
+    const h1C = pt(r1, r1, rh);
+    pushQuadOriented(positions, uvs, h0L, h1L, h1C, h0C, [-0.5, 1, 0.5], uvWest);
+    pushQuadOriented(positions, uvs, h0C, h1C, h1R, h0R, [0.5, 1, -0.5], uvNorth);
+  }
+
+  // Outer North eave fascia (wz = -outerReach) & Outer West eave fascia (wx = -outerReach)
+  const rOut = -outerReach;
+  pushQuadOriented(
+    positions,
+    uvs,
+    pt(rOut, rOut, 0),
+    pt(rOut, rOut, -thickness),
+    pt(-hx, rOut, -thickness),
+    pt(-hx, rOut, 0),
+    [0, 0, -1],
+    uvFascia
+  );
+  pushQuadOriented(
+    positions,
+    uvs,
+    pt(rOut, -hx, 0),
+    pt(rOut, -hx, -thickness),
+    pt(rOut, rOut, -thickness),
+    pt(rOut, rOut, 0),
+    [-1, 0, 0],
+    uvFascia
+  );
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geo.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+  geo.computeVertexNormals();
+  return geo;
+}
+
+/**
  * Per-level shared geometry cache for Connected Masonry blocks.
  * Guarantees < 0.2 ms neighbor updates and clean GPU disposal on scene exit.
  */

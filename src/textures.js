@@ -1505,6 +1505,152 @@ export function createTextureLibrary(renderer) {
     return romePack;
   }
 
+  // Lazy-cached Level 3 (Feudal Japan) 512x512 procedural PBR material pack
+  let japanPack = null;
+  const japanTextures = [];
+  const japanMaterials = [];
+
+  function ensureJapanPack() {
+    if (japanPack) return japanPack;
+
+    const mossGrass = buildJapanMossGrassPBR(anisotropy);
+    const zenGravel = buildJapanZenGravelPBR(anisotropy);
+    const basaltDust = buildJapanBasaltDustPBR(anisotropy);
+    const darkEarth = buildJapanDarkEarthPBR(anisotropy);
+    const ishigaki = buildJapanIshigakiPBR(anisotropy);
+    const shoji = buildJapanShojiWallPBR(anisotropy);
+    const kawara = buildJapanKawaraRoofPBR(anisotropy);
+    const cedar = buildJapanCedarTimberPBR(anisotropy);
+    const engawa = buildJapanEngawaDeckPBR(anisotropy);
+
+    [mossGrass, zenGravel, basaltDust, darkEarth].forEach((b) => {
+      japanTextures.push(b.albedo, b.normalRough);
+    });
+    [ishigaki, shoji, kawara, cedar, engawa].forEach((pack) => {
+      if (pack.map) japanTextures.push(pack.map);
+      if (pack.normalMap) japanTextures.push(pack.normalMap);
+      if (pack.roughnessMap) japanTextures.push(pack.roughnessMap);
+    });
+
+    const japanTerrainSplat = createTerrainSplatMaterial({
+      sand: mossGrass, // Biome 0: Mossy emerald forest grass & bamboo grove soil
+      earthPath: zenGravel, // Biome 1: Raked white Zen gravel & stepping-stone path
+      quarryDust: basaltDust, // Biome 2: Crushed grey basalt quarry dust
+      oasisGrass: darkEarth, // Biome 3: Compacted dark earth & damp pond banks
+    });
+    japanTerrainSplat.customProgramCacheKey = () => 'workd-builder-japan-terrain-splat-v1';
+
+    const jMats = {
+      terrainSplat: japanTerrainSplat,
+      ishigakiStone: new THREE.MeshStandardMaterial({
+        map: ishigaki.map,
+        normalMap: ishigaki.normalMap,
+        normalScale: new THREE.Vector2(1.2, 1.2),
+        roughnessMap: ishigaki.roughnessMap,
+        roughness: 1.0,
+        metalness: 0.05,
+      }),
+      rawBasalt: new THREE.MeshStandardMaterial({
+        map: basaltDust.albedo,
+        normalMap: ishigaki.normalMap,
+        normalScale: new THREE.Vector2(1.4, 1.4),
+        roughnessMap: ishigaki.roughnessMap,
+        color: new THREE.Color('#8e9399'),
+        roughness: 1.0,
+        metalness: 0.08,
+      }),
+      basaltCliff: new THREE.MeshStandardMaterial({
+        map: ishigaki.map,
+        normalMap: ishigaki.normalMap,
+        normalScale: new THREE.Vector2(1.3, 1.3),
+        color: new THREE.Color('#7a8088'),
+        roughness: 0.88,
+        metalness: 0.07,
+      }),
+      shojiWall: new THREE.MeshStandardMaterial({
+        map: shoji.map,
+        normalMap: shoji.normalMap,
+        normalScale: new THREE.Vector2(1.1, 1.1),
+        roughnessMap: shoji.roughnessMap,
+        emissive: new THREE.Color('#5a4320'),
+        emissiveIntensity: 0.14,
+        roughness: 1.0,
+        metalness: 0.02,
+      }),
+      kawaraRoof: new THREE.MeshStandardMaterial({
+        map: kawara.map,
+        normalMap: kawara.normalMap,
+        normalScale: new THREE.Vector2(1.35, 1.35),
+        roughnessMap: kawara.roughnessMap,
+        roughness: 0.88,
+        metalness: 0.14,
+      }),
+      cedarBeam: new THREE.MeshStandardMaterial({
+        map: cedar.map,
+        normalMap: cedar.normalMap,
+        normalScale: new THREE.Vector2(1.15, 1.15),
+        roughnessMap: cedar.roughnessMap,
+        roughness: 1.0,
+        metalness: 0.04,
+      }),
+      engawaDeck: new THREE.MeshStandardMaterial({
+        map: engawa.map,
+        normalMap: engawa.normalMap,
+        normalScale: new THREE.Vector2(0.85, 0.85),
+        roughnessMap: engawa.roughnessMap,
+        roughness: 0.92,
+        metalness: 0.03,
+      }),
+      lacquerRed: new THREE.MeshStandardMaterial({
+        color: new THREE.Color('#b63526'),
+        roughness: 0.32,
+        metalness: 0.14,
+      }),
+      sakuraBlossom: new THREE.MeshStandardMaterial({
+        color: new THREE.Color('#f6b2c6'),
+        roughness: 0.72,
+        metalness: 0.02,
+      }),
+      sakuraBlossomLight: new THREE.MeshStandardMaterial({
+        color: new THREE.Color('#ffd4e2'),
+        roughness: 0.68,
+        metalness: 0.02,
+      }),
+      sakuraTrunk: new THREE.MeshStandardMaterial({
+        color: new THREE.Color('#4a352c'),
+        roughness: 0.9,
+        metalness: 0.02,
+      }),
+      bambooStalk: new THREE.MeshStandardMaterial({
+        color: new THREE.Color('#5f8e3d'),
+        roughness: 0.52,
+        metalness: 0.05,
+      }),
+      bambooLeaf: new THREE.MeshStandardMaterial({
+        color: new THREE.Color('#487834'),
+        roughness: 0.74,
+        metalness: 0.02,
+      }),
+      lanternStone: new THREE.MeshStandardMaterial({
+        color: new THREE.Color('#9ea2a4'),
+        roughness: 0.9,
+        metalness: 0.04,
+      }),
+      lanternGlow: new THREE.MeshBasicMaterial({
+        color: new THREE.Color('#ffe294'),
+      }),
+      koiOrange: new THREE.MeshStandardMaterial({
+        color: new THREE.Color('#e85a26'),
+        roughness: 0.35,
+        metalness: 0.05,
+      }),
+    };
+
+    Object.values(jMats).forEach((m) => japanMaterials.push(m));
+    japanPack = { materials: jMats };
+    return japanPack;
+  }
+
   return {
     maps: {
       blueprint: blueprintMap,
@@ -1514,11 +1660,14 @@ export function createTextureLibrary(renderer) {
     },
     materials,
     ensureRomePack,
+    ensureJapanPack,
     dispose() {
       textures.forEach((t) => t.dispose());
       Object.values(materials).forEach((m) => m.dispose());
       romeTextures.forEach((t) => t.dispose());
       romeMaterials.forEach((m) => m.dispose());
+      japanTextures.forEach((t) => t.dispose());
+      japanMaterials.forEach((m) => m.dispose());
     },
   };
 }
@@ -1931,3 +2080,483 @@ function buildRomanMosaicFloor(anisotropy) {
 
   return wrapTexture(canvas, { isColor: true, anisotropy });
 }
+
+/* ============================================================================
+ * LEVEL 3 (FEUDAL JAPAN) — PROCEDURAL 512x512 ZEN GARDEN & MINKA PBR TEXTURES
+ * ========================================================================== */
+
+/** Japan Biome 0: Mossy Emerald Forest Grass & Fallen Sakura Petals (512x512) */
+function buildJapanMossGrassPBR(anisotropy) {
+  const size = 512;
+  const albedoCanvas = makeCanvas(size);
+  const ctx = albedoCanvas.getContext('2d');
+  const img = ctx.createImageData(size, size);
+  const data = img.data;
+  const height = new Float32Array(size * size);
+  const rough = new Float32Array(size * size);
+
+  for (let y = 0; y < size; y++) {
+    const v = y / size;
+    for (let x = 0; x < size; x++) {
+      const u = x / size;
+      const i = y * size + x;
+      const macro = tileFBM(u, v, 5, 3, 2101);
+      const tuft = tileFBM(u, v, 22, 2, 2117);
+      const blade = hash2i(x, y, 2131);
+
+      const h = clamp01(0.4 + (macro - 0.5) * 0.25 + (tuft - 0.5) * 0.34 + (blade - 0.5) * 0.14);
+      height[i] = h;
+
+      // Rich emerald-moss velvet palette with sunlit chartreuse highlights
+      let r = 64 + macro * 34 + tuft * 18 + (blade - 0.5) * 10;
+      let g = 114 + macro * 42 + tuft * 24 + (blade - 0.5) * 12;
+      let b = 52 + macro * 18 + tuft * 10 + (blade - 0.5) * 8;
+
+      // Subtle scattered pale-pink fallen sakura petals on the moss
+      const petal = hash2i(Math.floor(x / 5), Math.floor(y / 5), 2143);
+      if (petal > 0.992) {
+        r = 246;
+        g = 196;
+        b = 212;
+      }
+
+      rough[i] = clamp01(0.84 + (0.5 - tuft) * 0.16);
+      const idx = i * 4;
+      data[idx] = Math.min(255, Math.max(0, Math.round(r)));
+      data[idx + 1] = Math.min(255, Math.max(0, Math.round(g)));
+      data[idx + 2] = Math.min(255, Math.max(0, Math.round(b)));
+      data[idx + 3] = 255;
+    }
+  }
+
+  ctx.putImageData(img, 0, 0);
+  const normalPacked = buildSobelNormalCanvas(height, size, 2.5, rough);
+  return {
+    albedo: wrapTexture(albedoCanvas, { isColor: true, anisotropy }),
+    normalRough: wrapTexture(normalPacked, { isColor: false, anisotropy }),
+  };
+}
+
+/** Japan Biome 1: Raked White Zen Gravel (Karesansui waves, 512x512) */
+function buildJapanZenGravelPBR(anisotropy) {
+  const size = 512;
+  const albedoCanvas = makeCanvas(size);
+  const ctx = albedoCanvas.getContext('2d');
+  const img = ctx.createImageData(size, size);
+  const data = img.data;
+  const height = new Float32Array(size * size);
+  const rough = new Float32Array(size * size);
+
+  for (let y = 0; y < size; y++) {
+    const v = y / size;
+    for (let x = 0; x < size; x++) {
+      const u = x / size;
+      const i = y * size + x;
+      const wave = Math.sin((v * 14 + Math.sin(u * Math.PI * 2) * 0.45) * Math.PI * 2);
+      const grit = tileFBM(u, v, 36, 2, 2203);
+      const pebble = hash2i(x, y, 2221);
+
+      const ridge = wave * 0.5 + 0.5;
+      const h = clamp01(0.26 + ridge * 0.54 + (grit - 0.5) * 0.16 + (pebble - 0.5) * 0.1);
+      height[i] = h;
+
+      // Crisp pale white-silver Zen gravel with cool slate groove shadows
+      const shade = 0.86 + ridge * 0.14 + (grit - 0.5) * 0.08 + (pebble - 0.5) * 0.07;
+      const r = 228 * shade;
+      const g = 225 * shade;
+      const b = 219 * shade;
+
+      rough[i] = clamp01(0.82 + (0.5 - ridge) * 0.14);
+      const idx = i * 4;
+      data[idx] = Math.min(255, Math.max(0, Math.round(r)));
+      data[idx + 1] = Math.min(255, Math.max(0, Math.round(g)));
+      data[idx + 2] = Math.min(255, Math.max(0, Math.round(b)));
+      data[idx + 3] = 255;
+    }
+  }
+
+  ctx.putImageData(img, 0, 0);
+  const normalPacked = buildSobelNormalCanvas(height, size, 3.2, rough);
+  return {
+    albedo: wrapTexture(albedoCanvas, { isColor: true, anisotropy }),
+    normalRough: wrapTexture(normalPacked, { isColor: false, anisotropy }),
+  };
+}
+
+/** Japan Biome 2: Crushed Grey Volcanic Basalt Quarry Dust (512x512) */
+function buildJapanBasaltDustPBR(anisotropy) {
+  const size = 512;
+  const albedoCanvas = makeCanvas(size);
+  const ctx = albedoCanvas.getContext('2d');
+  const img = ctx.createImageData(size, size);
+  const data = img.data;
+  const height = new Float32Array(size * size);
+  const rough = new Float32Array(size * size);
+
+  for (let y = 0; y < size; y++) {
+    const v = y / size;
+    for (let x = 0; x < size; x++) {
+      const u = x / size;
+      const i = y * size + x;
+      const macro = tileFBM(u, v, 8, 3, 2309);
+      const chips = tileFBM(u, v, 28, 2, 2333);
+      const grain = hash2i(x, y, 2347);
+
+      const h = clamp01(0.42 + (macro - 0.5) * 0.34 + (chips - 0.5) * 0.32 + (grain - 0.5) * 0.14);
+      height[i] = h;
+
+      // Cool volcanic granite-basalt grey with faint warm mineral flecks
+      const base = 104 + macro * 42 + (chips - 0.5) * 30 + (grain - 0.5) * 14;
+      const r = base - 2;
+      const g = base + 1;
+      const b = base + 7;
+
+      rough[i] = clamp01(0.84 + (0.5 - chips) * 0.16);
+      const idx = i * 4;
+      data[idx] = Math.min(255, Math.max(0, Math.round(r)));
+      data[idx + 1] = Math.min(255, Math.max(0, Math.round(g)));
+      data[idx + 2] = Math.min(255, Math.max(0, Math.round(b)));
+      data[idx + 3] = 255;
+    }
+  }
+
+  ctx.putImageData(img, 0, 0);
+  const normalPacked = buildSobelNormalCanvas(height, size, 3.0, rough);
+  return {
+    albedo: wrapTexture(albedoCanvas, { isColor: true, anisotropy }),
+    normalRough: wrapTexture(normalPacked, { isColor: false, anisotropy }),
+  };
+}
+
+/** Japan Biome 3: Compacted Dark Garden Earth & Bamboo Soil (512x512) */
+function buildJapanDarkEarthPBR(anisotropy) {
+  const size = 512;
+  const albedoCanvas = makeCanvas(size);
+  const ctx = albedoCanvas.getContext('2d');
+  const img = ctx.createImageData(size, size);
+  const data = img.data;
+  const height = new Float32Array(size * size);
+  const rough = new Float32Array(size * size);
+
+  for (let y = 0; y < size; y++) {
+    const v = y / size;
+    for (let x = 0; x < size; x++) {
+      const u = x / size;
+      const i = y * size + x;
+      const soil = tileFBM(u, v, 9, 3, 2411);
+      const pebble = tileFBM(u, v, 24, 2, 2423);
+      const grain = hash2i(x, y, 2437);
+
+      height[i] = clamp01(0.45 + (soil - 0.5) * 0.28 + (pebble - 0.5) * 0.22);
+      const shade = 0.8 + soil * 0.34 + (pebble - 0.5) * 0.14 + (grain - 0.5) * 0.08;
+      const r = 92 * shade;
+      const g = 74 * shade;
+      const b = 56 * shade;
+
+      rough[i] = clamp01(0.88 + (0.5 - soil) * 0.12);
+      const idx = i * 4;
+      data[idx] = Math.min(255, Math.max(0, Math.round(r)));
+      data[idx + 1] = Math.min(255, Math.max(0, Math.round(g)));
+      data[idx + 2] = Math.min(255, Math.max(0, Math.round(b)));
+      data[idx + 3] = 255;
+    }
+  }
+
+  ctx.putImageData(img, 0, 0);
+  const normalPacked = buildSobelNormalCanvas(height, size, 2.6, rough);
+  return {
+    albedo: wrapTexture(albedoCanvas, { isColor: true, anisotropy }),
+    normalRough: wrapTexture(normalPacked, { isColor: false, anisotropy }),
+  };
+}
+
+/** Carved Grey Japanese Foundation Stone — Ishigaki Interlocking Ashlar (512x512) */
+function buildJapanIshigakiPBR(anisotropy) {
+  const size = 512;
+  const albedoCanvas = makeCanvas(size);
+  const ctx = albedoCanvas.getContext('2d');
+  const img = ctx.createImageData(size, size);
+  const data = img.data;
+  const height = new Float32Array(size * size);
+  const rough = new Float32Array(size * size);
+
+  const rows = 4;
+  const cols = 3;
+
+  for (let y = 0; y < size; y++) {
+    const v = y / size;
+    const rowIdx = Math.floor(v * rows);
+    const rowFrac = (v * rows) % 1;
+    const rowShift = (rowIdx % 2) * 0.48;
+
+    for (let x = 0; x < size; x++) {
+      const u = x / size;
+      const i = y * size + x;
+      const colRaw = (u * cols + rowShift) % cols;
+      const colIdx = Math.floor(colRaw);
+      const colFrac = colRaw % 1;
+
+      const edgeX = Math.min(colFrac, 1 - colFrac);
+      const edgeY = Math.min(rowFrac, 1 - rowFrac);
+      const mortar = Math.min(smoothstep(0.025, 0.08, edgeX), smoothstep(0.03, 0.09, edgeY));
+
+      const stoneTone = hash2i(colIdx + rowIdx * 7, rowIdx, 2503);
+      const granite = tileFBM(u, v, 14, 3, 2521);
+      const speckle = hash2i(x, y, 2539);
+      const moss = tileFBM(u, v, 7, 2, 2551);
+
+      const h = clamp01(0.16 + mortar * (0.64 + (granite - 0.5) * 0.22 + (speckle - 0.5) * 0.08));
+      height[i] = h;
+
+      // Cool blue-grey Kyoto granite blocks with dark mortar seams and whisper of moss
+      const base = 114 + stoneTone * 34 + (granite - 0.5) * 24 + (speckle - 0.5) * 14;
+      const mossAmt = (1 - mortar) * smoothstep(0.55, 0.8, moss) * 0.55;
+      const r = base * (0.48 + mortar * 0.52) - mossAmt * 28;
+      const g = (base + 3) * (0.48 + mortar * 0.52) + mossAmt * 22;
+      const b = (base + 9) * (0.48 + mortar * 0.52) - mossAmt * 24;
+
+      rough[i] = clamp01(0.84 - mortar * 0.1 + (speckle - 0.5) * 0.08);
+      const idx = i * 4;
+      data[idx] = Math.min(255, Math.max(0, Math.round(r)));
+      data[idx + 1] = Math.min(255, Math.max(0, Math.round(g)));
+      data[idx + 2] = Math.min(255, Math.max(0, Math.round(b)));
+      data[idx + 3] = 255;
+    }
+  }
+
+  ctx.putImageData(img, 0, 0);
+  const normalCanvas = buildSobelNormalCanvas(height, size, 3.6);
+  const roughCanvas = buildRoughnessCanvas(rough, size);
+  return {
+    map: wrapTexture(albedoCanvas, { isColor: true, anisotropy }),
+    normalMap: wrapTexture(normalCanvas, { isColor: false, anisotropy }),
+    roughnessMap: wrapTexture(roughCanvas, { isColor: false, anisotropy }),
+  };
+}
+
+/** Dark Cedar Timber Frame & Translucent Rice-Paper Shoji Lattice Walls (512x512) */
+function buildJapanShojiWallPBR(anisotropy) {
+  const size = 512;
+  const albedoCanvas = makeCanvas(size);
+  const ctx = albedoCanvas.getContext('2d');
+  const img = ctx.createImageData(size, size);
+  const data = img.data;
+  const height = new Float32Array(size * size);
+  const rough = new Float32Array(size * size);
+
+  for (let y = 0; y < size; y++) {
+    const v = y / size;
+    for (let x = 0; x < size; x++) {
+      const u = x / size;
+      const i = y * size + x;
+
+      // Outer structural dark cedar posts & top/bottom rails + wainscot kickboard (bottom 26%)
+      const isOuterPost = u < 0.1 || u > 0.9 || v < 0.1 || v > 0.74;
+      // Fine Kumiko shoji wooden lattice bars (4x3 grid inside upper paper panel)
+      const inPaper = !isOuterPost;
+      const gx = ((u - 0.1) / 0.8) * 4;
+      const gy = ((v - 0.1) / 0.64) * 3;
+      const fx = gx % 1;
+      const fy = gy % 1;
+      const isLattice = inPaper && (fx < 0.085 || fx > 0.915 || fy < 0.095 || fy > 0.905);
+
+      const woodGrain = tileFBM(u * 2.5, v * 0.5, 16, 2, 2609);
+      const paperFiber = tileFBM(u, v, 24, 2, 2621);
+
+      let r, g, b;
+      if (isOuterPost) {
+        const panelSlot = v > 0.74 ? smoothstep(0.76, 0.79, v) : 0;
+        const plankGroove = panelSlot > 0 ? smoothstep(0.03, 0.07, Math.abs(((u * 8) % 1) - 0.5)) : 1;
+        const shade = 0.76 + woodGrain * 0.34 - (1 - plankGroove) * 0.14;
+        r = 74 * shade;
+        g = 48 * shade;
+        b = 34 * shade;
+        height[i] = clamp01(0.78 + (woodGrain - 0.5) * 0.12 - (1 - plankGroove) * 0.15);
+        rough[i] = clamp01(0.74 + (0.5 - woodGrain) * 0.12);
+      } else if (isLattice) {
+        const shade = 0.84 + woodGrain * 0.24;
+        r = 96 * shade;
+        g = 64 * shade;
+        b = 44 * shade;
+        height[i] = 0.66;
+        rough[i] = 0.72;
+      } else {
+        // Warm backlit cream washi rice paper with subtle organic fiber grain
+        const warmGlow = 0.94 + (paperFiber - 0.5) * 0.1;
+        r = 247 * warmGlow;
+        g = 236 * warmGlow;
+        b = 207 * warmGlow;
+        height[i] = 0.28 + (paperFiber - 0.5) * 0.04;
+        rough[i] = 0.62;
+      }
+
+      const idx = i * 4;
+      data[idx] = Math.min(255, Math.max(0, Math.round(r)));
+      data[idx + 1] = Math.min(255, Math.max(0, Math.round(g)));
+      data[idx + 2] = Math.min(255, Math.max(0, Math.round(b)));
+      data[idx + 3] = 255;
+    }
+  }
+
+  ctx.putImageData(img, 0, 0);
+  const normalCanvas = buildSobelNormalCanvas(height, size, 3.4);
+  const roughCanvas = buildRoughnessCanvas(rough, size);
+  return {
+    map: wrapTexture(albedoCanvas, { isColor: true, anisotropy }),
+    normalMap: wrapTexture(normalCanvas, { isColor: false, anisotropy }),
+    roughnessMap: wrapTexture(roughCanvas, { isColor: false, anisotropy }),
+  };
+}
+
+/** Curved Dark Slate-Blue Glazed Japanese Kawara Roof Tiles (512x512) */
+function buildJapanKawaraRoofPBR(anisotropy) {
+  const size = 512;
+  const albedoCanvas = makeCanvas(size);
+  const ctx = albedoCanvas.getContext('2d');
+  const img = ctx.createImageData(size, size);
+  const data = img.data;
+  const height = new Float32Array(size * size);
+  const rough = new Float32Array(size * size);
+
+  const cols = 7;
+  const rows = 6;
+
+  for (let y = 0; y < size; y++) {
+    const v = y / size;
+    const row = (v * rows) % 1;
+    const rowId = Math.floor(v * rows);
+    for (let x = 0; x < size; x++) {
+      const u = x / size;
+      const i = y * size + x;
+      const col = (u * cols) % 1;
+      const colId = Math.floor(u * cols);
+
+      // Iconic concave pan + raised round semicircular marugawara ridge rib
+      const distRib = Math.min(col, 1 - col);
+      const rib = smoothstep(0.24, 0.0, distRib);
+      const panCurve = Math.sin(col * Math.PI) * 0.14;
+      const overlapShadow = smoothstep(0.0, 0.16, row);
+      const tileVar = hash2i(colId, rowId, 2707);
+      const glaze = tileFBM(u, v, 10, 2, 2719);
+
+      const h = clamp01(0.22 + rib * 0.54 + (0.14 - panCurve) + overlapShadow * 0.2);
+      height[i] = h;
+
+      // Deep slate-indigo / smoky silver-blue Japanese kawara glaze
+      const shade = 0.78 + tileVar * 0.2 + rib * 0.28 - (1 - overlapShadow) * 0.34 + (glaze - 0.5) * 0.08;
+      const r = 56 * shade;
+      const g = 68 * shade;
+      const b = 86 * shade;
+
+      rough[i] = clamp01(0.54 - rib * 0.2 + (glaze - 0.5) * 0.1);
+      const idx = i * 4;
+      data[idx] = Math.min(255, Math.max(0, Math.round(r)));
+      data[idx + 1] = Math.min(255, Math.max(0, Math.round(g)));
+      data[idx + 2] = Math.min(255, Math.max(0, Math.round(b)));
+      data[idx + 3] = 255;
+    }
+  }
+
+  ctx.putImageData(img, 0, 0);
+  const normalCanvas = buildSobelNormalCanvas(height, size, 4.0);
+  const roughCanvas = buildRoughnessCanvas(rough, size);
+  return {
+    map: wrapTexture(albedoCanvas, { isColor: true, anisotropy }),
+    normalMap: wrapTexture(normalCanvas, { isColor: false, anisotropy }),
+    roughnessMap: wrapTexture(roughCanvas, { isColor: false, anisotropy }),
+  };
+}
+
+/** Dark-Stained Aged Japanese Cedar Timber Beams (512x512) */
+function buildJapanCedarTimberPBR(anisotropy) {
+  const size = 512;
+  const albedoCanvas = makeCanvas(size);
+  const ctx = albedoCanvas.getContext('2d');
+  const img = ctx.createImageData(size, size);
+  const data = img.data;
+  const height = new Float32Array(size * size);
+  const rough = new Float32Array(size * size);
+
+  for (let y = 0; y < size; y++) {
+    const v = y / size;
+    for (let x = 0; x < size; x++) {
+      const u = x / size;
+      const i = y * size + x;
+      const streak = tileFBM(u * 0.4, v * 4.2, 12, 3, 2801);
+      const rings = Math.sin((v * 26 + streak * 3.2) * Math.PI * 2) * 0.5 + 0.5;
+      const h = clamp01(0.4 + (streak - 0.5) * 0.35 + (rings - 0.5) * 0.25);
+      height[i] = h;
+
+      const shade = 0.72 + streak * 0.36 + rings * 0.12;
+      const r = 72 * shade;
+      const g = 46 * shade;
+      const b = 33 * shade;
+
+      rough[i] = clamp01(0.76 - rings * 0.1);
+      const idx = i * 4;
+      data[idx] = Math.min(255, Math.max(0, Math.round(r)));
+      data[idx + 1] = Math.min(255, Math.max(0, Math.round(g)));
+      data[idx + 2] = Math.min(255, Math.max(0, Math.round(b)));
+      data[idx + 3] = 255;
+    }
+  }
+
+  ctx.putImageData(img, 0, 0);
+  const normalCanvas = buildSobelNormalCanvas(height, size, 2.8);
+  const roughCanvas = buildRoughnessCanvas(rough, size);
+  return {
+    map: wrapTexture(albedoCanvas, { isColor: true, anisotropy }),
+    normalMap: wrapTexture(normalCanvas, { isColor: false, anisotropy }),
+    roughnessMap: wrapTexture(roughCanvas, { isColor: false, anisotropy }),
+  };
+}
+
+/** Warm Honey-Cedar Hinoki Engawa Veranda Deck Floorboards (512x512) */
+function buildJapanEngawaDeckPBR(anisotropy) {
+  const size = 512;
+  const albedoCanvas = makeCanvas(size);
+  const ctx = albedoCanvas.getContext('2d');
+  const img = ctx.createImageData(size, size);
+  const data = img.data;
+  const height = new Float32Array(size * size);
+  const rough = new Float32Array(size * size);
+
+  const planks = 8;
+
+  for (let y = 0; y < size; y++) {
+    const v = y / size;
+    const pIdx = Math.floor(v * planks);
+    const pFrac = (v * planks) % 1;
+    const seam = smoothstep(0.02, 0.08, Math.min(pFrac, 1 - pFrac));
+    const plankTint = hash2i(pIdx, 3, 2903);
+
+    for (let x = 0; x < size; x++) {
+      const u = x / size;
+      const i = y * size + x;
+      const grain = tileFBM(u * 0.5, v * 3.0, 14, 2, 2917);
+
+      height[i] = clamp01(0.2 + seam * (0.65 + (grain - 0.5) * 0.16));
+      const shade = (0.8 + plankTint * 0.16 + (grain - 0.5) * 0.12) * (0.58 + seam * 0.42);
+      const r = 186 * shade;
+      const g = 132 * shade;
+      const b = 78 * shade;
+
+      rough[i] = clamp01(0.58 + (1 - seam) * 0.24);
+      const idx = i * 4;
+      data[idx] = Math.min(255, Math.max(0, Math.round(r)));
+      data[idx + 1] = Math.min(255, Math.max(0, Math.round(g)));
+      data[idx + 2] = Math.min(255, Math.max(0, Math.round(b)));
+      data[idx + 3] = 255;
+    }
+  }
+
+  ctx.putImageData(img, 0, 0);
+  const normalCanvas = buildSobelNormalCanvas(height, size, 2.5);
+  const roughCanvas = buildRoughnessCanvas(rough, size);
+  return {
+    map: wrapTexture(albedoCanvas, { isColor: true, anisotropy }),
+    normalMap: wrapTexture(normalCanvas, { isColor: false, anisotropy }),
+    roughnessMap: wrapTexture(roughCanvas, { isColor: false, anisotropy }),
+  };
+}
+
