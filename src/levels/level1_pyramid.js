@@ -25,6 +25,176 @@ const FOUNDATION_Y = 0.28;
 
 const LAYER_SIZES = [5, 4, 3, 2, 1]; // 25 + 16 + 9 + 4 + 1 = 55 blocks
 
+// Sculpted 128x128 diorama terrain dimensions & Nile water level
+const TERRAIN_W = 20.4;
+const TERRAIN_D = 19.2;
+const TERRAIN_SEG = 128;
+const WATER_LEVEL = -0.14;
+const PLINTH_BOTTOM = -1.65;
+
+function clamp01(v) {
+  return v < 0 ? 0 : v > 1 ? 1 : v;
+}
+
+function smoothstep(e0, e1, x) {
+  const t = clamp01((x - e0) / (e1 - e0));
+  return t * t * (3 - 2 * t);
+}
+
+/** Signed distance to an axis-aligned rectangle (negative inside) */
+function sdBox2D(x, z, cx, cz, hx, hz) {
+  const dx = Math.abs(x - cx) - hx;
+  const dz = Math.abs(z - cz) - hz;
+  return Math.hypot(Math.max(dx, 0), Math.max(dz, 0)) + Math.min(Math.max(dx, dz), 0);
+}
+
+/** Distance from point (x, z) to a 2D line segment (ax, az)-(bx, bz) */
+function distToSegment(x, z, ax, az, bx, bz) {
+  const vx = bx - ax;
+  const vz = bz - az;
+  const wx = x - ax;
+  const wz = z - az;
+  const lenSq = vx * vx + vz * vz || 1;
+  const t = clamp01((wx * vx + wz * vz) / lenSq);
+  return Math.hypot(x - (ax + vx * t), z - (az + vz * t));
+}
+
+/** Fast smooth deterministic pseudo-noise for organic desert dunes & biome feathering */
+function organicWave(x, z) {
+  return (
+    Math.sin(x * 0.42 + z * 0.27) * 0.45 +
+    Math.cos(x * 0.24 - z * 0.51 + 1.1) * 0.32 +
+    Math.sin(x * 0.85 - z * 0.62 + 0.5) * 0.15 +
+    Math.cos(x * 1.35 + z * 1.15) * 0.08
+  );
+}
+
+/** Distance to the curving North-East Nile water cove / oasis basin */
+function distToNileBasin(x, z) {
+  const d1 = distToSegment(x, z, 6.2, -6.1, 8.9, -5.5);
+  const d2 = distToSegment(x, z, 6.8, -6.4, 8.2, -8.9);
+  const organic = organicWave(x * 1.4, z * 1.4) * 0.34;
+  return Math.min(d1, d2) + organic;
+}
+
+/**
+ * Computes flat-pad mask in [0, 1] (1.0 on compacted playable work zones so all
+ * tracks, sleds, workbench, staging pads, and pyramid foundation sit flush at y = 0).
+ */
+function sampleFlatPadMask(x, z) {
+  const pads = [
+    // Pyramid construction foundation
+    sdBox2D(x, z, PYRAMID_CENTER.x, PYRAMID_CENTER.z, 3.45, 3.45),
+    // Pyramid staging pallet
+    sdBox2D(x, z, 4.15, 4.85, 1.6, 1.55),
+    // Stonecutter workshop & output pallet
+    sdBox2D(x, z, -4.6, 5.1, 2.3, 2.25),
+    // Track A + Quarry staging pad corridor
+    sdBox2D(x, z, -4.6, -0.5, 2.25, 3.05),
+    // Track B corridor
+    sdBox2D(x, z, 0.25, 4.85, 2.85, 1.75),
+    // Central stepping-stone promenade
+    sdBox2D(x, z, -0.8, 0.3, 1.9, 2.5),
+  ];
+
+  let minD = Infinity;
+  for (let i = 0; i < pads.length; i++) {
+    if (pads[i] < minD) minD = pads[i];
+  }
+  return 1.0 - smoothstep(0.0, 1.85, minD);
+}
+
+/**
+ * Deterministic analytical elevation function shared by the 128x128 terrain mesh,
+ * contoured plinth skirt, environment props, and drag-and-drop height sampling.
+ */
+function sampleTerrainHeight(x, z) {
+  const flatMask = sampleFlatPadMask(x, z);
+
+  // 1. Continuous wind-swept perimeter desert dunes
+  const edgeX = smoothstep(5.6, 9.8, Math.abs(x));
+  const edgeZ = smoothstep(5.2, 9.3, Math.abs(z));
+  const perimeterFactor = clamp01(Math.max(edgeX, edgeZ) * 0.92 + smoothstep(6.2, 10.6, Math.hypot(x * 0.92, z)) * 0.38);
+
+  const duneCrest = Math.sin(x * 0.38 + z * 0.32 + Math.cos(z * 0.25) * 0.7) * 0.5 + 0.5;
+  const duneUndulation = organicWave(x, z) * 0.32 + 0.55;
+  let height = (0.35 + duneCrest * 0.92 + duneUndulation * 0.36) * perimeterFactor * (1.0 - flatMask);
+
+  // Extra sculptural leeward sand ridge along North-Central & South edges
+  const northDune = (1.0 - smoothstep(1.2, 3.9, Math.hypot((x - 0.6) * 0.65, z + 8.1))) * 0.72;
+  const southDune = (1.0 - smoothstep(1.0, 3.4, Math.hypot((x - 0.3) * 0.68, z - 8.4))) * 0.52;
+  height += (northDune + southDune) * (1.0 - flatMask);
+
+  // 2. Excavated rocky Quarry pit around the NW extraction cliff base
+  const quarryPitDist = sdBox2D(x, z, -4.6, -4.65, 2.35, 0.55);
+  const quarryPitMask = 1.0 - smoothstep(0.0, 0.95, quarryPitDist);
+  height = height * (1.0 - quarryPitMask * 0.85) - quarryPitMask * 0.24;
+
+  // Rocky limestone shoulder rising naturally behind the NW Quarry cliff
+  const nwBankDist = sdBox2D(x, z, -6.4, -7.8, 3.0, 1.0);
+  const nwBankMask = 1.0 - smoothstep(0.0, 1.5, nwBankDist);
+  height += nwBankMask * (0.65 + Math.max(0, organicWave(x * 1.2, z * 1.2)) * 0.28) * (1.0 - flatMask) * (1.0 - quarryPitMask);
+
+  // 3. Gently depressed Nile water basin in the North-East corner
+  const dNile = distToNileBasin(x, z);
+  const basinMask = 1.0 - smoothstep(1.25, 3.05, dNile);
+  const deepBasin = 1.0 - smoothstep(0.15, 2.05, dNile);
+  // Carve basin cleanly down below WATER_LEVEL while preserving nearby Pyramid pad
+  const nileCut = (basinMask * 0.42 + deepBasin * 0.48) * (1.0 - flatMask * 0.92);
+  height = height * (1.0 - basinMask * 0.88) - nileCut;
+
+  return height;
+}
+
+/**
+ * Computes normalized 4-biome splat weights [Sand, EarthPath, QuarryDust, OasisGrass]
+ * for organic hand-painted terrain transitions.
+ */
+function sampleTerrainSplat(x, z, h) {
+  const jitter = organicWave(x * 1.7, z * 1.7) * 0.42;
+
+  // Biome 1: Compacted Dusty Earth & Gravel Path under tracks, sled routes, and stepping stones
+  const dTrackA = distToSegment(x, z, -4.6, -2.5, -4.6, 2.6);
+  const dTrackB = distToSegment(x, z, -2.5, 4.85, 3.5, 4.85);
+  const dPromenade1 = distToSegment(x, z, -1.2, -1.7, -0.35, 1.9);
+  const dPromenade2 = distToSegment(x, z, 3.6, 2.2, 4.0, 4.6);
+  const dStagePad = sdBox2D(x, z, 4.15, 4.85, 1.45, 1.45);
+  const dPathMin = Math.min(dTrackA - 1.15, dTrackB - 1.15, dPromenade1 - 0.68, dPromenade2 - 0.72, dStagePad);
+  let wPath = 1.0 - smoothstep(-0.15, 0.95, dPathMin + jitter * 0.55);
+
+  // Biome 2: Crushed Limestone & Cracked Quarry Dust around NW Quarry & SW Stonecutter Workshop
+  const dQuarryZone = sdBox2D(x, z, -4.8, -5.0, 3.2, 2.25);
+  const dWorkshopZone = sdBox2D(x, z, -4.6, 5.1, 2.15, 2.1);
+  const wQuarry = Math.max(
+    1.0 - smoothstep(-0.2, 1.35, dQuarryZone + jitter * 0.65),
+    (1.0 - smoothstep(-0.15, 1.15, dWorkshopZone + jitter * 0.55)) * 0.88
+  );
+
+  // Biome 3: Lush Riverbank Silt & Oasis Grass around Nile water edge and palm trees
+  const dNile = distToNileBasin(x, z);
+  const wNileBank = 1.0 - smoothstep(1.6, 4.15, dNile + jitter * 0.65);
+  const dSePalm = Math.hypot(x - 7.6, z - 5.8);
+  const wSeOasis = (1.0 - smoothstep(0.7, 2.35, dSePalm + jitter * 0.45)) * 0.78;
+  const wOasis = clamp01(Math.max(wNileBank, wSeOasis) * (h < 0.85 ? 1.0 : 0.4));
+
+  // Keep oasis grass and quarry dust clean from overlapping tracks
+  wPath *= 1.0 - wOasis * 0.85;
+
+  // Biome 0: Wind-Rippled Golden Desert Sand fills all remaining weight
+  const sumOther = wPath + wQuarry + wOasis;
+  let wSand = Math.max(0, 1.0 - sumOther);
+
+  const total = wSand + wPath + wQuarry + wOasis || 1;
+  return [wSand / total, wPath / total, wQuarry / total, wOasis / total];
+}
+
+/** Shoreline wetness factor in [0, 1] where terrain dips toward/under the Nile water surface */
+function sampleShoreWetness(x, z, h) {
+  const dNile = distToNileBasin(x, z);
+  if (dNile > 3.6) return 0;
+  return (1.0 - smoothstep(WATER_LEVEL - 0.02, WATER_LEVEL + 0.25, h)) * (1.0 - smoothstep(2.4, 3.5, dNile));
+}
+
 /**
  * Creates a displaced rough low-poly stone geometry (for Raw & Stage 1 blocks).
  */
@@ -302,78 +472,77 @@ export class Level1Pyramid {
   }
 
   /* ============================================================================
-   * 1. DESERT DIORAMA BASE & DECORATIVE PROPS
+   * 1. SCULPTED & HAND-PAINTED 128x128 3D TERRAIN + ANIMATED NILE BASIN
    * ========================================================================== */
+  getTerrainHeight(x, z) {
+    return sampleTerrainHeight(x, z);
+  }
+
   _buildDioramaBase() {
     const env = new THREE.Group();
     this.root.add(env);
 
-    // Top desert sand tabletop slab
-    const sandTopGeo = this._trackGeo(new THREE.BoxGeometry(19.6, 0.36, 18.6));
-    const sandTop = new THREE.Mesh(sandTopGeo, this.textures.materials.sand);
-    sandTop.position.set(0, -0.18, 0);
-    sandTop.receiveShadow = true;
-    env.add(sandTop);
-
-    // Layered geological sandstone plinth skirt underneath
-    const plinthGeo = this._trackGeo(new THREE.BoxGeometry(19.1, 1.5, 18.1));
-    const plinth = new THREE.Mesh(plinthGeo, this.textures.materials.plinth);
-    plinth.position.set(0, -1.1, 0);
-    plinth.receiveShadow = true;
-    env.add(plinth);
-
-    // Sculpted rolling perimeter dunes with seamless planar UVs (no pole pinching)
-    const duneSpecs = [
-      { x: 0.9, z: -7.7, sx: 4.5, sy: 0.68, sz: 1.9 },
-      { x: 8.1, z: -4.2, sx: 2.1, sy: 0.82, sz: 3.4 },
-      { x: 8.2, z: 2.5, sx: 1.9, sy: 0.64, sz: 3.1 },
-      { x: -8.2, z: 0.6, sx: 1.9, sy: 0.72, sz: 3.6 },
-      { x: 0.6, z: 8.25, sx: 3.8, sy: 0.54, sz: 1.45 },
-      { x: -7.4, z: 7.7, sx: 2.4, sy: 0.6, sz: 1.8 },
-    ];
-    const duneGeo = this._trackGeo(
-      (() => {
-        const g = new THREE.SphereGeometry(1, 18, 10, 0, Math.PI * 2, 0, Math.PI * 0.5);
-        const pos = g.attributes.position;
-        const uv = g.attributes.uv;
-        for (let i = 0; i < pos.count; i++) {
-          uv.setXY(i, pos.getX(i) * 0.32 + 0.5, pos.getZ(i) * 0.32 + 0.5);
-        }
-        uv.needsUpdate = true;
-        return g;
-      })()
+    // 1. High-density 128x128 subdivided sculpted terrain with 4-biome GPU splat painting
+    const terrainGeo = this._trackGeo(
+      new THREE.PlaneGeometry(TERRAIN_W, TERRAIN_D, TERRAIN_SEG, TERRAIN_SEG)
     );
-    duneSpecs.forEach((d) => {
-      const mesh = new THREE.Mesh(duneGeo, this.textures.materials.sand);
-      mesh.position.set(d.x, -0.06, d.z);
-      mesh.scale.set(d.sx, d.sy, d.sz);
-      mesh.receiveShadow = true;
-      env.add(mesh);
-    });
+    terrainGeo.rotateX(-Math.PI / 2);
 
-    // Small turquoise desert oasis pool in the North-East corner
-    const poolRimGeo = this._trackGeo(new THREE.CylinderGeometry(1.75, 1.9, 0.14, 14));
-    const poolRim = new THREE.Mesh(poolRimGeo, this.textures.materials.sand);
-    poolRim.position.set(6.5, 0.01, -6.1);
-    poolRim.scale.set(1.25, 1, 0.85);
-    poolRim.receiveShadow = true;
-    env.add(poolRim);
+    const pos = terrainGeo.attributes.position;
+    const vertCount = pos.count;
+    const splatArr = new Float32Array(vertCount * 4);
+    const wetArr = new Float32Array(vertCount);
 
-    const waterGeo = this._trackGeo(new THREE.CylinderGeometry(1.42, 1.42, 0.08, 14));
-    const water = new THREE.Mesh(waterGeo, this.textures.materials.oasisWater);
-    water.position.set(6.5, 0.06, -6.1);
-    water.scale.set(1.22, 1, 0.82);
-    water.receiveShadow = true;
-    env.add(water);
+    for (let i = 0; i < vertCount; i++) {
+      const x = pos.getX(i);
+      const z = pos.getZ(i);
+      const y = sampleTerrainHeight(x, z);
+      pos.setY(i, y);
 
-    // Stylized low-poly date palms framing the oasis & outer edge
-    this._createPalmTree(env, 4.9, -6.8, 1.05, 0.14);
-    this._createPalmTree(env, 7.8, -6.6, 0.88, -0.16);
-    this._createPalmTree(env, 7.6, 5.8, 0.95, -0.12);
-    this._createPalmTree(env, -7.6, 6.2, 0.82, 0.18);
+      const [wSand, wPath, wQuarry, wOasis] = sampleTerrainSplat(x, z, y);
+      splatArr[i * 4] = wSand;
+      splatArr[i * 4 + 1] = wPath;
+      splatArr[i * 4 + 2] = wQuarry;
+      splatArr[i * 4 + 3] = wOasis;
 
-    // Subtle sandstone stepping stones along the central work avenues
-    const stepGeo = this._trackGeo(new THREE.BoxGeometry(0.75, 0.06, 0.55));
+      wetArr[i] = sampleShoreWetness(x, z, y);
+    }
+
+    pos.needsUpdate = true;
+    terrainGeo.setAttribute('aSplat', new THREE.BufferAttribute(splatArr, 4));
+    terrainGeo.setAttribute('aWetness', new THREE.BufferAttribute(wetArr, 1));
+    terrainGeo.computeVertexNormals();
+
+    const terrainMesh = new THREE.Mesh(terrainGeo, this.textures.materials.terrainSplat);
+    terrainMesh.receiveShadow = true;
+    env.add(terrainMesh);
+
+    // 2. Contoured geological plinth skirt hugging the exact sculpted terrain edges
+    const skirtGeo = this._buildContouredPlinthSkirt();
+    const skirtMesh = new THREE.Mesh(skirtGeo, this.textures.materials.plinth);
+    skirtMesh.receiveShadow = true;
+    env.add(skirtMesh);
+
+    // Bottom cap under the diorama island
+    const bottomCapGeo = this._trackGeo(new THREE.PlaneGeometry(TERRAIN_W, TERRAIN_D));
+    bottomCapGeo.rotateX(Math.PI / 2);
+    const bottomCap = new THREE.Mesh(bottomCapGeo, this.textures.materials.plinth);
+    bottomCap.position.y = PLINTH_BOTTOM;
+    env.add(bottomCap);
+
+    // 3. Animated translucent turquoise Nile water & sandy shoreline foam in NE basin
+    this._buildNileWater(env);
+
+    // 4. Stylized date palms & coastal reed tufts planted on exact sculpted terrain height
+    this._createPalmTree(env, 4.75, -6.9, 1.08, 0.16);
+    this._createPalmTree(env, 8.2, -7.25, 0.92, -0.18);
+    this._createPalmTree(env, 5.75, -8.35, 0.84, 0.1);
+    this._createPalmTree(env, 7.6, 5.8, 0.96, -0.14);
+    this._createPalmTree(env, -7.8, 6.25, 0.85, 0.18);
+    this._buildOasisReeds(env);
+
+    // 5. Subtle sandstone stepping stones along central avenues at exact terrain height
+    const stepGeo = this._trackGeo(new THREE.BoxGeometry(0.76, 0.07, 0.56));
     const stepCoords = [
       [-1.1, -1.6],
       [-0.4, -0.7],
@@ -382,17 +551,173 @@ export class Level1Pyramid {
       [3.6, 3.05],
     ];
     stepCoords.forEach(([x, z], i) => {
+      const h = sampleTerrainHeight(x, z);
       const stone = new THREE.Mesh(stepGeo, this.textures.materials.foundation);
-      stone.position.set(x, 0.02, z);
-      stone.rotation.y = (i % 2 === 0 ? 0.12 : -0.15);
+      stone.position.set(x, h + 0.02, z);
+      stone.rotation.y = i % 2 === 0 ? 0.12 : -0.15;
       stone.receiveShadow = true;
       env.add(stone);
+    });
+
+    // 6. Sculpted limestone desert boulders nestled around the Quarry pit & dune ridges
+    const boulderGeo = this._trackGeo(new THREE.DodecahedronGeometry(0.45, 0));
+    const boulders = [
+      [-7.9, -3.2, 1.15, 0.72, 0.95],
+      [-7.2, -2.5, 0.65, 0.45, 0.6],
+      [-1.7, -5.6, 0.9, 0.62, 0.85],
+      [8.3, -2.1, 0.88, 0.52, 0.8],
+      [8.4, 3.2, 0.75, 0.48, 0.72],
+    ];
+    boulders.forEach(([bx, bz, sx, sy, sz], idx) => {
+      const by = sampleTerrainHeight(bx, bz);
+      const rock = new THREE.Mesh(boulderGeo, this.textures.materials.limestone);
+      rock.position.set(bx, by + sy * 0.25, bz);
+      rock.scale.set(sx, sy, sz);
+      rock.rotation.set(idx * 0.35, idx * 1.2, idx * 0.2);
+      rock.castShadow = true;
+      rock.receiveShadow = true;
+      env.add(rock);
+    });
+  }
+
+  /**
+   * Builds a 4-sided geological strata plinth skirt whose top contour matches
+   * sampleTerrainHeight(x, z) vertex-for-vertex around the entire island perimeter.
+   */
+  _buildContouredPlinthSkirt() {
+    const hw = TERRAIN_W * 0.5;
+    const hd = TERRAIN_D * 0.5;
+    const segs = TERRAIN_SEG;
+    const positions = [];
+    const normals = [];
+    const uvs = [];
+    const indices = [];
+
+    const addEdge = (x0, z0, x1, z1, nx, nz) => {
+      const baseIndex = positions.length / 3;
+      const edgeLen = Math.hypot(x1 - x0, z1 - z0);
+      for (let i = 0; i <= segs; i++) {
+        const t = i / segs;
+        const x = THREE.MathUtils.lerp(x0, x1, t);
+        const z = THREE.MathUtils.lerp(z0, z1, t);
+        const topY = sampleTerrainHeight(x, z);
+        const u = (t * edgeLen) / 6.0;
+
+        // Top vertex
+        positions.push(x, topY, z);
+        normals.push(nx, 0, nz);
+        uvs.push(u, 1);
+
+        // Bottom vertex
+        positions.push(x, PLINTH_BOTTOM, z);
+        normals.push(nx, 0, nz);
+        uvs.push(u, 0);
+      }
+      for (let i = 0; i < segs; i++) {
+        const a = baseIndex + i * 2;
+        const b = a + 1;
+        const c = a + 2;
+        const d = a + 3;
+        indices.push(a, b, c, b, d, c);
+      }
+    };
+
+    // South (+Z), East (+X), North (-Z), West (-X) with outward-facing winding
+    addEdge(-hw, hd, hw, hd, 0, 1);
+    addEdge(hw, hd, hw, -hd, 1, 0);
+    addEdge(hw, -hd, -hw, -hd, 0, -1);
+    addEdge(-hw, -hd, -hw, hd, -1, 0);
+
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+    geo.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
+    geo.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+    geo.setIndex(indices);
+    return this._trackGeo(geo);
+  }
+
+  /**
+   * Builds the translucent animated turquoise Nile water sheet and soft shoreline foam contour
+   * nestled inside the sculpted North-East water basin.
+   */
+  _buildNileWater(parent) {
+    const wWidth = 6.6;
+    const wDepth = 6.0;
+    const cx = 6.9;
+    const cz = -6.55;
+
+    const waterGeo = this._trackGeo(new THREE.PlaneGeometry(wWidth, wDepth, 24, 24));
+    waterGeo.rotateX(-Math.PI / 2);
+    const waterMesh = new THREE.Mesh(waterGeo, this.textures.materials.oasisWater);
+    waterMesh.position.set(cx, WATER_LEVEL, cz);
+    waterMesh.receiveShadow = true;
+    parent.add(waterMesh);
+    this.nileWaterMesh = waterMesh;
+
+    // Soft sandy shoreline foam ribbon that hugs the exact terrain-water intersection
+    const foamGeo = this._trackGeo(new THREE.PlaneGeometry(wWidth, wDepth, 40, 40));
+    foamGeo.rotateX(-Math.PI / 2);
+    const fPos = foamGeo.attributes.position;
+    const fColors = new Float32Array(fPos.count * 4);
+    for (let i = 0; i < fPos.count; i++) {
+      const wx = cx + fPos.getX(i);
+      const wz = cz + fPos.getZ(i);
+      const h = sampleTerrainHeight(wx, wz);
+      const diff = WATER_LEVEL - h; // > 0 in water, ~0 at shoreline
+      // Narrow frothy foam band just inside the shoreline edge
+      const foam = diff > -0.04 && diff < 0.22 ? Math.exp(-Math.pow((diff - 0.04) / 0.065, 2)) : 0;
+      fColors[i * 4] = 0.96;
+      fColors[i * 4 + 1] = 0.98;
+      fColors[i * 4 + 2] = 0.94;
+      fColors[i * 4 + 3] = foam * 0.65;
+    }
+    foamGeo.setAttribute('color', new THREE.BufferAttribute(fColors, 4));
+
+    this.nileFoamMat = this._trackMat(
+      new THREE.MeshBasicMaterial({
+        vertexColors: true,
+        transparent: true,
+        opacity: 0.72,
+        depthWrite: false,
+      })
+    );
+    const foamMesh = new THREE.Mesh(foamGeo, this.nileFoamMat);
+    foamMesh.position.set(cx, WATER_LEVEL + 0.012, cz);
+    parent.add(foamMesh);
+    this.nileFoamMesh = foamMesh;
+  }
+
+  _buildOasisReeds(parent) {
+    const reedGeo = this._trackGeo(new THREE.ConeGeometry(0.055, 0.65, 4));
+    reedGeo.translate(0, 0.32, 0);
+    const reedClusters = [
+      [5.35, -6.1],
+      [6.1, -5.05],
+      [7.4, -4.75],
+      [6.4, -7.8],
+      [8.6, -6.65],
+    ];
+    reedClusters.forEach(([rx, rz], idx) => {
+      const y = sampleTerrainHeight(rx, rz);
+      const tuft = new THREE.Group();
+      tuft.position.set(rx, y - 0.03, rz);
+      for (let k = 0; k < 4; k++) {
+        const blade = new THREE.Mesh(reedGeo, this.textures.materials.palmLeaf);
+        blade.position.set((k - 1.5) * 0.08, 0, ((k % 2) - 0.5) * 0.1);
+        blade.rotation.z = (k - 1.5) * 0.18;
+        blade.rotation.x = ((k % 2) - 0.5) * 0.16;
+        blade.scale.setScalar(0.8 + (k % 3) * 0.22);
+        tuft.add(blade);
+      }
+      this.palmFronds.push({ group: tuft, phase: idx * 1.1 });
+      parent.add(tuft);
     });
   }
 
   _createPalmTree(parent, x, z, scale = 1, lean = 0.12) {
     const group = new THREE.Group();
-    group.position.set(x, 0, z);
+    const groundY = sampleTerrainHeight(x, z);
+    group.position.set(x, groundY - 0.04, z);
     group.scale.setScalar(scale);
 
     // Segmented curved trunk
@@ -466,11 +791,11 @@ export class Level1Pyramid {
     beam.castShadow = true;
     quarryGroup.add(beam);
 
-    // 3 Extractable Rock Nodes along the cliff base
+    // 3 Extractable Rock Nodes nestled into the excavated rocky quarry pit
     const nodePositions = [
-      new THREE.Vector3(-6.05, 0.46, -4.55),
-      new THREE.Vector3(-4.6, 0.5, -4.78),
-      new THREE.Vector3(-3.15, 0.46, -4.55),
+      new THREE.Vector3(-6.05, sampleTerrainHeight(-6.05, -4.55) + 0.44, -4.55),
+      new THREE.Vector3(-4.6, sampleTerrainHeight(-4.6, -4.78) + 0.48, -4.78),
+      new THREE.Vector3(-3.15, sampleTerrainHeight(-3.15, -4.55) + 0.44, -4.55),
     ];
 
     const nodeGeo = this._trackGeo(new THREE.DodecahedronGeometry(0.62, 0));
@@ -1496,15 +1821,15 @@ export class Level1Pyramid {
       }
     }
 
-    // Compute ground elevation underneath the dragged block for the drop-shadow indicator
-    let groundY = 0.02;
+    // Compute ground elevation underneath the dragged block using sculpted terrain height
+    let groundY = Math.max(this.getTerrainHeight(dragPos.x, dragPos.z), WATER_LEVEL + 0.02);
     if (bestSlot) {
       groundY = bestSlot.dropIndicatorY;
     } else if (
       Math.abs(dragPos.x - PYRAMID_CENTER.x) < 3.1 &&
       Math.abs(dragPos.z - PYRAMID_CENTER.z) < 3.1
     ) {
-      groundY = FOUNDATION_Y + this.activeLayer * BLOCK_H;
+      groundY = Math.max(groundY, FOUNDATION_Y + this.activeLayer * BLOCK_H);
     }
 
     return { snapZone: bestSlot, groundY };
@@ -1857,7 +2182,7 @@ export class Level1Pyramid {
       }
     }
 
-    // 6. Subtle breeze on palm fronds, workshop sunshade, & carving pips
+    // 6. Subtle breeze on palm fronds, workshop sunshade, carving pips, & animated Nile water
     for (let i = 0; i < this.palmFronds.length; i++) {
       const p = this.palmFronds[i];
       p.group.rotation.z = Math.sin(elapsed * 1.45 + p.phase) * 0.045;
@@ -1865,6 +2190,14 @@ export class Level1Pyramid {
     }
     if (this.canopyMesh) {
       this.canopyMesh.rotation.z = Math.sin(elapsed * 1.8) * 0.015;
+    }
+    if (this.textures.maps.waterNormal) {
+      this.textures.maps.waterNormal.offset.x = (elapsed * 0.038) % 1;
+      this.textures.maps.waterNormal.offset.y = (elapsed * 0.024) % 1;
+    }
+    if (this.nileFoamMesh && this.nileFoamMat) {
+      this.nileFoamMesh.position.y = WATER_LEVEL + 0.012 + Math.sin(elapsed * 2.2) * 0.008;
+      this.nileFoamMat.opacity = 0.56 + Math.sin(elapsed * 2.2) * 0.16;
     }
     for (let i = 0; i < this.carvingPips.length; i++) {
       const pip = this.carvingPips[i];

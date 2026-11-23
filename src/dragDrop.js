@@ -503,9 +503,16 @@ export class TouchInteractionEngine {
       const targetZ = this.activeSnapZone
         ? THREE.MathUtils.lerp(this.dragTargetPos.z, this.activeSnapZone.position.z, 0.58)
         : this.dragTargetPos.z;
+      const indX = this.activeSnapZone ? this.activeSnapZone.position.x : this.dragVisualPos.x;
+      const indZ = this.activeSnapZone ? this.activeSnapZone.position.z : this.dragVisualPos.z;
+      const liveGroundY =
+        !this.activeSnapZone && this.level && typeof this.level.getTerrainHeight === 'function'
+          ? Math.max(this.level.getTerrainHeight(indX, indZ), this.shadowGroundY)
+          : this.shadowGroundY;
+
       const hoverBoost = this.activeSnapZone
         ? Math.max(this.dragHoverY, this.activeSnapZone.position.y + 1.05)
-        : this.dragHoverY;
+        : Math.max(this.dragHoverY, liveGroundY + 1.05);
       const bob = Math.sin(elapsed * 6.5) * 0.045;
 
       const prevX = this.dragVisualPos.x;
@@ -534,13 +541,11 @@ export class TouchInteractionEngine {
       );
 
       // Update ground drop-shadow indicator directly beneath carried block (or snapped slot)
-      const indX = this.activeSnapZone ? this.activeSnapZone.position.x : this.dragVisualPos.x;
-      const indZ = this.activeSnapZone ? this.activeSnapZone.position.z : this.dragVisualPos.z;
       const indY = this.activeSnapZone
-        ? this.activeSnapZone.dropIndicatorY ?? this.shadowGroundY
-        : this.shadowGroundY;
+        ? this.activeSnapZone.dropIndicatorY ?? liveGroundY
+        : liveGroundY;
 
-      this.dropIndicator.position.set(indX, indY + 0.025, indZ);
+      this.dropIndicator.position.set(indX, indY + 0.03, indZ);
       const ringPulse = this.activeSnapZone ? 1.08 + Math.sin(elapsed * 10) * 0.05 : 0.92;
       this.dropRing.scale.setScalar(ringPulse);
       this.dropRingMat.color.setHex(this.activeSnapZone ? 0xffd25a : 0xfff3d4);

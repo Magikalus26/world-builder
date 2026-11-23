@@ -1,27 +1,112 @@
 /**
- * Workd Builder — Procedural HTML5 Canvas Texture & Material Generator
- * Produces stylized tactile low-poly/diorama textures with zero external image files.
+ * Workd Builder — Procedural 512x512 PBR Texture & Material Generator
+ * Generates tileable Diffuse (Albedo), Sobel-filtered Normal Maps, Roughness Maps,
+ * and packed Normal+Roughness maps for 4-biome terrain splatting, limestone,
+ * beveled hieroglyphic sandstone, weathered timber, golden capstone, and animated Nile water.
+ * Zero external image files; memory-capped at 512x512 (anisotropy <= 4) for iPhone 16e 60 FPS.
  */
 
 import * as THREE from 'three';
 
-function makeCanvas(size = 256) {
+function makeCanvas(w = 512, h = w) {
   const canvas = document.createElement('canvas');
-  canvas.width = size;
-  canvas.height = size;
+  canvas.width = w;
+  canvas.height = h;
   return canvas;
 }
 
-function seededRand(seed) {
-  let s = seed % 2147483647;
-  if (s <= 0) s += 2147483646;
-  return () => {
-    s = (s * 16807) % 2147483647;
-    return (s - 1) / 2147483646;
-  };
+function clamp01(v) {
+  return v < 0 ? 0 : v > 1 ? 1 : v;
 }
 
-function createTexture(canvas, { repeat = [1, 1], isColor = true, anisotropy = 4 } = {}) {
+function lerp(a, b, t) {
+  return a + (b - a) * t;
+}
+
+function smoothstep(edge0, edge1, x) {
+  const t = clamp01((x - edge0) / (edge1 - edge0));
+  return t * t * (3 - 2 * t);
+}
+
+/** Deterministic integer hash in [0, 1] for seamlessly tileable lattice noise */
+function hash2i(ix, iy, seed) {
+  let n = (ix * 374761393 + iy * 668265263 + seed * 1442695041) | 0;
+  n = (n ^ (n >>> 13)) * 1274126177;
+  n = n ^ (n >>> 16);
+  return (n >>> 0) / 4294967295;
+}
+
+/** Smoothly interpolated tileable 2D value noise with integer period */
+function tileNoise2D(u, v, periodX, periodY, seed) {
+  const fx = u * periodX;
+  const fy = v * periodY;
+  const x0 = Math.floor(fx);
+  const y0 = Math.floor(fy);
+  const tx = fx - x0;
+  const ty = fy - y0;
+  const sx = tx * tx * (3 - 2 * tx);
+  const sy = ty * ty * (3 - 2 * ty);
+
+  const ix0 = ((x0 % periodX) + periodX) % periodX;
+  const iy0 = ((y0 % periodY) + periodY) % periodY;
+  const ix1 = (ix0 + 1) % periodX;
+  const iy1 = (iy0 + 1) % periodY;
+
+  const v00 = hash2i(ix0, iy0, seed);
+  const v10 = hash2i(ix1, iy0, seed);
+  const v01 = hash2i(ix0, iy1, seed);
+  const v11 = hash2i(ix1, iy1, seed);
+
+  return lerp(lerp(v00, v10, sx), lerp(v01, v11, sx), sy);
+}
+
+/** Seamless multi-octave FBM noise in [0, 1] */
+function tileFBM(u, v, basePeriod, octaves, seed) {
+  let sum = 0;
+  let amp = 0.5;
+  let norm = 0;
+  let period = basePeriod;
+  for (let o = 0; o < octaves; o++) {
+    sum += tileNoise2D(u, v, period, period, seed + o * 31) * amp;
+    norm += amp;
+    amp *= 0.5;
+    period *= 2;
+  }
+  return sum / norm;
+}
+
+/** Seamless cellular Worley distance (F1 and F2-F1 edge) for stones, gravel & cracks */
+function tileWorley(u, v, cells, seed) {
+  const fx = u * cells;
+  const fy = v * cells;
+  const cx = Math.floor(fx);
+  const cy = Math.floor(fy);
+  let d1 = 9;
+  let d2 = 9;
+  let cellId = 0;
+
+  for (let dy = -1; dy <= 1; dy++) {
+    for (let dx = -1; dx <= 1; dx++) {
+      const nx = cx + dx;
+      const ny = cy + dy;
+      const wx = ((nx % cells) + cells) % cells;
+      const wy = ((ny % cells) + cells) % cells;
+      const px = nx + 0.15 + 0.7 * hash2i(wx, wy, seed);
+      const py = ny + 0.15 + 0.7 * hash2i(wx, wy, seed + 97);
+      const d = Math.hypot(fx - px, fy - py);
+      if (d < d1) {
+        d2 = d1;
+        d1 = d;
+        cellId = hash2i(wx, wy, seed + 193);
+      } else if (d < d2) {
+        d2 = d;
+      }
+    }
+  }
+  return { f1: d1, edge: d2 - d1, id: cellId };
+}
+
+function wrapTexture(canvas, { repeat = [1, 1], isColor = true, anisotropy = 4 } = {}) {
   const tex = new THREE.CanvasTexture(canvas);
   tex.wrapS = THREE.RepeatWrapping;
   tex.wrapT = THREE.RepeatWrapping;
@@ -34,493 +119,878 @@ function createTexture(canvas, { repeat = [1, 1], isColor = true, anisotropy = 4
   return tex;
 }
 
-/** Warm golden desert sand with subtle wind-swept ripples */
-function buildDesertSand(anisotropy) {
+/**
+ * Sobel 3x3 filter converting a tileable Float32Array heightfield into a Tangent-Space Normal Map.
+ * If roughnessField is provided, packs roughness into the Alpha channel (for GPU terrain splatting).
+ */
+function buildSobelNormalCanvas(heightField, size, strength = 2.6, roughnessField = null) {
+  const canvas = makeCanvas(size);
+  const ctx = canvas.getContext('2d');
+  const img = ctx.createImageData(size, size);
+  const data = img.data;
+  const mask = size - 1; // size is power of 2 (512)
+
+  for (let y = 0; y < size; y++) {
+    const ym = (y - 1) & mask;
+    const yp = (y + 1) & mask;
+    const rowM = ym * size;
+    const row0 = y * size;
+    const rowP = yp * size;
+
+    for (let x = 0; x < size; x++) {
+      const xm = (x - 1) & mask;
+      const xp = (x + 1) & mask;
+
+      const tl = heightField[rowM + xm];
+      const tc = heightField[rowM + x];
+      const tr = heightField[rowM + xp];
+      const ml = heightField[row0 + xm];
+      const mr = heightField[row0 + xp];
+      const bl = heightField[rowP + xm];
+      const bc = heightField[rowP + x];
+      const br = heightField[rowP + xp];
+
+      const dx = (tr + 2 * mr + br) - (tl + 2 * ml + bl);
+      const dy = (bl + 2 * bc + br) - (tl + 2 * tc + tr);
+
+      let nx = -dx * strength;
+      let ny = -dy * strength;
+      let nz = 1.0;
+      const invLen = 1 / Math.hypot(nx, ny, nz);
+      nx *= invLen;
+      ny *= invLen;
+      nz *= invLen;
+
+      const idx = (row0 + x) * 4;
+      data[idx] = Math.round((nx * 0.5 + 0.5) * 255);
+      data[idx + 1] = Math.round((ny * 0.5 + 0.5) * 255);
+      data[idx + 2] = Math.round((nz * 0.5 + 0.5) * 255);
+      data[idx + 3] = roughnessField
+        ? Math.round(clamp01(roughnessField[row0 + x]) * 255)
+        : 255;
+    }
+  }
+
+  ctx.putImageData(img, 0, 0);
+  return canvas;
+}
+
+/** Builds a standalone grayscale Roughness canvas from a Float32Array */
+function buildRoughnessCanvas(roughField, size) {
+  const canvas = makeCanvas(size);
+  const ctx = canvas.getContext('2d');
+  const img = ctx.createImageData(size, size);
+  const data = img.data;
+  const total = size * size;
+  for (let i = 0; i < total; i++) {
+    const g = Math.round(clamp01(roughField[i]) * 255);
+    const idx = i * 4;
+    data[idx] = g;
+    data[idx + 1] = g;
+    data[idx + 2] = g;
+    data[idx + 3] = 255;
+  }
+  ctx.putImageData(img, 0, 0);
+  return canvas;
+}
+
+/* ============================================================================
+ * 1. BIOME 0 — WIND-RIPPLED GOLDEN DESERT SAND (512x512 Albedo + Normal+Rough)
+ * ========================================================================== */
+function buildDesertSandPBR(anisotropy) {
   const size = 512;
-  const colorCanvas = makeCanvas(size);
-  const bumpCanvas = makeCanvas(size);
-  const ctx = colorCanvas.getContext('2d');
-  const bctx = bumpCanvas.getContext('2d');
-  const rand = seededRand(101);
+  const albedoCanvas = makeCanvas(size);
+  const ctx = albedoCanvas.getContext('2d');
+  const img = ctx.createImageData(size, size);
+  const data = img.data;
 
-  // Seamless uniform warm desert sand base (no edge discontinuity when tiled)
-  ctx.fillStyle = '#e3bf7c';
-  ctx.fillRect(0, 0, size, size);
+  const height = new Float32Array(size * size);
+  const rough = new Float32Array(size * size);
 
-  bctx.fillStyle = '#808080';
-  bctx.fillRect(0, 0, size, size);
+  for (let y = 0; y < size; y++) {
+    const v = y / size;
+    for (let x = 0; x < size; x++) {
+      const u = x / size;
+      const i = y * size + x;
 
-  // Seamless periodic wind ripples
-  for (let y = 0; y < size; y += 2) {
-    const wave = Math.sin((y / size) * Math.PI * 12);
-    const alpha = (wave + 1) * 0.5;
-    ctx.fillStyle = wave > 0
-      ? `rgba(255, 242, 206, ${alpha * 0.1})`
-      : `rgba(176, 122, 58, ${(1 - alpha) * 0.09})`;
-    ctx.fillRect(0, y, size, 2);
+      // Flowing wind-blown sand ripples perturbed by seamless FBM
+      const warp = tileFBM(u, v, 4, 3, 13) * 0.32;
+      const ripplePhase = (v * 10 + u * 2 + warp * 3.2) * Math.PI * 2;
+      // Asymmetric wind-dune wave profile (steeper leeward slope)
+      const wave = Math.sin(ripplePhase) * 0.5 + Math.sin(ripplePhase * 2 - 0.6) * 0.14;
+      const macroVar = tileFBM(u, v, 4, 3, 47);
+      const grain = hash2i(x, y, 71);
+      const fineNoise = tileNoise2D(u, v, 64, 64, 91);
 
-    const bVal = Math.floor(128 + wave * 30);
-    bctx.fillStyle = `rgb(${bVal},${bVal},${bVal})`;
-    bctx.fillRect(0, y, size, 2);
-  }
+      // Sparkling quartz micro-facets (small percentage of grains catch sunlight)
+      const sparkle = grain > 0.968 ? 1.0 : 0.0;
 
-  // Soft curved wind ridges
-  ctx.strokeStyle = 'rgba(255, 244, 214, 0.12)';
-  ctx.lineWidth = 4;
-  for (let i = 0; i < 18; i++) {
-    const y0 = (i / 18) * size;
-    ctx.beginPath();
-    for (let x = 0; x <= size; x += 16) {
-      const y = y0 + Math.sin((x / size) * Math.PI * 2 + i * 0.6) * 8;
-      if (x === 0) ctx.moveTo(x, y);
-      else ctx.lineTo(x, y);
+      const h = clamp01(0.5 + wave * 0.34 + (macroVar - 0.5) * 0.14 + (fineNoise - 0.5) * 0.08 + (grain - 0.5) * 0.05);
+      height[i] = h;
+
+      // Warm golden ochre palette with luminous crests and deeper warm amber troughs
+      const crest = smoothstep(-0.55, 0.65, wave);
+      const r = lerp(206, 240, crest) + (macroVar - 0.5) * 18 + (grain - 0.5) * 14 + sparkle * 26;
+      const g = lerp(156, 202, crest) + (macroVar - 0.5) * 14 + (grain - 0.5) * 12 + sparkle * 24;
+      const b = lerp(94, 134, crest) + (macroVar - 0.5) * 10 + (grain - 0.5) * 10 + sparkle * 22;
+
+      const idx = i * 4;
+      data[idx] = Math.min(255, Math.max(0, Math.round(r)));
+      data[idx + 1] = Math.min(255, Math.max(0, Math.round(g)));
+      data[idx + 2] = Math.min(255, Math.max(0, Math.round(b)));
+      data[idx + 3] = 255;
+
+      // Sparkling specular sand micro-grains via lower roughness spots
+      rough[i] = sparkle > 0.5 ? 0.32 : clamp01(0.84 - crest * 0.1 + (grain - 0.5) * 0.1);
     }
-    ctx.stroke();
   }
 
-  // Fine quartz & ochre mineral grain
-  for (let i = 0; i < 4200; i++) {
-    const x = rand() * size;
-    const y = rand() * size;
-    const r = 0.7 + rand() * 1.4;
-    const bright = rand() > 0.45;
-    ctx.fillStyle = bright
-      ? `rgba(255, 246, 224, ${0.12 + rand() * 0.18})`
-      : `rgba(148, 100, 44, ${0.1 + rand() * 0.16})`;
-    ctx.fillRect(x, y, r, r);
-
-    const bv = bright ? 162 : 98;
-    bctx.fillStyle = `rgba(${bv},${bv},${bv},0.35)`;
-    bctx.fillRect(x, y, r, r);
-  }
+  ctx.putImageData(img, 0, 0);
+  const normalPackedCanvas = buildSobelNormalCanvas(height, size, 3.0, rough);
 
   return {
-    map: createTexture(colorCanvas, { repeat: [4, 4], isColor: true, anisotropy }),
-    bumpMap: createTexture(bumpCanvas, { repeat: [4, 4], isColor: false, anisotropy }),
+    albedo: wrapTexture(albedoCanvas, { isColor: true, anisotropy }),
+    normalRough: wrapTexture(normalPackedCanvas, { isColor: false, anisotropy }),
   };
 }
 
-/** Layered geological sandstone strata for diorama plinth edge */
-function buildPlinthStrata(anisotropy) {
-  const size = 256;
-  const canvas = makeCanvas(size);
-  const ctx = canvas.getContext('2d');
-  const rand = seededRand(202);
+/* ============================================================================
+ * 2. BIOME 1 — COMPACTED DUSTY EARTH & GRAVEL PATH (512x512)
+ * ========================================================================== */
+function buildEarthPathPBR(anisotropy) {
+  const size = 512;
+  const albedoCanvas = makeCanvas(size);
+  const ctx = albedoCanvas.getContext('2d');
+  const img = ctx.createImageData(size, size);
+  const data = img.data;
 
-  const bands = [
-    { y: 0, h: 46, color: '#cfa162' },
-    { y: 46, h: 52, color: '#b78349' },
-    { y: 98, h: 48, color: '#9c6b3b' },
-    { y: 146, h: 56, color: '#825731' },
-    { y: 202, h: 54, color: '#6b4628' },
-  ];
+  const height = new Float32Array(size * size);
+  const rough = new Float32Array(size * size);
 
-  bands.forEach((b) => {
-    ctx.fillStyle = b.color;
-    ctx.fillRect(0, b.y, size, b.h);
-  });
+  for (let y = 0; y < size; y++) {
+    const v = y / size;
+    for (let x = 0; x < size; x++) {
+      const u = x / size;
+      const i = y * size + x;
 
-  // Subtle sedimentary streaks
-  for (let i = 0; i < 40; i++) {
-    const y = rand() * size;
-    ctx.fillStyle = rand() > 0.5 ? 'rgba(255,232,190,0.09)' : 'rgba(54,30,12,0.12)';
-    ctx.fillRect(0, y, size, 2 + rand() * 4);
-  }
+      const dirt = tileFBM(u, v, 6, 4, 211);
+      const pebbles = tileWorley(u, v, 22, 239);
+      const grit = tileWorley(u, v, 44, 271);
+      const grain = hash2i(x, y, 293);
 
-  for (let i = 0; i < 1200; i++) {
-    ctx.fillStyle = rand() > 0.5 ? 'rgba(255,240,210,0.08)' : 'rgba(40,22,10,0.12)';
-    ctx.fillRect(rand() * size, rand() * size, 2, 2);
-  }
+      // Compacted river pebbles embedded in dry terracotta-ochre earth
+      const pebbleMask = smoothstep(0.36, 0.12, pebbles.f1) * (pebbles.id > 0.35 ? 1 : 0.35);
+      const gritBump = smoothstep(0.4, 0.15, grit.f1) * 0.35;
 
-  return createTexture(canvas, { repeat: [3, 1], isColor: true, anisotropy });
-}
+      const h = clamp01(0.42 + (dirt - 0.5) * 0.25 + pebbleMask * 0.34 + gritBump * 0.16 + (grain - 0.5) * 0.06);
+      height[i] = h;
 
-/** Rough grey-beige quarry limestone */
-function buildQuarryLimestone(anisotropy) {
-  const size = 256;
-  const colorCanvas = makeCanvas(size);
-  const bumpCanvas = makeCanvas(size);
-  const ctx = colorCanvas.getContext('2d');
-  const bctx = bumpCanvas.getContext('2d');
-  const rand = seededRand(303);
+      // Warm compacted dusty earth mixed with pale ochre/grey pebbles
+      let r = lerp(164, 198, dirt);
+      let g = lerp(124, 155, dirt);
+      let b = lerp(82, 108, dirt);
 
-  ctx.fillStyle = '#b4aa97';
-  ctx.fillRect(0, 0, size, size);
-  bctx.fillStyle = '#808080';
-  bctx.fillRect(0, 0, size, size);
+      if (pebbleMask > 0.05) {
+        const tone = 0.78 + pebbles.id * 0.36;
+        r = lerp(r, 178 * tone, pebbleMask * 0.72);
+        g = lerp(g, 160 * tone, pebbleMask * 0.72);
+        b = lerp(b, 132 * tone, pebbleMask * 0.72);
+      }
 
-  // Mottled rocky mineral blotches
-  for (let i = 0; i < 85; i++) {
-    const x = rand() * size;
-    const y = rand() * size;
-    const w = 18 + rand() * 48;
-    const h = 10 + rand() * 26;
-    const shade = Math.floor(148 + rand() * 48);
-    ctx.fillStyle = `rgba(${shade}, ${shade - 8}, ${shade - 22}, 0.28)`;
-    ctx.fillRect(x - w * 0.5, y - h * 0.5, w, h);
+      const idx = i * 4;
+      data[idx] = Math.min(255, Math.max(0, Math.round(r + (grain - 0.5) * 14)));
+      data[idx + 1] = Math.min(255, Math.max(0, Math.round(g + (grain - 0.5) * 12)));
+      data[idx + 2] = Math.min(255, Math.max(0, Math.round(b + (grain - 0.5) * 10)));
+      data[idx + 3] = 255;
 
-    const bv = Math.floor(95 + rand() * 75);
-    bctx.fillStyle = `rgba(${bv},${bv},${bv},0.35)`;
-    bctx.fillRect(x - w * 0.5, y - h * 0.5, w, h);
-  }
-
-  // Sedimentary fracture seams
-  for (let i = 0; i < 16; i++) {
-    const y0 = rand() * size;
-    ctx.strokeStyle = 'rgba(72, 63, 50, 0.34)';
-    ctx.lineWidth = 1.2 + rand() * 1.6;
-    bctx.strokeStyle = 'rgba(35, 35, 35, 0.7)';
-    bctx.lineWidth = 2;
-
-    ctx.beginPath();
-    bctx.beginPath();
-    let cx = rand() * size * 0.3;
-    let cy = y0;
-    ctx.moveTo(cx, cy);
-    bctx.moveTo(cx, cy);
-    for (let s = 0; s < 5; s++) {
-      cx += 18 + rand() * 34;
-      cy += (rand() - 0.5) * 14;
-      ctx.lineTo(cx, cy);
-      bctx.lineTo(cx, cy);
+      rough[i] = clamp01(0.92 - pebbleMask * 0.2 + (grain - 0.5) * 0.08);
     }
-    ctx.stroke();
-    bctx.stroke();
   }
 
-  // Chalky speckles
-  for (let i = 0; i < 1600; i++) {
-    const x = rand() * size;
-    const y = rand() * size;
-    const bright = rand() > 0.5;
-    ctx.fillStyle = bright ? 'rgba(235, 228, 212, 0.22)' : 'rgba(84, 76, 62, 0.2)';
-    ctx.fillRect(x, y, 2, 2);
-  }
+  ctx.putImageData(img, 0, 0);
+  const normalPackedCanvas = buildSobelNormalCanvas(height, size, 3.8, rough);
 
   return {
-    map: createTexture(colorCanvas, { repeat: [1, 1], isColor: true, anisotropy }),
-    bumpMap: createTexture(bumpCanvas, { repeat: [1, 1], isColor: false, anisotropy }),
+    albedo: wrapTexture(albedoCanvas, { isColor: true, anisotropy }),
+    normalRough: wrapTexture(normalPackedCanvas, { isColor: false, anisotropy }),
   };
 }
 
-/** Transitional chisel carving texture (stage 1 or stage 2) */
-function buildCarvingStageTexture(stage, anisotropy) {
-  const size = 256;
-  const canvas = makeCanvas(size);
-  const ctx = canvas.getContext('2d');
-  const rand = seededRand(stage === 1 ? 401 : 402);
+/* ============================================================================
+ * 3. BIOME 2 — CRUSHED LIMESTONE & CRACKED QUARRY DUST (512x512)
+ * ========================================================================== */
+function buildQuarryDustPBR(anisotropy) {
+  const size = 512;
+  const albedoCanvas = makeCanvas(size);
+  const ctx = albedoCanvas.getContext('2d');
+  const img = ctx.createImageData(size, size);
+  const data = img.data;
 
-  // Stage 1: mostly rough limestone revealing warm sandstone core
-  // Stage 2: mostly golden sandstone with diagonal chisel dress marks
-  ctx.fillStyle = stage === 1 ? '#c6b38e' : '#dfb973';
-  ctx.fillRect(0, 0, size, size);
+  const height = new Float32Array(size * size);
+  const rough = new Float32Array(size * size);
 
-  // Outer rough rim or emerging bevel
-  const pad = stage === 1 ? 18 : 14;
-  ctx.strokeStyle = stage === 1 ? 'rgba(120, 108, 90, 0.48)' : 'rgba(164, 114, 42, 0.52)';
-  ctx.lineWidth = stage === 1 ? 14 : 10;
-  ctx.strokeRect(pad, pad, size - pad * 2, size - pad * 2);
+  for (let y = 0; y < size; y++) {
+    const v = y / size;
+    for (let x = 0; x < size; x++) {
+      const u = x / size;
+      const i = y * size + x;
 
-  // Diagonal hand-chisel marks
-  const strokes = stage === 1 ? 36 : 54;
-  for (let i = 0; i < strokes; i++) {
-    const x = 18 + rand() * (size - 36);
-    const y = 18 + rand() * (size - 36);
-    const len = 14 + rand() * 24;
-    ctx.strokeStyle = rand() > 0.45
-      ? 'rgba(255, 240, 200, 0.34)'
-      : 'rgba(130, 92, 42, 0.28)';
-    ctx.lineWidth = stage === 1 ? 2.5 : 1.6;
-    ctx.beginPath();
-    ctx.moveTo(x, y);
-    ctx.lineTo(x + len * 0.7, y + len * 0.7);
-    ctx.stroke();
+      const base = tileFBM(u, v, 5, 4, 311);
+      const slab = tileWorley(u, v, 9, 349);
+      const chips = tileWorley(u, v, 28, 383);
+      const grain = hash2i(x, y, 401);
+
+      // Dry quarry slab cracks + scattered sharp limestone rubble chips
+      const crack = 1.0 - smoothstep(0.015, 0.075, slab.edge);
+      const chipH = smoothstep(0.38, 0.1, chips.f1) * (chips.id > 0.42 ? 1.0 : 0.25);
+
+      const h = clamp01(0.54 + (base - 0.5) * 0.2 - crack * 0.42 + chipH * 0.3 + (grain - 0.5) * 0.07);
+      height[i] = h;
+
+      // Chalky limestone grey-beige with dusty shadow in cracks
+      let r = lerp(178, 212, base) + (slab.id - 0.5) * 14;
+      let g = lerp(168, 200, base) + (slab.id - 0.5) * 12;
+      let b = lerp(146, 176, base) + (slab.id - 0.5) * 10;
+
+      // Highlight angular stone chips
+      r = lerp(r, 224, chipH * 0.42);
+      g = lerp(g, 214, chipH * 0.42);
+      b = lerp(b, 192, chipH * 0.42);
+
+      // Darken fracture cracks
+      const crackShade = 1.0 - crack * 0.46;
+      const idx = i * 4;
+      data[idx] = Math.min(255, Math.max(0, Math.round(r * crackShade + (grain - 0.5) * 12)));
+      data[idx + 1] = Math.min(255, Math.max(0, Math.round(g * crackShade + (grain - 0.5) * 12)));
+      data[idx + 2] = Math.min(255, Math.max(0, Math.round(b * crackShade + (grain - 0.5) * 10)));
+      data[idx + 3] = 255;
+
+      rough[i] = clamp01(0.9 + crack * 0.08 - chipH * 0.14 + (grain - 0.5) * 0.06);
+    }
   }
 
-  for (let i = 0; i < 900; i++) {
-    ctx.fillStyle = rand() > 0.5 ? 'rgba(255,244,218,0.18)' : 'rgba(122,88,42,0.15)';
-    ctx.fillRect(rand() * size, rand() * size, 2, 2);
-  }
+  ctx.putImageData(img, 0, 0);
+  const normalPackedCanvas = buildSobelNormalCanvas(height, size, 4.2, rough);
 
-  return createTexture(canvas, { repeat: [1, 1], isColor: true, anisotropy });
+  return {
+    albedo: wrapTexture(albedoCanvas, { isColor: true, anisotropy }),
+    normalRough: wrapTexture(normalPackedCanvas, { isColor: false, anisotropy }),
+  };
 }
 
-/** Carved golden beveled sandstone with subtle stylized hieroglyphic trim */
-function buildCarvedSandstone(anisotropy) {
-  const size = 256;
-  const colorCanvas = makeCanvas(size);
-  const bumpCanvas = makeCanvas(size);
-  const ctx = colorCanvas.getContext('2d');
-  const bctx = bumpCanvas.getContext('2d');
-  const rand = seededRand(505);
+/* ============================================================================
+ * 4. BIOME 3 — LUSH RIVERBANK SILT & OASIS GRASS (512x512)
+ * ========================================================================== */
+function buildOasisGrassPBR(anisotropy) {
+  const size = 512;
+  const albedoCanvas = makeCanvas(size);
+  const ctx = albedoCanvas.getContext('2d');
+  const img = ctx.createImageData(size, size);
+  const data = img.data;
 
-  // Warm sunlit golden sandstone base
-  const grad = ctx.createLinearGradient(0, 0, size, size);
-  grad.addColorStop(0, '#f0cc82');
-  grad.addColorStop(0.5, '#e5b864');
-  grad.addColorStop(1, '#d6a24c');
-  ctx.fillStyle = grad;
-  ctx.fillRect(0, 0, size, size);
+  const height = new Float32Array(size * size);
+  const rough = new Float32Array(size * size);
 
-  bctx.fillStyle = '#909090';
-  bctx.fillRect(0, 0, size, size);
+  for (let y = 0; y < size; y++) {
+    const v = y / size;
+    for (let x = 0; x < size; x++) {
+      const u = x / size;
+      const i = y * size + x;
 
-  // Sculpted outer bevel border
-  ctx.lineWidth = 10;
-  ctx.strokeStyle = '#c48f3c';
-  ctx.strokeRect(5, 5, size - 10, size - 10);
+      const lush = tileFBM(u, v, 5, 4, 431);
+      const blades = tileFBM(u, v, 24, 3, 463);
+      const tuft = tileWorley(u, v, 18, 491);
+      const grain = hash2i(x, y, 521);
 
-  // Highlighted top/left chamfer & shaded bottom/right chamfer
-  ctx.strokeStyle = 'rgba(255, 245, 214, 0.55)';
-  ctx.lineWidth = 4;
-  ctx.beginPath();
-  ctx.moveTo(12, size - 12);
-  ctx.lineTo(12, 12);
-  ctx.lineTo(size - 12, 12);
-  ctx.stroke();
+      // Grass tuft clusters emerging from fertile Nile silt
+      const grassCover = smoothstep(0.32, 0.72, lush * 0.7 + (1.0 - tuft.f1) * 0.35);
+      const bladeRelief = blades * grassCover;
 
-  ctx.strokeStyle = 'rgba(138, 92, 30, 0.45)';
-  ctx.beginPath();
-  ctx.moveTo(size - 12, 12);
-  ctx.lineTo(size - 12, size - 12);
-  ctx.lineTo(12, size - 12);
-  ctx.stroke();
+      const h = clamp01(0.35 + (lush - 0.5) * 0.16 + bladeRelief * 0.45 + (grain - 0.5) * 0.08);
+      height[i] = h;
 
-  // Bump bevel recess
-  bctx.strokeStyle = '#404040';
-  bctx.lineWidth = 8;
-  bctx.strokeRect(8, 8, size - 16, size - 16);
+      // Dark fertile riverbank silt -> lush warm emerald-olive oasis foliage
+      const siltR = 102 + lush * 24;
+      const siltG = 86 + lush * 20;
+      const siltB = 58 + lush * 14;
 
-  // Subtle carved hieroglyphic trim frieze along upper/lower inner band
-  const drawFrieze = (yCenter) => {
-    ctx.strokeStyle = 'rgba(154, 103, 38, 0.42)';
-    ctx.fillStyle = 'rgba(154, 103, 38, 0.36)';
-    ctx.lineWidth = 2;
+      const grassR = lerp(84, 126, blades);
+      const grassG = lerp(124, 166, blades);
+      const grassB = lerp(52, 74, blades);
 
-    bctx.strokeStyle = '#555555';
-    bctx.lineWidth = 2;
+      const r = lerp(siltR, grassR, grassCover);
+      const g = lerp(siltG, grassG, grassCover);
+      const b = lerp(siltB, grassB, grassCover);
 
-    // Horizontal trim guide rules
-    ctx.beginPath();
-    ctx.moveTo(24, yCenter - 11);
-    ctx.lineTo(size - 24, yCenter - 11);
-    ctx.moveTo(24, yCenter + 11);
-    ctx.lineTo(size - 24, yCenter + 11);
-    ctx.stroke();
+      const idx = i * 4;
+      data[idx] = Math.min(255, Math.max(0, Math.round(r + (grain - 0.5) * 12)));
+      data[idx + 1] = Math.min(255, Math.max(0, Math.round(g + (grain - 0.5) * 14)));
+      data[idx + 2] = Math.min(255, Math.max(0, Math.round(b + (grain - 0.5) * 10)));
+      data[idx + 3] = 255;
 
-    bctx.beginPath();
-    bctx.moveTo(24, yCenter - 11);
-    bctx.lineTo(size - 24, yCenter - 11);
-    bctx.moveTo(24, yCenter + 11);
-    bctx.lineTo(size - 24, yCenter + 11);
-    bctx.stroke();
+      // Silt is slightly damper/glossier; grass blades are softly matte
+      rough[i] = clamp01(lerp(0.64, 0.84, grassCover) + (grain - 0.5) * 0.08);
+    }
+  }
 
-    // Repeating geometric motifs: solar disk, diamond cartouche, ankh-like cross, wave
-    for (let x = 38; x <= size - 38; x += 36) {
-      const idx = Math.floor(x / 36) % 3;
-      if (idx === 0) {
+  ctx.putImageData(img, 0, 0);
+  const normalPackedCanvas = buildSobelNormalCanvas(height, size, 3.6, rough);
+
+  return {
+    albedo: wrapTexture(albedoCanvas, { isColor: true, anisotropy }),
+    normalRough: wrapTexture(normalPackedCanvas, { isColor: false, anisotropy }),
+  };
+}
+
+/* ============================================================================
+ * 5. QUARRY CLIFF & RAW STONE LIMESTONE (512x512 Albedo + Normal + Roughness)
+ * ========================================================================== */
+function buildQuarryLimestonePBR(anisotropy) {
+  const size = 512;
+  const albedoCanvas = makeCanvas(size);
+  const ctx = albedoCanvas.getContext('2d');
+  const img = ctx.createImageData(size, size);
+  const data = img.data;
+
+  const height = new Float32Array(size * size);
+  const rough = new Float32Array(size * size);
+
+  for (let y = 0; y < size; y++) {
+    const v = y / size;
+    for (let x = 0; x < size; x++) {
+      const u = x / size;
+      const i = y * size + x;
+
+      // Stratified horizontal sedimentary bedding planes warped organically
+      const warp = tileFBM(u, v, 4, 3, 601) * 0.14;
+      const strataWave = Math.sin((v + warp) * Math.PI * 14);
+      const strataBand = tileNoise2D(0.2, v + warp, 4, 16, 617);
+      const rockFbm = tileFBM(u, v, 8, 4, 641);
+      const fractures = tileWorley(u, v, 7, 673);
+      const grain = hash2i(x, y, 701);
+
+      const crevice = 1.0 - smoothstep(0.012, 0.068, fractures.edge);
+      const beddingGroove = 1.0 - smoothstep(0.0, 0.22, Math.abs(strataWave));
+
+      const h = clamp01(
+        0.55 +
+          strataWave * 0.14 +
+          (rockFbm - 0.5) * 0.26 -
+          crevice * 0.42 -
+          beddingGroove * 0.14 +
+          (grain - 0.5) * 0.08
+      );
+      height[i] = h;
+
+      // Stratified grey-beige Egyptian limestone tones
+      const shade = 1.0 - crevice * 0.48 - beddingGroove * 0.16;
+      const r = (lerp(154, 198, strataBand) + (rockFbm - 0.5) * 26) * shade;
+      const g = (lerp(144, 186, strataBand) + (rockFbm - 0.5) * 24) * shade;
+      const b = (lerp(126, 162, strataBand) + (rockFbm - 0.5) * 20) * shade;
+
+      // Mineral chalk speckles
+      const speck = grain > 0.94 ? 22 : grain < 0.06 ? -20 : 0;
+
+      const idx = i * 4;
+      data[idx] = Math.min(255, Math.max(0, Math.round(r + speck)));
+      data[idx + 1] = Math.min(255, Math.max(0, Math.round(g + speck)));
+      data[idx + 2] = Math.min(255, Math.max(0, Math.round(b + speck * 0.85)));
+      data[idx + 3] = 255;
+
+      rough[i] = clamp01(0.86 + crevice * 0.12 + (grain - 0.5) * 0.1);
+    }
+  }
+
+  ctx.putImageData(img, 0, 0);
+  const normalCanvas = buildSobelNormalCanvas(height, size, 4.4);
+  const roughCanvas = buildRoughnessCanvas(rough, size);
+
+  return {
+    map: wrapTexture(albedoCanvas, { isColor: true, anisotropy }),
+    normalMap: wrapTexture(normalCanvas, { isColor: false, anisotropy }),
+    roughnessMap: wrapTexture(roughCanvas, { isColor: false, anisotropy }),
+  };
+}
+
+/* ============================================================================
+ * 6. CARVED PYRAMID SANDSTONE (512x512 Albedo + Normal + Roughness + Cartouche)
+ * ========================================================================== */
+function buildCarvedSandstonePBR(anisotropy) {
+  const size = 512;
+  const albedoCanvas = makeCanvas(size);
+  const ctx = albedoCanvas.getContext('2d');
+  const img = ctx.createImageData(size, size);
+  const data = img.data;
+
+  const height = new Float32Array(size * size);
+  const rough = new Float32Array(size * size);
+
+  // Pass 1: Sandstone micro-grain, diagonal chisel dressing marks, & weathered edges
+  for (let y = 0; y < size; y++) {
+    const v = y / size;
+    for (let x = 0; x < size; x++) {
+      const u = x / size;
+      const i = y * size + x;
+
+      const stone = tileFBM(u, v, 6, 4, 733);
+      const pores = tileFBM(u, v, 32, 2, 761);
+      const grain = hash2i(x, y, 787);
+
+      // Fine diagonal hand-chisel marks across dressed face
+      const chisel = Math.sin((u * 38 + v * 38 + stone * 1.4) * Math.PI * 2) * 0.5 + 0.5;
+      const edgeDist = Math.min(u, 1 - u, v, 1 - v);
+      const bevelFrame = smoothstep(0.015, 0.065, edgeDist);
+      const innerRecess = smoothstep(0.065, 0.09, edgeDist);
+
+      let h = 0.62 + (stone - 0.5) * 0.12 + (chisel - 0.5) * 0.06 + (pores - 0.5) * 0.07 + (grain - 0.5) * 0.04;
+      // Sculpted outer edge bevel & inset panel step
+      h *= 0.72 + 0.28 * bevelFrame;
+      h -= (1 - innerRecess) * bevelFrame * 0.08;
+      height[i] = clamp01(h);
+
+      // Rich warm golden sandstone albedo
+      const edgeWeather = lerp(0.84, 1.0, bevelFrame);
+      const r = (lerp(218, 244, stone) + (chisel - 0.5) * 10 + (grain - 0.5) * 12) * edgeWeather;
+      const g = (lerp(170, 204, stone) + (chisel - 0.5) * 8 + (grain - 0.5) * 10) * edgeWeather;
+      const b = (lerp(94, 130, stone) + (chisel - 0.5) * 6 + (grain - 0.5) * 8) * edgeWeather;
+
+      const idx = i * 4;
+      data[idx] = Math.min(255, Math.max(0, Math.round(r)));
+      data[idx + 1] = Math.min(255, Math.max(0, Math.round(g)));
+      data[idx + 2] = Math.min(255, Math.max(0, Math.round(b)));
+      data[idx + 3] = 255;
+
+      rough[i] = clamp01(0.68 - (stone - 0.5) * 0.14 + (1 - bevelFrame) * 0.18 + (grain - 0.5) * 0.08);
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+
+  // Pass 2: Draw crisp Egyptian cartouche & hieroglyphic border reliefs onto an offscreen relief mask
+  // so both Albedo shading AND Sobel Normal relief share the exact carved geometry!
+  const reliefCanvas = makeCanvas(size);
+  const rctx = reliefCanvas.getContext('2d');
+  rctx.clearRect(0, 0, size, size);
+  rctx.strokeStyle = '#ffffff';
+  rctx.fillStyle = '#ffffff';
+  rctx.lineCap = 'round';
+  rctx.lineJoin = 'round';
+
+  // Crisp double dressed ashlar border recess
+  rctx.lineWidth = 6;
+  rctx.strokeRect(24, 24, size - 48, size - 48);
+
+  // Upper & lower hieroglyphic frieze bands
+  const drawFriezeBand = (yc) => {
+    rctx.lineWidth = 3.5;
+    rctx.beginPath();
+    rctx.moveTo(42, yc - 22);
+    rctx.lineTo(size - 42, yc - 22);
+    rctx.moveTo(42, yc + 22);
+    rctx.lineTo(size - 42, yc + 22);
+    rctx.stroke();
+
+    for (let cx = 74; cx <= size - 74; cx += 62) {
+      const m = Math.floor(cx / 62) % 4;
+      rctx.lineWidth = 3.5;
+      if (m === 0) {
         // Solar disk
-        ctx.beginPath();
-        ctx.arc(x, yCenter, 5.5, 0, Math.PI * 2);
-        ctx.stroke();
-        ctx.beginPath();
-        ctx.arc(x, yCenter, 2, 0, Math.PI * 2);
-        ctx.fill();
-      } else if (idx === 1) {
-        // Stylized Ankh motif
-        ctx.beginPath();
-        ctx.arc(x, yCenter - 3.5, 3, 0, Math.PI * 2);
-        ctx.moveTo(x, yCenter - 0.5);
-        ctx.lineTo(x, yCenter + 6.5);
-        ctx.moveTo(x - 4.5, yCenter + 1.5);
-        ctx.lineTo(x + 4.5, yCenter + 1.5);
-        ctx.stroke();
+        rctx.beginPath();
+        rctx.arc(cx, yc, 10, 0, Math.PI * 2);
+        rctx.stroke();
+        rctx.beginPath();
+        rctx.arc(cx, yc, 3.5, 0, Math.PI * 2);
+        rctx.fill();
+      } else if (m === 1) {
+        // Stylized Ankh
+        rctx.beginPath();
+        rctx.arc(cx, yc - 6, 5.5, 0, Math.PI * 2);
+        rctx.moveTo(cx, yc - 0.5);
+        rctx.lineTo(cx, yc + 13);
+        rctx.moveTo(cx - 8, yc + 3.5);
+        rctx.lineTo(cx + 8, yc + 3.5);
+        rctx.stroke();
+      } else if (m === 2) {
+        // Royal Cartouche oval
+        rctx.beginPath();
+        rctx.roundRect(cx - 15, yc - 8.5, 30, 17, 8.5);
+        rctx.stroke();
+        rctx.beginPath();
+        rctx.moveTo(cx + 18, yc - 10);
+        rctx.lineTo(cx + 18, yc + 10);
+        rctx.stroke();
       } else {
-        // Diamond reed motif
-        ctx.beginPath();
-        ctx.moveTo(x, yCenter - 6);
-        ctx.lineTo(x + 5, yCenter);
-        ctx.lineTo(x, yCenter + 6);
-        ctx.lineTo(x - 5, yCenter);
-        ctx.closePath();
-        ctx.stroke();
+        // Nile wave & reed chevron
+        rctx.beginPath();
+        rctx.moveTo(cx - 13, yc + 5);
+        rctx.lineTo(cx - 6, yc - 5);
+        rctx.lineTo(cx, yc + 5);
+        rctx.lineTo(cx + 6, yc - 5);
+        rctx.lineTo(cx + 13, yc + 5);
+        rctx.stroke();
       }
     }
   };
 
-  drawFrieze(40);
-  drawFrieze(size - 40);
+  drawFriezeBand(74);
+  drawFriezeBand(size - 74);
 
-  // Fine sandstone mineral grain
-  for (let i = 0; i < 1400; i++) {
-    const x = rand() * size;
-    const y = rand() * size;
-    const light = rand() > 0.48;
-    ctx.fillStyle = light ? 'rgba(255, 246, 218, 0.16)' : 'rgba(135, 92, 34, 0.12)';
-    ctx.fillRect(x, y, 1.8, 1.8);
+  // Subtle central royal cartouche emblem
+  rctx.lineWidth = 3.5;
+  rctx.beginPath();
+  rctx.roundRect(size * 0.5 - 46, size * 0.5 - 24, 92, 48, 24);
+  rctx.stroke();
+  rctx.beginPath();
+  rctx.arc(size * 0.5 - 16, size * 0.5, 10, 0, Math.PI * 2);
+  rctx.stroke();
+  rctx.beginPath();
+  rctx.moveTo(size * 0.5 + 4, size * 0.5 - 11);
+  rctx.lineTo(size * 0.5 + 24, size * 0.5);
+  rctx.lineTo(size * 0.5 + 4, size * 0.5 + 11);
+  rctx.closePath();
+  rctx.stroke();
+
+  // Carve the relief mask into both the heightfield and subtle ambient-occluded albedo
+  const reliefData = rctx.getImageData(0, 0, size, size).data;
+  const albedoImg = ctx.getImageData(0, 0, size, size);
+  const aData = albedoImg.data;
+  for (let i = 0; i < size * size; i++) {
+    const carve = reliefData[i * 4 + 3] / 255;
+    if (carve > 0.01) {
+      height[i] = clamp01(height[i] - carve * 0.24);
+      rough[i] = clamp01(rough[i] + carve * 0.16);
+      const ao = 1.0 - carve * 0.28;
+      aData[i * 4] = Math.round(aData[i * 4] * ao);
+      aData[i * 4 + 1] = Math.round(aData[i * 4 + 1] * ao);
+      aData[i * 4 + 2] = Math.round(aData[i * 4 + 2] * ao);
+    }
   }
+  ctx.putImageData(albedoImg, 0, 0);
+
+  const normalCanvas = buildSobelNormalCanvas(height, size, 3.6);
+  const roughCanvas = buildRoughnessCanvas(rough, size);
 
   return {
-    map: createTexture(colorCanvas, { repeat: [1, 1], isColor: true, anisotropy }),
-    bumpMap: createTexture(bumpCanvas, { repeat: [1, 1], isColor: false, anisotropy }),
+    map: wrapTexture(albedoCanvas, { isColor: true, anisotropy }),
+    normalMap: wrapTexture(normalCanvas, { isColor: false, anisotropy }),
+    roughnessMap: wrapTexture(roughCanvas, { isColor: false, anisotropy }),
   };
 }
 
-/** Burnished engraved gold texture for the 55th Pyramidion Capstone */
-function buildGoldenCapstone(anisotropy) {
+/* ============================================================================
+ * 7. INTERMEDIATE CARVING STAGES (STAGE 1 & STAGE 2, 256x256)
+ * ========================================================================== */
+function buildCarvingStageTexture(stage, anisotropy) {
   const size = 256;
-  const colorCanvas = makeCanvas(size);
-  const bumpCanvas = makeCanvas(size);
-  const ctx = colorCanvas.getContext('2d');
-  const bctx = bumpCanvas.getContext('2d');
+  const canvas = makeCanvas(size);
+  const ctx = canvas.getContext('2d');
+  const img = ctx.createImageData(size, size);
+  const data = img.data;
+  const height = new Float32Array(size * size);
+
+  for (let y = 0; y < size; y++) {
+    const v = y / size;
+    for (let x = 0; x < size; x++) {
+      const u = x / size;
+      const i = y * size + x;
+      const fbm = tileFBM(u, v, 6, 3, stage === 1 ? 811 : 853);
+      const chisel = Math.sin((u * 26 + v * 26 + fbm * 2) * Math.PI * 2) * 0.5 + 0.5;
+      const grain = hash2i(x, y, 881);
+      const edge = smoothstep(0.04, 0.16, Math.min(u, 1 - u, v, 1 - v));
+
+      height[i] = clamp01(0.5 + (fbm - 0.5) * 0.22 + (chisel - 0.5) * 0.16);
+      const baseR = stage === 1 ? lerp(176, 212, edge) : lerp(206, 232, edge);
+      const baseG = stage === 1 ? lerp(156, 184, edge) : lerp(164, 194, edge);
+      const baseB = stage === 1 ? lerp(124, 134, edge) : lerp(104, 120, edge);
+
+      const shade = 0.9 + chisel * 0.16 + (fbm - 0.5) * 0.12;
+      const idx = i * 4;
+      data[idx] = Math.min(255, Math.max(0, Math.round(baseR * shade + (grain - 0.5) * 14)));
+      data[idx + 1] = Math.min(255, Math.max(0, Math.round(baseG * shade + (grain - 0.5) * 12)));
+      data[idx + 2] = Math.min(255, Math.max(0, Math.round(baseB * shade + (grain - 0.5) * 10)));
+      data[idx + 3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  const normalCanvas = buildSobelNormalCanvas(height, size, 3.2);
+
+  return {
+    map: wrapTexture(canvas, { isColor: true, anisotropy }),
+    normalMap: wrapTexture(normalCanvas, { isColor: false, anisotropy }),
+  };
+}
+
+/* ============================================================================
+ * 8. GOLDEN PYRAMIDION CAPSTONE (512x512 Burnished Engraved Gold PBR)
+ * ========================================================================== */
+function buildGoldenCapstonePBR(anisotropy) {
+  const size = 512;
+  const albedoCanvas = makeCanvas(size);
+  const ctx = albedoCanvas.getContext('2d');
+  const height = new Float32Array(size * size);
+  const rough = new Float32Array(size * size);
 
   const grad = ctx.createLinearGradient(0, 0, 0, size);
-  grad.addColorStop(0, '#fff2b0');
-  grad.addColorStop(0.35, '#ffd452');
-  grad.addColorStop(0.75, '#e6a825');
-  grad.addColorStop(1, '#c48316');
+  grad.addColorStop(0, '#fff4ba');
+  grad.addColorStop(0.38, '#ffd454');
+  grad.addColorStop(0.75, '#e8aa24');
+  grad.addColorStop(1, '#c58316');
   ctx.fillStyle = grad;
   ctx.fillRect(0, 0, size, size);
 
-  bctx.fillStyle = '#808080';
-  bctx.fillRect(0, 0, size, size);
-
-  // Subtle brushed metal sheen lines
-  for (let y = 0; y < size; y += 3) {
-    ctx.fillStyle = y % 6 === 0 ? 'rgba(255,255,230,0.09)' : 'rgba(140,88,10,0.06)';
-    ctx.fillRect(0, y, size, 1.5);
+  // Subtle brushed metal micro-grain
+  const img = ctx.getImageData(0, 0, size, size);
+  const data = img.data;
+  for (let y = 0; y < size; y++) {
+    const brush = Math.sin((y / size) * Math.PI * 24) * 0.006;
+    for (let x = 0; x < size; x++) {
+      const i = y * size + x;
+      const g = hash2i(x, y, 919);
+      height[i] = 0.65 + brush + (g - 0.5) * 0.014;
+      rough[i] = clamp01(0.18 + (g - 0.5) * 0.05 + Math.abs(brush) * 0.4);
+      data[i * 4] = Math.min(255, Math.max(0, Math.round(data[i * 4] + (g - 0.5) * 8)));
+      data[i * 4 + 1] = Math.min(255, Math.max(0, Math.round(data[i * 4 + 1] + (g - 0.5) * 7)));
+    }
   }
+  ctx.putImageData(img, 0, 0);
 
-  // Engraved solar emblem & royal bands
-  ctx.strokeStyle = 'rgba(138, 82, 8, 0.55)';
-  ctx.lineWidth = 3;
-  bctx.strokeStyle = '#383838';
-  bctx.lineWidth = 3;
+  // Engraved solar emblem & winged sun relief
+  const relief = makeCanvas(size);
+  const rctx = relief.getContext('2d');
+  rctx.strokeStyle = '#ffffff';
+  rctx.lineWidth = 6;
+  rctx.beginPath();
+  rctx.arc(size * 0.5, size * 0.58, 46, 0, Math.PI * 2);
+  rctx.stroke();
+  rctx.beginPath();
+  rctx.arc(size * 0.5, size * 0.58, 22, 0, Math.PI * 2);
+  rctx.stroke();
 
-  // Sun disk centered on face
-  ctx.beginPath();
-  ctx.arc(size * 0.5, size * 0.58, 26, 0, Math.PI * 2);
-  ctx.stroke();
-  bctx.beginPath();
-  bctx.arc(size * 0.5, size * 0.58, 26, 0, Math.PI * 2);
-  bctx.stroke();
-
-  // Horizontal base trim
-  [size - 28, size - 16].forEach((y) => {
-    ctx.beginPath();
-    ctx.moveTo(0, y);
-    ctx.lineTo(size, y);
-    ctx.stroke();
-    bctx.beginPath();
-    bctx.moveTo(0, y);
-    bctx.lineTo(size, y);
-    bctx.stroke();
+  // Base royal trim bands
+  [size - 56, size - 30].forEach((yy) => {
+    rctx.beginPath();
+    rctx.moveTo(0, yy);
+    rctx.lineTo(size, yy);
+    rctx.stroke();
   });
 
+  const rData = relief.getContext('2d').getImageData(0, 0, size, size).data;
+  const aImg = ctx.getImageData(0, 0, size, size);
+  for (let i = 0; i < size * size; i++) {
+    const c = rData[i * 4 + 3] / 255;
+    if (c > 0.01) {
+      height[i] = clamp01(height[i] - c * 0.25);
+      rough[i] = clamp01(rough[i] + c * 0.35);
+      const shade = 1 - c * 0.28;
+      aImg.data[i * 4] = Math.round(aImg.data[i * 4] * shade);
+      aImg.data[i * 4 + 1] = Math.round(aImg.data[i * 4 + 1] * shade);
+      aImg.data[i * 4 + 2] = Math.round(aImg.data[i * 4 + 2] * shade);
+    }
+  }
+  ctx.putImageData(aImg, 0, 0);
+
+  const normalCanvas = buildSobelNormalCanvas(height, size, 3.2);
+  const roughCanvas = buildRoughnessCanvas(rough, size);
+
   return {
-    map: createTexture(colorCanvas, { repeat: [1, 1], isColor: true, anisotropy }),
-    bumpMap: createTexture(bumpCanvas, { repeat: [1, 1], isColor: false, anisotropy }),
+    map: wrapTexture(albedoCanvas, { isColor: true, anisotropy }),
+    normalMap: wrapTexture(normalCanvas, { isColor: false, anisotropy }),
+    roughnessMap: wrapTexture(roughCanvas, { isColor: false, anisotropy }),
   };
 }
 
-/** Weathered acacia/cedar timber planks */
-function buildTimberPlanks(anisotropy) {
-  const size = 256;
-  const colorCanvas = makeCanvas(size);
-  const bumpCanvas = makeCanvas(size);
-  const ctx = colorCanvas.getContext('2d');
-  const bctx = bumpCanvas.getContext('2d');
-  const rand = seededRand(606);
+/* ============================================================================
+ * 9. WEATHERED TIMBER PLANKS (512x512 Albedo + Normal + Roughness + Knots)
+ * ========================================================================== */
+function buildWeatheredTimberPBR(anisotropy) {
+  const size = 512;
+  const albedoCanvas = makeCanvas(size);
+  const ctx = albedoCanvas.getContext('2d');
+  const img = ctx.createImageData(size, size);
+  const data = img.data;
 
-  ctx.fillStyle = '#8d5d36';
-  ctx.fillRect(0, 0, size, size);
-  bctx.fillStyle = '#888888';
-  bctx.fillRect(0, 0, size, size);
-
+  const height = new Float32Array(size * size);
+  const rough = new Float32Array(size * size);
   const plankCount = 4;
-  const plankH = size / plankCount;
 
-  for (let p = 0; p < plankCount; p++) {
-    const y0 = p * plankH;
-    const toneShift = (p % 2 === 0 ? 1 : -1) * 8;
-    ctx.fillStyle = `rgb(${144 + toneShift}, ${96 + toneShift}, ${55 + Math.floor(toneShift * 0.5)})`;
-    ctx.fillRect(0, y0, size, plankH - 3);
+  // Deterministic knot centers on each plank
+  const knots = [
+    { x: 0.26, y: 0.125, r: 0.055 },
+    { x: 0.72, y: 0.375, r: 0.048 },
+    { x: 0.41, y: 0.625, r: 0.052 },
+    { x: 0.81, y: 0.875, r: 0.045 },
+  ];
 
-    // Wood grain streaks
-    for (let g = 0; g < 22; g++) {
-      const gy = y0 + 4 + rand() * (plankH - 10);
-      ctx.strokeStyle = rand() > 0.45
-        ? 'rgba(210, 165, 114, 0.22)'
-        : 'rgba(66, 38, 18, 0.25)';
-      ctx.lineWidth = 1 + rand() * 2;
-      ctx.beginPath();
-      ctx.moveTo(0, gy);
-      ctx.bezierCurveTo(
-        size * 0.33, gy + (rand() - 0.5) * 6,
-        size * 0.66, gy + (rand() - 0.5) * 6,
-        size, gy
+  for (let y = 0; y < size; y++) {
+    const v = y / size;
+    const plankIdx = Math.floor(v * plankCount);
+    const plankV = (v * plankCount) % 1;
+    const plankTone = (hash2i(plankIdx, 7, 947) - 0.5) * 24;
+
+    // Deep dark groove between planks + dust accumulation along bevel
+    const seamDist = Math.min(plankV, 1 - plankV);
+    const seamCut = 1.0 - smoothstep(0.012, 0.045, seamDist);
+    const dustEdge = smoothstep(0.02, 0.09, seamDist) * (1.0 - smoothstep(0.09, 0.2, seamDist));
+
+    for (let x = 0; x < size; x++) {
+      const u = x / size;
+      const i = y * size + x;
+
+      // Knot distortion pulls wood grain fibers organically around dark wood knots
+      let knotDark = 0;
+      let knotDeflect = 0;
+      for (let k = 0; k < knots.length; k++) {
+        const kn = knots[k];
+        const dx = (u - kn.x) * 0.55;
+        const dy = (v - kn.y) * 2.1;
+        const d = Math.hypot(dx, dy);
+        if (d < kn.r * 2.2) {
+          const factor = 1.0 - d / (kn.r * 2.2);
+          knotDeflect += factor * 0.18;
+          knotDark = Math.max(knotDark, smoothstep(kn.r * 1.15, kn.r * 0.25, d));
+        }
+      }
+
+      // Elongated wood grain fibers
+      const grainWarp = tileFBM(u, v, 4, 3, 971 + plankIdx * 19) * 0.22 + knotDeflect;
+      const rings = Math.sin((plankV * 14 + grainWarp * 10) * Math.PI * 2) * 0.5 + 0.5;
+      const fineFiber = tileNoise2D(u, v, 16, 128, 997);
+      const dustPatch = tileFBM(u, v, 8, 3, 1021);
+      const micro = hash2i(x, y, 1049);
+
+      const h = clamp01(
+        0.58 +
+          (rings - 0.5) * 0.16 +
+          (fineFiber - 0.5) * 0.12 -
+          seamCut * 0.5 -
+          knotDark * 0.14
       );
-      ctx.stroke();
+      height[i] = h;
+
+      // Rich sun-weathered acacia/cedar tones
+      let r = lerp(116, 160, rings) + plankTone + (fineFiber - 0.5) * 18;
+      let g = lerp(74, 108, rings) + plankTone * 0.75 + (fineFiber - 0.5) * 14;
+      let b = lerp(42, 66, rings) + plankTone * 0.5 + (fineFiber - 0.5) * 10;
+
+      // Darken knots & plank seams
+      const knotMul = 1.0 - knotDark * 0.52;
+      const seamMul = 1.0 - seamCut * 0.65;
+      r *= knotMul * seamMul;
+      g *= knotMul * seamMul;
+      b *= knotMul * seamMul;
+
+      // Desert sand dust accumulation in crevices and worn grooves
+      const dustAmt = clamp01((dustEdge * 0.45 + smoothstep(0.58, 0.85, dustPatch) * 0.22) * (1 - seamCut));
+      r = lerp(r, 212, dustAmt * 0.55);
+      g = lerp(g, 180, dustAmt * 0.55);
+      b = lerp(b, 126, dustAmt * 0.55);
+
+      const idx = i * 4;
+      data[idx] = Math.min(255, Math.max(0, Math.round(r + (micro - 0.5) * 10)));
+      data[idx + 1] = Math.min(255, Math.max(0, Math.round(g + (micro - 0.5) * 8)));
+      data[idx + 2] = Math.min(255, Math.max(0, Math.round(b + (micro - 0.5) * 6)));
+      data[idx + 3] = 255;
+
+      rough[i] = clamp01(0.78 + dustAmt * 0.16 + seamCut * 0.14 - knotDark * 0.15 + (micro - 0.5) * 0.08);
     }
+  }
 
-    // Plank dark seam
-    ctx.fillStyle = '#472a13';
-    ctx.fillRect(0, y0 + plankH - 3, size, 3);
-    bctx.fillStyle = '#252525';
-    bctx.fillRect(0, y0 + plankH - 3, size, 3);
+  ctx.putImageData(img, 0, 0);
 
-    // Peg / nail dots near ends
-    ctx.fillStyle = '#3b2412';
-    [18, size - 18].forEach((nx) => {
+  // Add subtle wooden pegs near plank ends
+  ctx.fillStyle = '#361f0e';
+  const plankH = size / plankCount;
+  for (let p = 0; p < plankCount; p++) {
+    const cy = (p + 0.5) * plankH;
+    [34, size - 34].forEach((px) => {
       ctx.beginPath();
-      ctx.arc(nx, y0 + plankH * 0.5, 3, 0, Math.PI * 2);
+      ctx.arc(px, cy, 5.5, 0, Math.PI * 2);
       ctx.fill();
     });
   }
 
+  const normalCanvas = buildSobelNormalCanvas(height, size, 3.8);
+  const roughCanvas = buildRoughnessCanvas(rough, size);
+
   return {
-    map: createTexture(colorCanvas, { repeat: [1, 1], isColor: true, anisotropy }),
-    bumpMap: createTexture(bumpCanvas, { repeat: [1, 1], isColor: false, anisotropy }),
+    map: wrapTexture(albedoCanvas, { isColor: true, anisotropy }),
+    normalMap: wrapTexture(normalCanvas, { isColor: false, anisotropy }),
+    roughnessMap: wrapTexture(roughCanvas, { isColor: false, anisotropy }),
   };
 }
 
-/** Woven warm desert sunshade canopy fabric */
+/* ============================================================================
+ * 10. ANIMATED NILE WATER NORMAL MAP (512x512 Seamless Wave Ripple Normal)
+ * ========================================================================== */
+function buildWaterNormalMap(anisotropy) {
+  const size = 512;
+  const height = new Float32Array(size * size);
+
+  for (let y = 0; y < size; y++) {
+    const v = y / size;
+    for (let x = 0; x < size; x++) {
+      const u = x / size;
+      const w1 = Math.sin((u * 4 + v * 3) * Math.PI * 2);
+      const w2 = Math.sin((u * -3 + v * 5 + 0.35) * Math.PI * 2);
+      const fbm = tileFBM(u, v, 8, 3, 1103);
+      const fine = tileFBM(u, v, 24, 2, 1151);
+      height[y * size + x] = clamp01(0.5 + w1 * 0.12 + w2 * 0.1 + (fbm - 0.5) * 0.32 + (fine - 0.5) * 0.14);
+    }
+  }
+
+  const normalCanvas = buildSobelNormalCanvas(height, size, 2.8);
+  return wrapTexture(normalCanvas, { repeat: [2, 2], isColor: false, anisotropy });
+}
+
+/* ============================================================================
+ * 11. SUPPORTING TEXTURES (PLINTH STRATA, CANOPY, BLUEPRINT, SHADOW, SUNBEAM)
+ * ========================================================================== */
+function buildPlinthStrata(anisotropy) {
+  const size = 256;
+  const canvas = makeCanvas(size);
+  const ctx = canvas.getContext('2d');
+  const bands = [
+    { y: 0, h: 42, color: '#cfa05f' },
+    { y: 42, h: 52, color: '#b88247' },
+    { y: 94, h: 48, color: '#9c6a3a' },
+    { y: 142, h: 56, color: '#815630' },
+    { y: 198, h: 58, color: '#694426' },
+  ];
+  bands.forEach((b) => {
+    ctx.fillStyle = b.color;
+    ctx.fillRect(0, b.y, size, b.h);
+  });
+  for (let i = 0; i < 45; i++) {
+    const y = hash2i(i, 1, 1201) * size;
+    ctx.fillStyle = i % 2 === 0 ? 'rgba(255,232,190,0.09)' : 'rgba(48,24,10,0.12)';
+    ctx.fillRect(0, y, size, 2 + hash2i(i, 2, 1201) * 4);
+  }
+  return wrapTexture(canvas, { repeat: [4, 1], isColor: true, anisotropy });
+}
+
 function buildCanopyCloth(anisotropy) {
   const size = 256;
   const canvas = makeCanvas(size);
   const ctx = canvas.getContext('2d');
-
-  // Alternating warm cream & terracotta desert stripes
   const stripes = 8;
   const w = size / stripes;
   for (let i = 0; i < stripes; i++) {
-    ctx.fillStyle = i % 2 === 0 ? '#f1dfc0' : '#c65d3b';
+    ctx.fillStyle = i % 2 === 0 ? '#f3e2c4' : '#c65a38';
     ctx.fillRect(i * w, 0, w, size);
   }
-
-  // Subtle woven linen crosshatch
   ctx.fillStyle = 'rgba(70, 38, 18, 0.08)';
-  for (let y = 0; y < size; y += 6) {
-    ctx.fillRect(0, y, size, 2);
-  }
-  for (let x = 0; x < size; x += 6) {
-    ctx.fillRect(x, 0, 1.5, size);
-  }
-
-  return createTexture(canvas, { repeat: [1, 1], isColor: true, anisotropy });
+  for (let y = 0; y < size; y += 5) ctx.fillRect(0, y, size, 1.8);
+  for (let x = 0; x < size; x += 5) ctx.fillRect(x, 0, 1.4, size);
+  return wrapTexture(canvas, { isColor: true, anisotropy });
 }
 
-/** Glowing chalk blueprint grid for active pyramid ghost slots */
 function buildBlueprintGrid(anisotropy) {
   const size = 256;
   const canvas = makeCanvas(size);
   const ctx = canvas.getContext('2d');
 
-  // Translucent cerulean-gold drafting wash
   ctx.fillStyle = 'rgba(64, 182, 224, 0.24)';
   ctx.fillRect(0, 0, size, size);
 
-  // Subtle interior drafting grid
   ctx.strokeStyle = 'rgba(214, 246, 255, 0.34)';
   ctx.lineWidth = 2;
   const step = size / 4;
@@ -533,19 +1003,16 @@ function buildBlueprintGrid(anisotropy) {
     ctx.stroke();
   }
 
-  // Crisp chalk outer border
   ctx.strokeStyle = 'rgba(240, 252, 255, 0.92)';
   ctx.lineWidth = 8;
   ctx.strokeRect(8, 8, size - 16, size - 16);
 
-  // Dashed inner chalk frame
   ctx.setLineDash([12, 10]);
   ctx.lineWidth = 3;
   ctx.strokeStyle = 'rgba(255, 244, 200, 0.85)';
   ctx.strokeRect(24, 24, size - 48, size - 48);
   ctx.setLineDash([]);
 
-  // Center crosshair registration mark
   ctx.strokeStyle = 'rgba(255, 252, 232, 0.9)';
   ctx.lineWidth = 3;
   ctx.beginPath();
@@ -555,16 +1022,14 @@ function buildBlueprintGrid(anisotropy) {
   ctx.lineTo(size * 0.5, size * 0.5 + 16);
   ctx.stroke();
 
-  return createTexture(canvas, { repeat: [1, 1], isColor: true, anisotropy });
+  return wrapTexture(canvas, { isColor: true, anisotropy });
 }
 
-/** Soft radial shadow indicator for dragged blocks */
 function buildShadowBlob() {
   const size = 128;
   const canvas = makeCanvas(size);
   const ctx = canvas.getContext('2d');
   const cx = size * 0.5;
-
   const grad = ctx.createRadialGradient(cx, cx, 8, cx, cx, cx);
   grad.addColorStop(0, 'rgba(38, 22, 8, 0.58)');
   grad.addColorStop(0.55, 'rgba(38, 22, 8, 0.28)');
@@ -578,16 +1043,12 @@ function buildShadowBlob() {
   return tex;
 }
 
-/** Feathered golden volumetric sunbeam gradient for victory celebration */
 function buildSunbeamGradient() {
   const w = 128;
   const h = 256;
-  const canvas = document.createElement('canvas');
-  canvas.width = w;
-  canvas.height = h;
+  const canvas = makeCanvas(w, h);
   const ctx = canvas.getContext('2d');
 
-  // Vertical soft fade from sky down onto the golden pyramidion
   const vGrad = ctx.createLinearGradient(0, 0, 0, h);
   vGrad.addColorStop(0.0, 'rgba(255, 224, 130, 0.0)');
   vGrad.addColorStop(0.28, 'rgba(255, 226, 136, 0.55)');
@@ -596,7 +1057,6 @@ function buildSunbeamGradient() {
   ctx.fillStyle = vGrad;
   ctx.fillRect(0, 0, w, h);
 
-  // Subtle vertical sun-ray streaks
   for (let i = 0; i < 6; i++) {
     const x = (i / 6) * w;
     const streak = ctx.createLinearGradient(x, 0, x + w / 6, 0);
@@ -616,121 +1076,264 @@ function buildSunbeamGradient() {
 }
 
 /**
- * Generates and caches all procedural textures and shared materials.
+ * Builds the 4-biome GPU Terrain Texture Splatting material (Sand, Earth Path,
+ * Quarry Dust, Oasis Grass) with per-biome Albedo + Sobel Normal + Roughness
+ * and Nile shoreline wetness darkening.
+ */
+function createTerrainSplatMaterial(biomes) {
+  const mat = new THREE.MeshStandardMaterial({
+    color: 0xffffff,
+    roughness: 1.0,
+    metalness: 0.04,
+  });
+
+  mat.onBeforeCompile = (shader) => {
+    shader.uniforms.uAlb0 = { value: biomes.sand.albedo };
+    shader.uniforms.uAlb1 = { value: biomes.earthPath.albedo };
+    shader.uniforms.uAlb2 = { value: biomes.quarryDust.albedo };
+    shader.uniforms.uAlb3 = { value: biomes.oasisGrass.albedo };
+
+    shader.uniforms.uNR0 = { value: biomes.sand.normalRough };
+    shader.uniforms.uNR1 = { value: biomes.earthPath.normalRough };
+    shader.uniforms.uNR2 = { value: biomes.quarryDust.normalRough };
+    shader.uniforms.uNR3 = { value: biomes.oasisGrass.normalRough };
+
+    shader.uniforms.uNormalStrength = { value: 0.92 };
+
+    shader.vertexShader = shader.vertexShader
+      .replace(
+        '#include <common>',
+        `#include <common>
+        attribute vec4 aSplat;
+        attribute float aWetness;
+        varying vec4 vSplat;
+        varying float vWetness;
+        varying vec2 vTerrainUv;
+        varying vec3 vTerrainT;
+        varying vec3 vTerrainB;`
+      )
+      .replace(
+        '#include <begin_vertex>',
+        `#include <begin_vertex>
+        vSplat = aSplat;
+        vWetness = aWetness;
+        vTerrainUv = position.xz * 0.24;
+        vec3 objT = normalize(vec3(max(objectNormal.y, 0.05), -objectNormal.x, 0.0));
+        vec3 objB = normalize(cross(objT, objectNormal));
+        vTerrainT = normalize(normalMatrix * objT);
+        vTerrainB = normalize(normalMatrix * objB);`
+      );
+
+    shader.fragmentShader = shader.fragmentShader
+      .replace(
+        '#include <common>',
+        `#include <common>
+        uniform sampler2D uAlb0;
+        uniform sampler2D uAlb1;
+        uniform sampler2D uAlb2;
+        uniform sampler2D uAlb3;
+        uniform sampler2D uNR0;
+        uniform sampler2D uNR1;
+        uniform sampler2D uNR2;
+        uniform sampler2D uNR3;
+        uniform float uNormalStrength;
+        varying vec4 vSplat;
+        varying float vWetness;
+        varying vec2 vTerrainUv;
+        varying vec3 vTerrainT;
+        varying vec3 vTerrainB;`
+      )
+      .replace(
+        '#include <map_fragment>',
+        `vec4 c0 = texture2D(uAlb0, vTerrainUv);
+        vec4 c1 = texture2D(uAlb1, vTerrainUv * 1.35);
+        vec4 c2 = texture2D(uAlb2, vTerrainUv * 1.25);
+        vec4 c3 = texture2D(uAlb3, vTerrainUv * 1.4);
+
+        vec4 nr0 = texture2D(uNR0, vTerrainUv);
+        vec4 nr1 = texture2D(uNR1, vTerrainUv * 1.35);
+        vec4 nr2 = texture2D(uNR2, vTerrainUv * 1.25);
+        vec4 nr3 = texture2D(uNR3, vTerrainUv * 1.4);
+
+        // Organic micro-height modulated splat weights for crisp natural biome borders
+        vec4 microH = vec4(nr0.b, nr1.b, nr2.b, nr3.b);
+        vec4 w = max(vSplat + (microH - 0.5) * 0.14 * step(0.02, vSplat), vec4(0.0));
+        w /= max(w.x + w.y + w.z + w.w, 0.0001);
+
+        vec3 splatColor = c0.rgb * w.x + c1.rgb * w.y + c2.rgb * w.z + c3.rgb * w.w;
+        vec4 splatNR = nr0 * w.x + nr1 * w.y + nr2 * w.z + nr3 * w.w;
+
+        // Nile shoreline dampness & wet silt darkening where terrain meets water
+        float wet = clamp(vWetness, 0.0, 1.0);
+        splatColor *= mix(1.0, 0.56, wet);
+        diffuseColor.rgb *= splatColor;`
+      )
+      .replace(
+        '#include <roughnessmap_fragment>',
+        `float roughnessFactor = roughness * mix(splatNR.a, 0.18, clamp(vWetness, 0.0, 1.0));`
+      )
+      .replace(
+        '#include <normal_fragment_maps>',
+        `vec3 mapN = splatNR.rgb * 2.0 - 1.0;
+        mapN.xy *= uNormalStrength * mix(1.0, 0.45, clamp(vWetness, 0.0, 1.0));
+        normal = normalize(normalize(vTerrainT) * mapN.x + normalize(vTerrainB) * mapN.y + normal * mapN.z);`
+      );
+  };
+
+  mat.customProgramCacheKey = () => 'workd-builder-terrain-splat-v1';
+  return mat;
+}
+
+/**
+ * Generates and caches all procedural 512x512 PBR textures and shared materials.
  */
 export function createTextureLibrary(renderer) {
   const anisotropy = Math.min(renderer.capabilities.getMaxAnisotropy(), 4);
 
-  const sand = buildDesertSand(anisotropy);
+  // 4-Biome Terrain PBR sets
+  const terrainBiomes = {
+    sand: buildDesertSandPBR(anisotropy),
+    earthPath: buildEarthPathPBR(anisotropy),
+    quarryDust: buildQuarryDustPBR(anisotropy),
+    oasisGrass: buildOasisGrassPBR(anisotropy),
+  };
+
+  // Surface PBR sets
+  const limestone = buildQuarryLimestonePBR(anisotropy);
+  const carving1 = buildCarvingStageTexture(1, anisotropy);
+  const carving2 = buildCarvingStageTexture(2, anisotropy);
+  const sandstone = buildCarvedSandstonePBR(anisotropy);
+  const capstone = buildGoldenCapstonePBR(anisotropy);
+  const timber = buildWeatheredTimberPBR(anisotropy);
+  const waterNormal = buildWaterNormalMap(anisotropy);
+
   const plinthMap = buildPlinthStrata(anisotropy);
-  const limestone = buildQuarryLimestone(anisotropy);
-  const carving1Map = buildCarvingStageTexture(1, anisotropy);
-  const carving2Map = buildCarvingStageTexture(2, anisotropy);
-  const sandstone = buildCarvedSandstone(anisotropy);
-  const capstone = buildGoldenCapstone(anisotropy);
-  const timber = buildTimberPlanks(anisotropy);
   const canopyMap = buildCanopyCloth(anisotropy);
   const blueprintMap = buildBlueprintGrid(anisotropy);
   const shadowBlobMap = buildShadowBlob();
   const sunbeamMap = buildSunbeamGradient();
 
   const textures = [
-    sand.map,
-    sand.bumpMap,
-    plinthMap,
+    terrainBiomes.sand.albedo,
+    terrainBiomes.sand.normalRough,
+    terrainBiomes.earthPath.albedo,
+    terrainBiomes.earthPath.normalRough,
+    terrainBiomes.quarryDust.albedo,
+    terrainBiomes.quarryDust.normalRough,
+    terrainBiomes.oasisGrass.albedo,
+    terrainBiomes.oasisGrass.normalRough,
     limestone.map,
-    limestone.bumpMap,
-    carving1Map,
-    carving2Map,
+    limestone.normalMap,
+    limestone.roughnessMap,
+    carving1.map,
+    carving1.normalMap,
+    carving2.map,
+    carving2.normalMap,
     sandstone.map,
-    sandstone.bumpMap,
+    sandstone.normalMap,
+    sandstone.roughnessMap,
     capstone.map,
-    capstone.bumpMap,
+    capstone.normalMap,
+    capstone.roughnessMap,
     timber.map,
-    timber.bumpMap,
+    timber.normalMap,
+    timber.roughnessMap,
+    waterNormal,
+    plinthMap,
     canopyMap,
     blueprintMap,
     shadowBlobMap,
     sunbeamMap,
   ];
 
+  // Animated translucent turquoise Nile water material
+  const nileWaterMat = new THREE.MeshStandardMaterial({
+    color: new THREE.Color('#279eb2'),
+    normalMap: waterNormal,
+    normalScale: new THREE.Vector2(0.42, 0.42),
+    roughness: 0.12,
+    metalness: 0.16,
+    transparent: true,
+    opacity: 0.84,
+  });
+
   const materials = {
-    sand: new THREE.MeshStandardMaterial({
-      map: sand.map,
-      bumpMap: sand.bumpMap,
-      bumpScale: 0.06,
-      roughness: 0.92,
-      metalness: 0.02,
-    }),
+    terrainSplat: createTerrainSplatMaterial(terrainBiomes),
     plinth: new THREE.MeshStandardMaterial({
       map: plinthMap,
-      roughness: 0.95,
+      roughness: 0.94,
       metalness: 0.0,
     }),
     limestone: new THREE.MeshStandardMaterial({
       map: limestone.map,
-      bumpMap: limestone.bumpMap,
-      bumpScale: 0.08,
-      roughness: 0.88,
-      metalness: 0.03,
+      normalMap: limestone.normalMap,
+      normalScale: new THREE.Vector2(1.05, 1.05),
+      roughnessMap: limestone.roughnessMap,
+      roughness: 1.0,
+      metalness: 0.04,
     }),
     rawBlock: new THREE.MeshStandardMaterial({
       map: limestone.map,
-      bumpMap: limestone.bumpMap,
-      bumpScale: 0.09,
-      roughness: 0.86,
+      normalMap: limestone.normalMap,
+      normalScale: new THREE.Vector2(1.1, 1.1),
+      roughnessMap: limestone.roughnessMap,
+      roughness: 1.0,
       metalness: 0.04,
-      color: new THREE.Color('#ece4d4'),
+      color: new THREE.Color('#efe7d8'),
     }),
     carvingStage1: new THREE.MeshStandardMaterial({
-      map: carving1Map,
-      bumpMap: limestone.bumpMap,
-      bumpScale: 0.06,
+      map: carving1.map,
+      normalMap: carving1.normalMap,
+      normalScale: new THREE.Vector2(0.85, 0.85),
       roughness: 0.82,
       metalness: 0.04,
     }),
     carvingStage2: new THREE.MeshStandardMaterial({
-      map: carving2Map,
-      bumpMap: sandstone.bumpMap,
-      bumpScale: 0.04,
+      map: carving2.map,
+      normalMap: carving2.normalMap,
+      normalScale: new THREE.Vector2(0.75, 0.75),
       roughness: 0.74,
       metalness: 0.06,
     }),
     carvedBlock: new THREE.MeshStandardMaterial({
       map: sandstone.map,
-      bumpMap: sandstone.bumpMap,
-      bumpScale: 0.045,
-      roughness: 0.66,
+      normalMap: sandstone.normalMap,
+      normalScale: new THREE.Vector2(0.95, 0.95),
+      roughnessMap: sandstone.roughnessMap,
+      roughness: 1.0,
       metalness: 0.08,
     }),
     capstoneGold: new THREE.MeshStandardMaterial({
       map: capstone.map,
-      bumpMap: capstone.bumpMap,
-      bumpScale: 0.035,
-      roughness: 0.24,
-      metalness: 0.78,
-      emissive: new THREE.Color('#613d06'),
-      emissiveIntensity: 0.25,
+      normalMap: capstone.normalMap,
+      normalScale: new THREE.Vector2(0.75, 0.75),
+      roughnessMap: capstone.roughnessMap,
+      roughness: 1.0,
+      metalness: 0.86,
+      emissive: new THREE.Color('#6a4408'),
+      emissiveIntensity: 0.22,
     }),
     timber: new THREE.MeshStandardMaterial({
       map: timber.map,
-      bumpMap: timber.bumpMap,
-      bumpScale: 0.05,
-      roughness: 0.82,
+      normalMap: timber.normalMap,
+      normalScale: new THREE.Vector2(0.95, 0.95),
+      roughnessMap: timber.roughnessMap,
+      roughness: 1.0,
       metalness: 0.04,
     }),
     timberDark: new THREE.MeshStandardMaterial({
       map: timber.map,
-      bumpMap: timber.bumpMap,
-      bumpScale: 0.05,
-      color: new THREE.Color('#b5906c'),
-      roughness: 0.86,
-      metalness: 0.03,
+      normalMap: timber.normalMap,
+      normalScale: new THREE.Vector2(1.0, 1.0),
+      roughnessMap: timber.roughnessMap,
+      color: new THREE.Color('#b08a66'),
+      roughness: 1.0,
+      metalness: 0.04,
     }),
     leverKnob: new THREE.MeshStandardMaterial({
       color: new THREE.Color('#c8442c'),
-      roughness: 0.52,
-      metalness: 0.08,
+      roughness: 0.42,
+      metalness: 0.12,
     }),
     canopy: new THREE.MeshStandardMaterial({
       map: canopyMap,
@@ -740,11 +1343,12 @@ export function createTextureLibrary(renderer) {
     }),
     foundation: new THREE.MeshStandardMaterial({
       map: sandstone.map,
-      bumpMap: sandstone.bumpMap,
-      bumpScale: 0.03,
-      color: new THREE.Color('#dec599'),
-      roughness: 0.84,
-      metalness: 0.03,
+      normalMap: sandstone.normalMap,
+      normalScale: new THREE.Vector2(0.55, 0.55),
+      roughnessMap: sandstone.roughnessMap,
+      color: new THREE.Color('#dfca9e'),
+      roughness: 1.0,
+      metalness: 0.04,
     }),
     blueprintBase: new THREE.MeshBasicMaterial({
       map: blueprintMap,
@@ -760,23 +1364,23 @@ export function createTextureLibrary(renderer) {
       depthWrite: false,
     }),
     palmTrunk: new THREE.MeshStandardMaterial({
-      color: new THREE.Color('#8c6139'),
+      map: timber.map,
+      normalMap: timber.normalMap,
+      normalScale: new THREE.Vector2(0.7, 0.7),
+      color: new THREE.Color('#9c7148'),
       roughness: 0.9,
     }),
     palmLeaf: new THREE.MeshStandardMaterial({
-      color: new THREE.Color('#5a8c45'),
-      roughness: 0.75,
+      color: new THREE.Color('#53883e'),
+      roughness: 0.68,
+      metalness: 0.04,
       side: THREE.DoubleSide,
     }),
-    oasisWater: new THREE.MeshStandardMaterial({
-      color: new THREE.Color('#3ca8b8'),
-      roughness: 0.16,
-      metalness: 0.18,
-    }),
+    oasisWater: nileWaterMat,
     copperTool: new THREE.MeshStandardMaterial({
-      color: new THREE.Color('#c97a40'),
-      roughness: 0.35,
-      metalness: 0.72,
+      color: new THREE.Color('#cf7f42'),
+      roughness: 0.28,
+      metalness: 0.78,
     }),
   };
 
@@ -785,6 +1389,7 @@ export function createTextureLibrary(renderer) {
       blueprint: blueprintMap,
       shadowBlob: shadowBlobMap,
       sunbeam: sunbeamMap,
+      waterNormal,
     },
     materials,
     dispose() {
