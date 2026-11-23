@@ -1,8 +1,8 @@
 /**
- * Workd Builder — Application Bootstrap, 3D World Map & Level Orchestrator
- * Initializes Three.js WebGLRenderer, procedural desert PMREM environment & lighting,
- * procedural 512x512 PBR textures, procedural Web Audio SFX, touch interaction engine,
- * 3D World Map Level Selector, and playable level modules.
+ * Workd Builder — Application Bootstrap, Main Menu, 3D World Map, Campaign & Roguelike Orchestrator
+ * Manages Three.js WebGLRenderer, procedural PMREM environment & lighting, 512x512 PBR textures,
+ * procedural Web Audio SFX, localStorage save system, 3-tab Main Menu, Shop modal,
+ * 3D World Map selector, Level 1, and procedural Roguelike random levels.
  */
 
 import * as THREE from 'three';
@@ -11,9 +11,10 @@ import { createTextureLibrary } from './textures.js';
 import { DioramaCameraController } from './camera.js';
 import { TouchInteractionEngine } from './dragDrop.js';
 import { WorldMapScene } from './worldMap.js';
+import { SaveManager, MainMenuController } from './mainMenu.js';
 import { Level1Pyramid } from './levels/level1_pyramid.js';
+import { RoguelikeLevel, generateRoguelikeConfig } from './levels/roguelike_level.js';
 
-// Extensible level registry — add future civilization modules here
 const LEVEL_REGISTRY = [Level1Pyramid];
 
 class WorkdBuilderApp {
@@ -22,6 +23,7 @@ class WorkdBuilderApp {
 
     // World Map HUD elements
     this.hudMapTop = document.getElementById('hud-map-top');
+    this.mapBackMenuBtn = document.getElementById('map-back-menu-btn');
     this.mapLevelCard = document.getElementById('map-level-card');
     this.mapCardTitle = document.getElementById('map-card-title');
     this.playLevelBtn = document.getElementById('play-level-btn');
@@ -29,16 +31,19 @@ class WorkdBuilderApp {
 
     // In-Game HUD elements
     this.hudGameTop = document.getElementById('hud-game-top');
-    this.backToMapBtn = document.getElementById('back-to-map-btn');
+    this.gameBackMenuBtn = document.getElementById('game-back-menu-btn');
     this.hudPill = document.getElementById('hud-pill');
     this.hudCounter = document.getElementById('hud-counter');
+    this.rogueModWrap = document.getElementById('roguelike-modifier-wrap');
+    this.rogueModPill = document.getElementById('roguelike-modifier-pill');
 
     // Completion HUD elements
     this.completionBar = document.getElementById('completion-bar');
+    this.rewardPill = document.getElementById('reward-pill');
     this.restartBtn = document.getElementById('restart-btn');
     this.completionMapBtn = document.getElementById('completion-map-btn');
 
-    this.mode = 'worldmap'; // 'worldmap' | 'level'
+    this.mode = 'menu'; // 'menu' | 'worldmap' | 'level' | 'roguelike'
     this.currentLevelIndex = 0;
     this.pendingLevelIndex = 0;
     this.worldMap = null;
@@ -48,6 +53,7 @@ class WorkdBuilderApp {
 
     this._initRendererAndScene();
     this.audio = new SoundEngine();
+    this.save = new SaveManager();
     this.textures = createTextureLibrary(this.renderer);
     this.cameraController = new DioramaCameraController(this.camera, this.canvas);
     this.interaction = new TouchInteractionEngine({
@@ -59,9 +65,16 @@ class WorkdBuilderApp {
       audio: this.audio,
     });
 
+    this.mainMenu = new MainMenuController({
+      audio: this.audio,
+      save: this.save,
+      onOpenWorldMap: () => this.openWorldMap(false),
+      onStartRoguelike: () => this.startRoguelikeRun(true),
+    });
+
     this._bindUI();
-    // Launch onto the interactive 3D World Map Level Selector by default
-    this.openWorldMap(true);
+    // Launch directly onto the 3-card Main Menu over a live gently orbiting 3D diorama
+    this.openMainMenu(true);
 
     this.lastTime = performance.now();
     this.elapsed = 0;
@@ -79,7 +92,7 @@ class WorkdBuilderApp {
       alpha: false,
       powerPreference: 'high-performance',
     });
-    // Cap pixel ratio at 2x for locked 60 FPS and low thermals on iPhone OLED displays
+    // Cap pixel ratio at 2x for locked 60 FPS and low thermals on iPhone 16e Safari
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
     this.renderer.setSize(width, height, false);
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -89,14 +102,13 @@ class WorkdBuilderApp {
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color('#efd3a2');
-    this.scene.fog = new THREE.Fog('#efd3a2', 42, 88);
+    this.scene.background = new THREE.Color('#e6c893');
+    this.scene.fog = new THREE.Fog('#e6c893', 42, 88);
     this.scene.environment = this._createDesertEnvironment();
     this.scene.environmentIntensity = 0.45;
 
     this.camera = new THREE.PerspectiveCamera(37, width / Math.max(height, 1), 0.5, 130);
 
-    // Warm golden sunlit lighting rig (sunlight + sky/sand bounce + cool turquoise shadow fill)
     const hemiLight = new THREE.HemisphereLight('#fff8ea', '#c28344', 0.84);
     hemiLight.position.set(0, 20, 0);
     this.scene.add(hemiLight);
@@ -121,10 +133,6 @@ class WorkdBuilderApp {
     this.scene.add(rimFill);
   }
 
-  /**
-   * Builds a lightweight procedural warm desert sky/horizon PMREM environment once at startup
-   * so PBR normal/roughness highlights, ocean waves, Nile water, and gold gleam naturally.
-   */
   _createDesertEnvironment() {
     const pmrem = new THREE.PMREMGenerator(this.renderer);
     pmrem.compileEquirectangularShader();
@@ -177,36 +185,51 @@ class WorkdBuilderApp {
       setTimeout(this._onResize, 120);
     });
 
-    // Prevent Safari page pinch-zoom gesture events outside canvas
     window.addEventListener('gesturestart', (e) => e.preventDefault(), { passive: false });
     window.addEventListener('gesturechange', (e) => e.preventDefault(), { passive: false });
 
-    // Launch selected unlocked level from 3D World Map card
+    // Top-left "← Menu" on World Map
+    this.mapBackMenuBtn.addEventListener('click', () => {
+      this.audio.unlock();
+      this.audio.playWoodCardTap();
+      this.openMainMenu(false);
+    });
+
+    // Top-left "← Menu" inside Level 1 or Roguelike
+    this.gameBackMenuBtn.addEventListener('click', () => {
+      this.audio.unlock();
+      this.audio.playWoodCardTap();
+      this.openMainMenu(true);
+    });
+
+    // Launch selected level from 3D World Map card
     this.playLevelBtn.addEventListener('click', () => {
       this.audio.unlock();
       this.audio.playStartChime();
       this.loadLevel(this.pendingLevelIndex, true);
     });
 
-    // Return to 3D World Map from active gameplay HUD
-    this.backToMapBtn.addEventListener('click', () => {
-      this.audio.unlock();
-      this.audio.playCameraWhoosh();
-      this.openWorldMap(true);
-    });
-
-    // Restart Level 1 from completion bar
+    // Completion primary button (Recommencer Level 1 OR Nouveau Run Roguelike)
     this.restartBtn.addEventListener('click', () => {
       this.audio.unlock();
-      this.audio.playLeverFlip();
-      this.restartCurrentLevel();
+      if (this.mode === 'roguelike') {
+        this.audio.playDiceChime();
+        this.startRoguelikeRun(true);
+      } else {
+        this.audio.playLeverFlip();
+        this.restartCurrentLevel();
+      }
     });
 
-    // Return to 3D World Map from completion bar
+    // Completion secondary button (Retour à la Carte for Campaign, Retour au Menu for Roguelike)
     this.completionMapBtn.addEventListener('click', () => {
       this.audio.unlock();
       this.audio.playCameraWhoosh();
-      this.openWorldMap(true);
+      if (this.mode === 'roguelike') {
+        this.openMainMenu(true);
+      } else {
+        this.openWorldMap(true);
+      }
     });
   }
 
@@ -218,39 +241,95 @@ class WorkdBuilderApp {
     this.mapLockedPill.hidden = true;
   }
 
-  _disposeActiveScene() {
-    this.interaction.setLevel(null);
+  _hideCompletionAndModifiers() {
+    this.completionBar.classList.remove('is-visible');
+    this.completionBar.hidden = true;
+    this.rewardPill.hidden = true;
+    this.rogueModWrap.hidden = true;
+    this.hudPill.classList.remove('is-complete', 'is-bumped');
+  }
+
+  _disposeActiveLevel() {
     if (this.currentLevel) {
+      this.interaction.setLevel(null);
       this.currentLevel.dispose();
       this.currentLevel = null;
     }
+  }
+
+  _disposeWorldMap() {
     if (this.worldMap) {
+      this.interaction.setLevel(null);
       this.worldMap.dispose();
       this.worldMap = null;
     }
+  }
+
+  _ensureWorldMapMounted() {
+    if (this.worldMap) return;
+    this.worldMap = new WorldMapScene({
+      scene: this.scene,
+      textures: this.textures,
+      audio: this.audio,
+      cameraController: this.cameraController,
+      onSelectNode: (node) => this._handleMapNodeSelect(node),
+      onClearSelection: () => this._hideMapBottomOverlays(),
+    });
+  }
+
+  /**
+   * Opens the 3-card Main Menu over a live gently orbiting 3D multi-civilization diorama.
+   */
+  openMainMenu(immediateCamera = false) {
+    this._disposeActiveLevel();
+    this._hideMapBottomOverlays();
+    this._hideCompletionAndModifiers();
+
+    this.mode = 'menu';
+    this.scene.background.set('#e5c78f');
+    this.scene.fog.color.set('#e5c78f');
+
+    this.hudMapTop.hidden = true;
+    this.hudGameTop.hidden = true;
+    this.mainMenu.show();
+
+    this._ensureWorldMapMounted();
+    this.interaction.setLevel(null);
+    this.interaction.setEnabled(false);
+
+    // Gentle elevated framing showcasing the live 3D archipelago behind the menu dock
+    this.cameraController.configurePreset({
+      target: new THREE.Vector3(0.0, 0.3, 0.5),
+      elevationDeg: 40,
+      azimuth: 0.25,
+      minDistance: 12.0,
+      maxDistance: 54.0,
+      panBounds: { minX: -6.8, maxX: 6.8, minZ: -7.2, maxZ: 7.2 },
+      distanceScale: 0.78,
+    });
+    this.cameraController.resetView(immediateCamera);
   }
 
   /**
    * Opens the interactive 3D Tabletop World Map Level Selector.
    */
   openWorldMap(immediateCamera = false) {
-    this._disposeActiveScene();
+    this._disposeActiveLevel();
     this._hideMapBottomOverlays();
+    this._hideCompletionAndModifiers();
+    this.mainMenu.hide();
 
     this.mode = 'worldmap';
-
-    // Warm coastal sky backdrop framing the carved wooden tabletop archipelago
     this.scene.background.set('#d5e8ea');
     this.scene.fog.color.set('#d5e8ea');
 
-    // Toggle HUD bars cleanly
     this.hudMapTop.hidden = false;
     this.hudGameTop.hidden = true;
-    this.completionBar.classList.remove('is-visible');
-    this.completionBar.hidden = true;
-    this.hudPill.classList.remove('is-complete', 'is-bumped');
+    this.mainMenu.refreshCoins();
 
-    // Configure archipelago camera overview framing for portrait iPhone 16e & desktop
+    this._ensureWorldMapMounted();
+    this.worldMap.selectedNode = null;
+
     this.cameraController.configurePreset({
       target: new THREE.Vector3(0.0, 0.25, 0.25),
       elevationDeg: 52,
@@ -259,15 +338,6 @@ class WorkdBuilderApp {
       maxDistance: 54.0,
       panBounds: { minX: -6.8, maxX: 6.8, minZ: -7.2, maxZ: 7.2 },
       distanceScale: 0.92,
-    });
-
-    this.worldMap = new WorldMapScene({
-      scene: this.scene,
-      textures: this.textures,
-      audio: this.audio,
-      cameraController: this.cameraController,
-      onSelectNode: (node) => this._handleMapNodeSelect(node),
-      onClearSelection: () => this._hideMapBottomOverlays(),
     });
 
     this.interaction.setLevel(this.worldMap);
@@ -302,30 +372,28 @@ class WorkdBuilderApp {
   }
 
   /**
-   * Transitions cleanly from the World Map (or restarts) into a playable level module.
+   * Launches a Campaign Level (e.g. Level 1 — La Petite Pyramide).
    */
   loadLevel(index, immediateCamera = false) {
     const LevelClass = LEVEL_REGISTRY[index] || LEVEL_REGISTRY[0];
     this.currentLevelIndex = index;
 
-    this._disposeActiveScene();
+    this._disposeActiveLevel();
+    this._disposeWorldMap();
     this._hideMapBottomOverlays();
+    this._hideCompletionAndModifiers();
+    this.mainMenu.hide();
 
     this.mode = 'level';
-
-    // Warm sunlit Egyptian desert sky backdrop
     this.scene.background.set('#efd3a2');
     this.scene.fog.color.set('#efd3a2');
 
-    // Toggle HUD bars cleanly
     this.hudMapTop.hidden = true;
     this.hudGameTop.hidden = false;
-    this.completionBar.classList.remove('is-visible');
-    this.completionBar.hidden = true;
-    this.hudPill.classList.remove('is-complete', 'is-bumped');
+    this.restartBtn.textContent = 'Recommencer';
+    this.completionMapBtn.textContent = 'Retour à la Carte';
     this._updateHUD(0, LevelClass.meta.totalGoal, LevelClass.meta.hudLabel, false);
 
-    // Restore Level 1 diorama camera preset
     this.cameraController.configurePreset({
       target: new THREE.Vector3(-0.15, 0.35, 0.1),
       elevationDeg: 55,
@@ -340,11 +408,67 @@ class WorkdBuilderApp {
       scene: this.scene,
       textures: this.textures,
       audio: this.audio,
+      upgrades: this.save.getUpgrades(),
       onProgress: (count, total) => {
         this._updateHUD(count, total, LevelClass.meta.hudLabel, true);
       },
-      onComplete: ({ focusPoint }) => {
-        this._handleLevelComplete(focusPoint);
+      onComplete: (payload) => {
+        this._handleLevelComplete(payload);
+      },
+    });
+
+    this.interaction.setLevel(this.currentLevel);
+    this.interaction.setEnabled(true);
+    this.cameraController.resetView(immediateCamera);
+  }
+
+  /**
+   * Launches a freshly generated procedural Roguelike random level (18–45 blocks).
+   */
+  startRoguelikeRun(immediateCamera = false) {
+    const cfg = generateRoguelikeConfig();
+
+    this._disposeActiveLevel();
+    this._disposeWorldMap();
+    this._hideMapBottomOverlays();
+    this._hideCompletionAndModifiers();
+    this.mainMenu.hide();
+
+    this.mode = 'roguelike';
+    this.scene.background.set(cfg.skyColor);
+    this.scene.fog.color.set(cfg.skyColor);
+
+    this.hudMapTop.hidden = true;
+    this.hudGameTop.hidden = false;
+    this.restartBtn.textContent = 'Nouveau Niveau';
+    this.completionMapBtn.textContent = 'Retour au Menu';
+    this._updateHUD(0, cfg.totalGoal, cfg.hudLabel, false);
+
+    // Show crisp Roguelike run modifier pill beneath top bar
+    this.rogueModPill.textContent = `🎲 ${cfg.modifierLabel} • ${cfg.biomeName} • +${cfg.rewardCoins} Or`;
+    this.rogueModWrap.hidden = false;
+
+    this.cameraController.configurePreset({
+      target: new THREE.Vector3(-0.15 * cfg.mirrorX, 0.35, 0.1),
+      elevationDeg: 55,
+      azimuth: 0.08 * cfg.mirrorX,
+      minDistance: 10.5,
+      maxDistance: 56.0,
+      panBounds: { minX: -8.5, maxX: 8.5, minZ: -8.2, maxZ: 8.5 },
+      distanceScale: 1.0,
+    });
+
+    this.currentLevel = new RoguelikeLevel({
+      scene: this.scene,
+      textures: this.textures,
+      audio: this.audio,
+      upgrades: this.save.getUpgrades(),
+      runConfig: cfg,
+      onProgress: (count, total) => {
+        this._updateHUD(count, total, cfg.hudLabel, true);
+      },
+      onComplete: (payload) => {
+        this._handleLevelComplete(payload);
       },
     });
 
@@ -371,10 +495,19 @@ class WorkdBuilderApp {
     }
   }
 
-  _handleLevelComplete(focusPoint) {
+  _handleLevelComplete({ focusPoint, rewardCoins = 150 }) {
     this.hudPill.classList.add('is-complete');
     this.interaction.cancelActiveInteraction();
     this.cameraController.startVictoryOrbit(focusPoint);
+
+    // Award persistent gold coins and play coin clink
+    if (rewardCoins > 0) {
+      this.save.addCoins(rewardCoins, this.mode);
+      this.mainMenu.refreshCoins();
+      this.rewardPill.textContent = `🪙 +${rewardCoins} Or gagnés !`;
+      this.rewardPill.hidden = false;
+      setTimeout(() => this.audio.playCoinClink(), 380);
+    }
 
     this.completionBar.hidden = false;
     requestAnimationFrame(() => {
@@ -385,25 +518,26 @@ class WorkdBuilderApp {
   _tick(now) {
     this.rafId = requestAnimationFrame(this._tick);
 
-    // Cap delta time cleanly so switching tabs or Safari backgrounding never spikes physics
     const dt = Math.min(Math.max((now - this.lastTime) / 1000, 0.001), 0.05);
     this.lastTime = now;
     this.elapsed += dt;
 
     this.interaction.update(dt, this.elapsed);
-    if (this.mode === 'worldmap' && this.worldMap) {
+
+    if (this.mode === 'menu' && this.worldMap) {
       this.worldMap.update(dt, this.elapsed);
-    } else if (this.mode === 'level' && this.currentLevel) {
+      // Gentle living diorama rotation behind the carved wooden menu dock
+      this.cameraController.desiredAzimuth += dt * 0.14;
+    } else if (this.mode === 'worldmap' && this.worldMap) {
+      this.worldMap.update(dt, this.elapsed);
+    } else if ((this.mode === 'level' || this.mode === 'roguelike') && this.currentLevel) {
       this.currentLevel.update(dt, this.elapsed);
     }
-    this.cameraController.update(dt, this.interaction.isCameraGestureActive());
 
+    this.cameraController.update(dt, this.interaction.isCameraGestureActive());
     this.renderer.render(this.scene, this.camera);
   }
 }
 
-// Launch onto the 3D World Map Level Selector on DOM ready
 const app = new WorkdBuilderApp();
-
-// Expose clean debug/test hook on window without polluting gameplay UI
 window.__WORKD_BUILDER__ = app;

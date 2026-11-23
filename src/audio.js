@@ -522,6 +522,104 @@ export class SoundEngine {
     });
   }
 
+  /**
+   * Warm carved-wood card tap SFX for the Main Menu navigation dock.
+   */
+  playWoodCardTap() {
+    if (!this._ready()) return;
+    const now = this.ctx.currentTime;
+
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(310, now);
+    osc.frequency.exponentialRampToValueAtTime(140, now + 0.065);
+    gain.gain.setValueAtTime(0.28, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.075);
+    osc.connect(gain);
+    gain.connect(this.master);
+    osc.start(now);
+    osc.stop(now + 0.08);
+
+    const click = this.ctx.createOscillator();
+    const cGain = this.ctx.createGain();
+    click.type = 'sine';
+    click.frequency.setValueAtTime(680, now);
+    click.frequency.exponentialRampToValueAtTime(420, now + 0.035);
+    cGain.gain.setValueAtTime(0.12, now);
+    cGain.gain.exponentialRampToValueAtTime(0.001, now + 0.04);
+    click.connect(cGain);
+    cGain.connect(this.master);
+    click.start(now);
+    click.stop(now + 0.045);
+  }
+
+  /**
+   * Bright metallic gold coin clink-shimmer for Shop purchases and gold rewards.
+   */
+  playCoinClink() {
+    if (!this._ready()) return;
+    const now = this.ctx.currentTime;
+    const notes = [1318.51, 1760.0, 2637.02]; // E6 - A6 - E7 metallic ring
+
+    notes.forEach((freq, i) => {
+      const t = now + i * 0.045;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(freq, t);
+      gain.gain.setValueAtTime(0.001, t);
+      gain.gain.linearRampToValueAtTime(i === 2 ? 0.14 : 0.17, t + 0.01);
+      gain.gain.exponentialRampToValueAtTime(0.0008, t + 0.34);
+      osc.connect(gain);
+      gain.connect(this.master);
+      osc.start(t);
+      osc.stop(t + 0.36);
+    });
+  }
+
+  /**
+   * Playful stone-dice rattle followed by a mystical portal chime for Roguelike runs.
+   */
+  playDiceChime() {
+    if (!this._ready()) return;
+    const now = this.ctx.currentTime;
+
+    // 3 quick tumbling stone die clacks
+    [0.0, 0.06, 0.12].forEach((offset, idx) => {
+      const t = now + offset;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = 'triangle';
+      const f = 420 + idx * 95;
+      osc.frequency.setValueAtTime(f, t);
+      osc.frequency.exponentialRampToValueAtTime(f * 0.45, t + 0.04);
+      gain.gain.setValueAtTime(0.2, t);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.045);
+      osc.connect(gain);
+      gain.connect(this.master);
+      osc.start(t);
+      osc.stop(t + 0.05);
+    });
+
+    // Mystical ascending portal shimmer chord
+    const portalNotes = [440.0, 554.37, 659.25, 880.0, 1108.73];
+    portalNotes.forEach((freq, i) => {
+      const t = now + 0.16 + i * 0.045;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(freq, t);
+      gain.gain.setValueAtTime(0.001, t);
+      gain.gain.linearRampToValueAtTime(0.13, t + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0008, t + 0.42);
+      osc.connect(gain);
+      gain.connect(this.master);
+      osc.start(t);
+      osc.stop(t + 0.45);
+    });
+  }
+
   dispose() {
     if (this.ctx && this.ctx.state !== 'closed') {
       this.ctx.close().catch(() => {});

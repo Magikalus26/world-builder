@@ -13,7 +13,7 @@
   <meta name="theme-color" content="#d49b42" />
   <meta
     name="description"
-    content="Workd Builder — Jeu tactile 3D de construction en diorama mobile. Extrayez, transportez, taillez et assemblez votre pyramide bloc par bloc."
+    content="Workd Builder — Jeu tactile 3D de construction en diorama mobile. Extrayez, transportez, taillez et assemblez vos monuments bloc par bloc."
   />
   <title>Workd Builder</title>
   <link rel="apple-touch-icon" sizes="180x180" href="./icon.png" />
@@ -36,29 +36,110 @@
       aria-label="Workd Builder — Diorama 3D interactif"
     ></canvas>
 
-    <!-- World Map Top Title Badge (default launch) -->
-    <header id="hud-map-top" class="hud-top">
+    <!-- MAIN MENU OVERLAY (Default Launch — Faithful 3-Card Carved Wood & Gold Layout) -->
+    <section id="main-menu-overlay" class="main-menu-overlay is-visible" aria-label="Menu principal Workd Builder">
+      <!-- Sunlit multi-civilization hero banner with golden 3D WORKD BUILDER logo -->
+      <div class="menu-hero-banner" aria-hidden="true">
+        <img
+          src="./assets/menu-hero.jpg"
+          alt="Workd Builder — Pyramides, Temple Romain et Pagode"
+          class="menu-hero-img"
+        />
+      </div>
+
+      <!-- Top-right player gold coin balance -->
+      <div class="menu-top-bar">
+        <div class="coin-pill" aria-live="polite">
+          <span class="coin-icon" aria-hidden="true">🪙</span>
+          <span id="menu-coins-val">100 Or</span>
+        </div>
+      </div>
+
+      <!-- Carved Wood & Burnished Gold 3-Card Bottom Navigation Dock -->
+      <nav class="menu-dock" aria-label="Modes de jeu">
+        <div class="menu-dock-grid">
+          <!-- LEFT CARD: BOUTIQUE -->
+          <button id="menu-card-shop" class="menu-card menu-card--shop" type="button">
+            <span class="menu-card-art">
+              <img src="./assets/card-shop.jpg" alt="" />
+            </span>
+            <span class="menu-card-plaque menu-card-plaque--shop">
+              <span class="menu-card-label">BOUTIQUE</span>
+            </span>
+          </button>
+
+          <!-- CENTER FEATURED CARD: SÉLECTION DE NIVEAU -->
+          <button id="menu-card-levels" class="menu-card menu-card--levels" type="button">
+            <span class="menu-card-art">
+              <img src="./assets/card-levels.jpg" alt="" />
+            </span>
+            <span class="menu-card-plaque menu-card-plaque--levels">
+              <span class="menu-card-label">SÉLECTION<br />DE NIVEAU</span>
+            </span>
+          </button>
+
+          <!-- RIGHT CARD: ROGUELIKE -->
+          <button id="menu-card-roguelike" class="menu-card menu-card--roguelike" type="button">
+            <span class="menu-card-art">
+              <img src="./assets/card-roguelike.jpg" alt="" />
+            </span>
+            <span class="menu-card-plaque menu-card-plaque--roguelike">
+              <span class="menu-card-label">ROGUELIKE</span>
+              <span class="menu-card-sub">Niveau Aléatoire</span>
+            </span>
+          </button>
+        </div>
+      </nav>
+    </section>
+
+    <!-- TACTILE SHOP MODAL -->
+    <div id="shop-modal" class="shop-modal" hidden role="dialog" aria-modal="true" aria-labelledby="shop-title">
+      <div id="shop-backdrop" class="shop-backdrop"></div>
+      <div class="shop-panel">
+        <div class="shop-header">
+          <h1 id="shop-title" class="shop-title">Boutique</h1>
+          <div class="shop-header-right">
+            <div class="coin-pill coin-pill--sm">
+              <span class="coin-icon" aria-hidden="true">🪙</span>
+              <span id="shop-coins-val">100 Or</span>
+            </div>
+            <button id="shop-close-btn" class="shop-close-btn" type="button" aria-label="Fermer la boutique">✕</button>
+          </div>
+        </div>
+        <div id="shop-items-list" class="shop-items-list"></div>
+      </div>
+    </div>
+
+    <!-- 3D WORLD MAP TOP HUD (← Menu + Title + Coins) -->
+    <header id="hud-map-top" class="hud-top hud-map-top" hidden>
+      <button id="map-back-menu-btn" class="hud-back-btn" type="button" aria-label="Retour au menu">
+        ← Menu
+      </button>
       <div id="hud-map-badge" class="hud-pill hud-map-badge">
         <span class="hud-brand">Workd Builder</span>
       </div>
+      <div class="coin-pill coin-pill--hud" aria-live="polite">
+        <span class="coin-icon" aria-hidden="true">🪙</span>
+        <span id="map-coins-val">100 Or</span>
+      </div>
     </header>
 
-    <!-- In-Game Top HUD Bar (discrete ← Carte button + Pyramid block counter) -->
+    <!-- IN-GAME TOP HUD BAR (← Menu + Block Counter) -->
     <header id="hud-game-top" class="hud-top hud-game-top" hidden>
-      <button id="back-to-map-btn" class="hud-back-btn" type="button" aria-label="Retour à la carte">
-        ← Carte
+      <button id="game-back-menu-btn" class="hud-back-btn" type="button" aria-label="Retour au menu">
+        ← Menu
       </button>
-      <div
-        id="hud-pill"
-        class="hud-pill"
-        role="status"
-        aria-live="polite"
-      >
+      <div id="hud-pill" class="hud-pill" role="status" aria-live="polite">
         <span id="hud-counter" class="hud-counter">Pyramide : 0 / 55 blocs</span>
       </div>
     </header>
 
-    <!-- World Map Bottom Floating Card (Level 1 Unlocked) -->
+    <!-- ROGUELIKE RUN MODIFIER PILL -->
+    <div id="roguelike-modifier-wrap" class="roguelike-modifier-wrap" hidden>
+      <div id="roguelike-modifier-pill" class="roguelike-modifier-pill"></div>
+    </div>
+
+    <!-- WORLD MAP BOTTOM FLOATING CARD (Level 1 Unlocked) -->
     <section id="map-level-card" class="map-bottom-wrap" hidden aria-live="polite">
       <div class="map-card">
         <p id="map-card-title" class="map-card-title">Niveau 1 : La Petite Pyramide (55 blocs)</p>
@@ -66,19 +147,22 @@
       </div>
     </section>
 
-    <!-- World Map Brief Locked Notice Pill (Levels 2 & 3) -->
+    <!-- WORLD MAP BRIEF LOCKED NOTICE PILL (Levels 2 & 3) -->
     <div id="map-locked-pill" class="map-bottom-wrap" hidden role="status" aria-live="polite">
       <div class="locked-pill">Prochaine civilisation en construction</div>
     </div>
 
-    <!-- Level Completion Action Bar -->
+    <!-- LEVEL / ROGUELIKE COMPLETION BAR -->
     <div id="completion-bar" class="completion-bar" hidden>
-      <button id="restart-btn" class="restart-btn" type="button">
-        Recommencer
-      </button>
-      <button id="completion-map-btn" class="secondary-btn" type="button">
-        Retour à la Carte
-      </button>
+      <div id="reward-pill" class="reward-pill" hidden>🪙 +150 Or</div>
+      <div class="completion-actions">
+        <button id="restart-btn" class="restart-btn" type="button">
+          Recommencer
+        </button>
+        <button id="completion-map-btn" class="secondary-btn" type="button">
+          Retour à la Carte
+        </button>
+      </div>
     </div>
   </main>
 

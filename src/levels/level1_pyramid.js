@@ -288,20 +288,59 @@ export class Level1Pyramid {
     totalGoal: 55,
   };
 
-  constructor({ scene, textures, audio, onProgress, onComplete }) {
+  constructor({ scene, textures, audio, onProgress, onComplete, upgrades = {}, runConfig = null }) {
     this.scene = scene;
     this.textures = textures;
     this.audio = audio;
     this.onProgress = onProgress;
     this.onComplete = onComplete;
+    this.upgrades = upgrades || {};
+    this.runConfig = runConfig || null;
+
+    // Layout mirroring & gameplay parameters (extensible for Roguelike runs & Shop upgrades)
+    this.mirrorX = (this.runConfig && this.runConfig.mirrorX) || 1;
+    this.pyramidCenter = new THREE.Vector3(PYRAMID_CENTER.x * this.mirrorX, 0, PYRAMID_CENTER.z);
+    this.totalGoal = (this.runConfig && this.runConfig.totalGoal) || Level1Pyramid.meta.totalGoal;
+    this.hudLabel = (this.runConfig && this.runConfig.hudLabel) || Level1Pyramid.meta.hudLabel;
+    this.carveStep = (this.upgrades.golden_chisel ? 2 : 1) + (this.runConfig && this.runConfig.fastCarve ? 1 : 0);
+    this.quarryMaxHits = (this.runConfig && this.runConfig.quarryMaxHits) || 2;
+    this.sledCapacity = this.upgrades.reinforced_sled ? 4 : 3;
+    this.sledSpeedMult =
+      (this.upgrades.reinforced_sled ? 1.25 : 1.0) *
+      (this.runConfig && this.runConfig.sledSpeedMult ? this.runConfig.sledSpeedMult : 1.0);
+    this.pyramidSnapRadius = this.upgrades.pyramidion_aura ? 1.56 : 1.25;
+    this.maxLayerIndex = 4;
 
     this.root = new THREE.Group();
-    this.root.name = 'Level1PyramidRoot';
+    this.root.name = this.runConfig ? 'RoguelikeLevelRoot' : 'Level1PyramidRoot';
     this.scene.add(this.root);
 
     // Track locally allocated geometries/materials for guaranteed leak-free disposal
     this.ownedGeometries = [];
     this.ownedMaterials = [];
+
+    // Apply biome terrain tint if running a Roguelike biome variant
+    if (this.runConfig && this.runConfig.terrainTint) {
+      this.textures.materials.terrainSplat.color.set(this.runConfig.terrainTint);
+    } else {
+      this.textures.materials.terrainSplat.color.setHex(0xffffff);
+    }
+
+    // Carved block material (upgraded with Royal Gold sheen or biome stone tint if active)
+    if (this.upgrades.royal_gold_stone || (this.runConfig && this.runConfig.stoneTint)) {
+      const m = this._trackMat(this.textures.materials.carvedBlock.clone());
+      if (this.runConfig && this.runConfig.stoneTint) {
+        m.color.set(this.runConfig.stoneTint);
+      }
+      if (this.upgrades.royal_gold_stone) {
+        m.emissive = new THREE.Color('#6b4708');
+        m.emissiveIntensity = 0.18;
+        m.metalness = 0.28;
+      }
+      this.carvedBlockMat = m;
+    } else {
+      this.carvedBlockMat = this.textures.materials.carvedBlock;
+    }
 
     // Gameplay collections
     this.blocks = [];
@@ -326,6 +365,7 @@ export class Level1Pyramid {
     this.palmFronds = [];
     this.canopyMesh = null;
     this.carvingPips = [];
+    this.auraRingMesh = null;
     this.victoryGroup = null;
     this.victoryBeamInner = null;
     this.victoryBeamOuter = null;
@@ -343,6 +383,10 @@ export class Level1Pyramid {
     this._buildPyramidSite();
     this._buildParticlePool();
     this._rebuildHitTargets();
+  }
+
+  _mx(x) {
+    return x * this.mirrorX;
   }
 
   _trackGeo(geo) {
@@ -475,7 +519,7 @@ export class Level1Pyramid {
    * 1. SCULPTED & HAND-PAINTED 128x128 3D TERRAIN + ANIMATED NILE BASIN
    * ========================================================================== */
   getTerrainHeight(x, z) {
-    return sampleTerrainHeight(x, z);
+    return sampleTerrainHeight(x * this.mirrorX, z);
   }
 
   _buildDioramaBase() {
@@ -495,17 +539,18 @@ export class Level1Pyramid {
 
     for (let i = 0; i < vertCount; i++) {
       const x = pos.getX(i);
+      const sx = x * this.mirrorX;
       const z = pos.getZ(i);
-      const y = sampleTerrainHeight(x, z);
+      const y = sampleTerrainHeight(sx, z);
       pos.setY(i, y);
 
-      const [wSand, wPath, wQuarry, wOasis] = sampleTerrainSplat(x, z, y);
+      const [wSand, wPath, wQuarry, wOasis] = sampleTerrainSplat(sx, z, y);
       splatArr[i * 4] = wSand;
       splatArr[i * 4 + 1] = wPath;
       splatArr[i * 4 + 2] = wQuarry;
       splatArr[i * 4 + 3] = wOasis;
 
-      wetArr[i] = sampleShoreWetness(x, z, y);
+      wetArr[i] = sampleShoreWetness(sx, z, y);
     }
 
     pos.needsUpdate = true;
@@ -530,15 +575,15 @@ export class Level1Pyramid {
     bottomCap.position.y = PLINTH_BOTTOM;
     env.add(bottomCap);
 
-    // 3. Animated translucent turquoise Nile water & sandy shoreline foam in NE basin
+    // 3. Animated translucent turquoise Nile water & sandy shoreline foam
     this._buildNileWater(env);
 
     // 4. Stylized date palms & coastal reed tufts planted on exact sculpted terrain height
-    this._createPalmTree(env, 4.75, -6.9, 1.08, 0.16);
-    this._createPalmTree(env, 8.2, -7.25, 0.92, -0.18);
-    this._createPalmTree(env, 5.75, -8.35, 0.84, 0.1);
-    this._createPalmTree(env, 7.6, 5.8, 0.96, -0.14);
-    this._createPalmTree(env, -7.8, 6.25, 0.85, 0.18);
+    this._createPalmTree(env, this._mx(4.75), -6.9, 1.08, 0.16 * this.mirrorX);
+    this._createPalmTree(env, this._mx(8.2), -7.25, 0.92, -0.18 * this.mirrorX);
+    this._createPalmTree(env, this._mx(5.75), -8.35, 0.84, 0.1 * this.mirrorX);
+    this._createPalmTree(env, this._mx(7.6), 5.8, 0.96, -0.14 * this.mirrorX);
+    this._createPalmTree(env, this._mx(-7.8), 6.25, 0.85, 0.18 * this.mirrorX);
     this._buildOasisReeds(env);
 
     // 5. Subtle sandstone stepping stones along central avenues at exact terrain height
@@ -551,10 +596,11 @@ export class Level1Pyramid {
       [3.6, 3.05],
     ];
     stepCoords.forEach(([x, z], i) => {
-      const h = sampleTerrainHeight(x, z);
+      const wx = this._mx(x);
+      const h = this.getTerrainHeight(wx, z);
       const stone = new THREE.Mesh(stepGeo, this.textures.materials.foundation);
-      stone.position.set(x, h + 0.02, z);
-      stone.rotation.y = i % 2 === 0 ? 0.12 : -0.15;
+      stone.position.set(wx, h + 0.02, z);
+      stone.rotation.y = (i % 2 === 0 ? 0.12 : -0.15) * this.mirrorX;
       stone.receiveShadow = true;
       env.add(stone);
     });
@@ -569,9 +615,10 @@ export class Level1Pyramid {
       [8.4, 3.2, 0.75, 0.48, 0.72],
     ];
     boulders.forEach(([bx, bz, sx, sy, sz], idx) => {
-      const by = sampleTerrainHeight(bx, bz);
+      const wx = this._mx(bx);
+      const by = this.getTerrainHeight(wx, bz);
       const rock = new THREE.Mesh(boulderGeo, this.textures.materials.limestone);
-      rock.position.set(bx, by + sy * 0.25, bz);
+      rock.position.set(wx, by + sy * 0.25, bz);
       rock.scale.set(sx, sy, sz);
       rock.rotation.set(idx * 0.35, idx * 1.2, idx * 0.2);
       rock.castShadow = true;
@@ -582,7 +629,7 @@ export class Level1Pyramid {
 
   /**
    * Builds a 4-sided geological strata plinth skirt whose top contour matches
-   * sampleTerrainHeight(x, z) vertex-for-vertex around the entire island perimeter.
+   * getTerrainHeight(x, z) vertex-for-vertex around the entire island perimeter.
    */
   _buildContouredPlinthSkirt() {
     const hw = TERRAIN_W * 0.5;
@@ -600,15 +647,13 @@ export class Level1Pyramid {
         const t = i / segs;
         const x = THREE.MathUtils.lerp(x0, x1, t);
         const z = THREE.MathUtils.lerp(z0, z1, t);
-        const topY = sampleTerrainHeight(x, z);
+        const topY = this.getTerrainHeight(x, z);
         const u = (t * edgeLen) / 6.0;
 
-        // Top vertex
         positions.push(x, topY, z);
         normals.push(nx, 0, nz);
         uvs.push(u, 1);
 
-        // Bottom vertex
         positions.push(x, PLINTH_BOTTOM, z);
         normals.push(nx, 0, nz);
         uvs.push(u, 0);
@@ -622,7 +667,6 @@ export class Level1Pyramid {
       }
     };
 
-    // South (+Z), East (+X), North (-Z), West (-X) with outward-facing winding
     addEdge(-hw, hd, hw, hd, 0, 1);
     addEdge(hw, hd, hw, -hd, 1, 0);
     addEdge(hw, -hd, -hw, -hd, 0, -1);
@@ -637,13 +681,12 @@ export class Level1Pyramid {
   }
 
   /**
-   * Builds the translucent animated turquoise Nile water sheet and soft shoreline foam contour
-   * nestled inside the sculpted North-East water basin.
+   * Builds the translucent animated turquoise Nile water sheet and soft shoreline foam contour.
    */
   _buildNileWater(parent) {
-    const wWidth = 6.6;
-    const wDepth = 6.0;
-    const cx = 6.9;
+    const wWidth = 6.5;
+    const wDepth = 5.95;
+    const cx = this._mx(6.9);
     const cz = -6.55;
 
     const waterGeo = this._trackGeo(new THREE.PlaneGeometry(wWidth, wDepth, 24, 24));
@@ -654,7 +697,6 @@ export class Level1Pyramid {
     parent.add(waterMesh);
     this.nileWaterMesh = waterMesh;
 
-    // Soft sandy shoreline foam ribbon that hugs the exact terrain-water intersection
     const foamGeo = this._trackGeo(new THREE.PlaneGeometry(wWidth, wDepth, 40, 40));
     foamGeo.rotateX(-Math.PI / 2);
     const fPos = foamGeo.attributes.position;
@@ -662,9 +704,8 @@ export class Level1Pyramid {
     for (let i = 0; i < fPos.count; i++) {
       const wx = cx + fPos.getX(i);
       const wz = cz + fPos.getZ(i);
-      const h = sampleTerrainHeight(wx, wz);
-      const diff = WATER_LEVEL - h; // > 0 in water, ~0 at shoreline
-      // Narrow frothy foam band just inside the shoreline edge
+      const h = this.getTerrainHeight(wx, wz);
+      const diff = WATER_LEVEL - h;
       const foam = diff > -0.04 && diff < 0.22 ? Math.exp(-Math.pow((diff - 0.04) / 0.065, 2)) : 0;
       fColors[i * 4] = 0.96;
       fColors[i * 4 + 1] = 0.98;
@@ -698,9 +739,10 @@ export class Level1Pyramid {
       [8.6, -6.65],
     ];
     reedClusters.forEach(([rx, rz], idx) => {
-      const y = sampleTerrainHeight(rx, rz);
+      const wx = this._mx(rx);
+      const y = this.getTerrainHeight(wx, rz);
       const tuft = new THREE.Group();
-      tuft.position.set(rx, y - 0.03, rz);
+      tuft.position.set(wx, y - 0.03, rz);
       for (let k = 0; k < 4; k++) {
         const blade = new THREE.Mesh(reedGeo, this.textures.materials.palmLeaf);
         blade.position.set((k - 1.5) * 0.08, 0, ((k % 2) - 0.5) * 0.1);
@@ -716,11 +758,10 @@ export class Level1Pyramid {
 
   _createPalmTree(parent, x, z, scale = 1, lean = 0.12) {
     const group = new THREE.Group();
-    const groundY = sampleTerrainHeight(x, z);
+    const groundY = this.getTerrainHeight(x, z);
     group.position.set(x, groundY - 0.04, z);
     group.scale.setScalar(scale);
 
-    // Segmented curved trunk
     const segGeo = this._trackGeo(new THREE.CylinderGeometry(0.11, 0.16, 0.52, 6));
     let curY = 0.22;
     let curX = 0;
@@ -736,7 +777,6 @@ export class Level1Pyramid {
       curY += 0.44;
     }
 
-    // Crown of swaying palm fronds
     const crown = new THREE.Group();
     crown.position.set(curX, curY - 0.1, 0);
     const frondGeo = this._trackGeo(new THREE.ConeGeometry(0.24, 1.35, 4));
@@ -756,13 +796,12 @@ export class Level1Pyramid {
   }
 
   /* ============================================================================
-   * 2. STATION 1 — LA CARRIÈRE (QUARRY - NORTH-WEST)
+   * 2. STATION 1 — LA CARRIÈRE (QUARRY)
    * ========================================================================== */
   _buildQuarryStation() {
     const quarryGroup = new THREE.Group();
     this.root.add(quarryGroup);
 
-    // Stepped stratified limestone cliff terraces (NW corner)
     const terraceSpecs = [
       { x: -4.7, y: 0.45, z: -5.9, w: 6.4, h: 0.9, d: 2.3 },
       { x: -5.1, y: 1.25, z: -6.45, w: 5.4, h: 1.0, d: 1.65 },
@@ -772,30 +811,29 @@ export class Level1Pyramid {
     terraceSpecs.forEach((t) => {
       const geo = this._trackGeo(new THREE.BoxGeometry(t.w, t.h, t.d));
       const mesh = new THREE.Mesh(geo, this.textures.materials.limestone);
-      mesh.position.set(t.x, t.y, t.z);
+      mesh.position.set(this._mx(t.x), t.y, t.z);
       mesh.castShadow = true;
       mesh.receiveShadow = true;
       quarryGroup.add(mesh);
     });
 
-    // Timber quarry beam & resting copper pickaxe prop
     const postGeo = this._trackGeo(new THREE.BoxGeometry(0.18, 1.5, 0.18));
     const beamGeo = this._trackGeo(new THREE.BoxGeometry(1.4, 0.16, 0.18));
     const post = new THREE.Mesh(postGeo, this.textures.materials.timber);
-    post.position.set(-2.1, 0.75, -5.2);
+    post.position.set(this._mx(-2.1), 0.75, -5.2);
     post.castShadow = true;
     quarryGroup.add(post);
 
     const beam = new THREE.Mesh(beamGeo, this.textures.materials.timber);
-    beam.position.set(-2.5, 1.45, -5.2);
+    beam.position.set(this._mx(-2.5), 1.45, -5.2);
     beam.castShadow = true;
     quarryGroup.add(beam);
 
     // 3 Extractable Rock Nodes nestled into the excavated rocky quarry pit
     const nodePositions = [
-      new THREE.Vector3(-6.05, sampleTerrainHeight(-6.05, -4.55) + 0.44, -4.55),
-      new THREE.Vector3(-4.6, sampleTerrainHeight(-4.6, -4.78) + 0.48, -4.78),
-      new THREE.Vector3(-3.15, sampleTerrainHeight(-3.15, -4.55) + 0.44, -4.55),
+      new THREE.Vector3(this._mx(-6.05), this.getTerrainHeight(this._mx(-6.05), -4.55) + 0.44, -4.55),
+      new THREE.Vector3(this._mx(-4.6), this.getTerrainHeight(this._mx(-4.6), -4.78) + 0.48, -4.78),
+      new THREE.Vector3(this._mx(-3.15), this.getTerrainHeight(this._mx(-3.15), -4.55) + 0.44, -4.55),
     ];
 
     const nodeGeo = this._trackGeo(new THREE.DodecahedronGeometry(0.62, 0));
@@ -824,13 +862,12 @@ export class Level1Pyramid {
         material: mat,
         basePos: pos.clone(),
         hits: 0,
-        maxHits: 2,
+        maxHits: this.quarryMaxHits,
         depleted: false,
         regenTimer: 0,
         shakeTime: 0,
       };
 
-      // Generous invisible touch hitbox for effortless iPhone tapping/holding
       const hitbox = new THREE.Mesh(hitSphereGeo, hitMat);
       hitbox.userData.interact = { type: 'quarry-node', node: nodeData };
       rockMesh.userData.interact = { type: 'quarry-node', node: nodeData };
@@ -843,12 +880,12 @@ export class Level1Pyramid {
     // Quarry Raw-Stone Staging Pad (5 neat slots right in front of the rock nodes)
     const padGeo = this._trackGeo(new THREE.BoxGeometry(5.6, 0.14, 1.35));
     const pad = new THREE.Mesh(padGeo, this.textures.materials.foundation);
-    pad.position.set(-4.6, 0.07, -3.15);
+    pad.position.set(this._mx(-4.6), 0.07, -3.15);
     pad.receiveShadow = true;
     quarryGroup.add(pad);
 
     for (let i = 0; i < 5; i++) {
-      const sx = -6.6 + i * 1.0;
+      const sx = this._mx(-6.6 + i * 1.0);
       const slotPos = new THREE.Vector3(sx, 0.14 + BLOCK_H * 0.5, -3.15);
       const marker = this._createSlotMarker(quarryGroup, sx, 0.155, -3.15);
       this.quarrySlots.push({
@@ -867,32 +904,36 @@ export class Level1Pyramid {
    * 3. STATION 2 — LE TRANSPORT (TRACKS A & B + WOODEN SLEDS)
    * ========================================================================== */
   _buildTransportTracksAndSleds() {
-    // Track A: West, North-South (Quarry -> Stonecutter)
+    const leverDist = this.sledCapacity === 4 ? 2.22 : 1.76;
+
+    // Track A: North-South (Quarry -> Stonecutter)
     this._createTrackAndSled({
       id: 'sledA',
       axis: 'z',
-      fixedCoord: -4.6,
+      fixedCoord: this._mx(-4.6),
       startPos: -1.3,
       endPos: 1.45,
       trackStart: -2.05,
       trackEnd: 2.25,
       accepts: ['raw', 'carved', 'capstone'],
       primaryKind: 'raw',
-      leverLocalPos: new THREE.Vector3(1.76, 0.34, 0),
+      leverLocalPos: new THREE.Vector3(this._mx(leverDist), 0.34, 0),
     });
 
-    // Track B: Center-South, West-East (Stonecutter -> Pyramid Staging)
+    // Track B: West-East (Stonecutter -> Pyramid Staging)
+    const bTrackMin = Math.min(this._mx(-2.25), this._mx(2.65));
+    const bTrackMax = Math.max(this._mx(-2.25), this._mx(2.65));
     this._createTrackAndSled({
       id: 'sledB',
       axis: 'x',
       fixedCoord: 4.85,
-      startPos: -1.45,
-      endPos: 1.85,
-      trackStart: -2.25,
-      trackEnd: 2.65,
+      startPos: this._mx(-1.45),
+      endPos: this._mx(1.85),
+      trackStart: bTrackMin,
+      trackEnd: bTrackMax,
       accepts: ['carved', 'capstone', 'raw'],
       primaryKind: 'carved',
-      leverLocalPos: new THREE.Vector3(0, 0.34, 1.76),
+      leverLocalPos: new THREE.Vector3(0, 0.34, leverDist),
     });
   }
 
@@ -904,7 +945,6 @@ export class Level1Pyramid {
     const mid = (cfg.trackStart + cfg.trackEnd) * 0.5;
     const isZ = cfg.axis === 'z';
 
-    // Two longitudinal timber rail runners
     const railGeo = this._trackGeo(
       isZ ? new THREE.BoxGeometry(0.24, 0.12, len) : new THREE.BoxGeometry(len, 0.12, 0.24)
     );
@@ -919,7 +959,6 @@ export class Level1Pyramid {
       trackGroup.add(rail);
     });
 
-    // Sunken wooden cross-ties along the track
     const tieGeo = this._trackGeo(
       isZ ? new THREE.BoxGeometry(2.55, 0.08, 0.24) : new THREE.BoxGeometry(0.24, 0.08, 2.55)
     );
@@ -932,7 +971,6 @@ export class Level1Pyramid {
       trackGroup.add(tie);
     }
 
-    // End bumpers at both stations
     const bumperGeo = this._trackGeo(
       isZ ? new THREE.BoxGeometry(2.4, 0.22, 0.18) : new THREE.BoxGeometry(0.18, 0.22, 2.4)
     );
@@ -944,18 +982,18 @@ export class Level1Pyramid {
       trackGroup.add(b);
     });
 
-    // Wooden Desert Sled Mesh
     const sledGroup = new THREE.Group();
     const initX = isZ ? cfg.fixedCoord : cfg.startPos;
     const initZ = isZ ? cfg.startPos : cfg.fixedCoord;
     sledGroup.position.set(initX, 0.11, initZ);
     this.root.add(sledGroup);
 
-    // Sled runners (curved sled feel with angled end tips)
+    const deckSpan = this.sledCapacity === 4 ? 4.08 : 3.15;
     const runnerGeo = this._trackGeo(
       isZ ? new THREE.BoxGeometry(0.18, 0.14, 1.32) : new THREE.BoxGeometry(1.32, 0.14, 0.18)
     );
-    [-1.15, 0, 1.15].forEach((rOff) => {
+    const runnerSpan = this.sledCapacity === 4 ? 1.55 : 1.15;
+    [-runnerSpan, 0, runnerSpan].forEach((rOff) => {
       const runner = new THREE.Mesh(runnerGeo, this.textures.materials.timberDark);
       runner.position.set(isZ ? rOff : 0, 0.07, isZ ? 0 : rOff);
       runner.castShadow = true;
@@ -963,9 +1001,8 @@ export class Level1Pyramid {
       sledGroup.add(runner);
     });
 
-    // Slatted wooden cargo deck (holds 3 blocks side-by-side)
     const deckGeo = this._trackGeo(
-      isZ ? new THREE.BoxGeometry(3.15, 0.14, 1.18) : new THREE.BoxGeometry(1.18, 0.14, 3.15)
+      isZ ? new THREE.BoxGeometry(deckSpan, 0.14, 1.18) : new THREE.BoxGeometry(1.18, 0.14, deckSpan)
     );
     const deck = new THREE.Mesh(deckGeo, this.textures.materials.timber);
     deck.position.y = 0.19;
@@ -973,18 +1010,21 @@ export class Level1Pyramid {
     deck.receiveShadow = true;
     sledGroup.add(deck);
 
-    // Low side guard rails on front/back of deck
+    // Reinforced sleds feature gilded guard rails
+    const guardMat = this.upgrades.reinforced_sled
+      ? this.textures.materials.capstoneGold
+      : this.textures.materials.timberDark;
     const guardGeo = this._trackGeo(
-      isZ ? new THREE.BoxGeometry(3.15, 0.11, 0.08) : new THREE.BoxGeometry(0.08, 0.11, 3.15)
+      isZ ? new THREE.BoxGeometry(deckSpan, 0.11, 0.08) : new THREE.BoxGeometry(0.08, 0.11, deckSpan)
     );
     [-0.55, 0.55].forEach((gOff) => {
-      const guard = new THREE.Mesh(guardGeo, this.textures.materials.timberDark);
+      const guard = new THREE.Mesh(guardGeo, guardMat);
       guard.position.set(isZ ? 0 : gOff, 0.3, isZ ? gOff : 0);
       guard.castShadow = true;
       sledGroup.add(guard);
     });
 
-    // Physical wooden pull-lever assembly (mounted on side facing clear space)
+    // Physical wooden pull-lever assembly
     const leverPivot = new THREE.Group();
     leverPivot.position.copy(cfg.leverLocalPos);
     leverPivot.position.y = 0.22;
@@ -1008,7 +1048,6 @@ export class Level1Pyramid {
     knob.castShadow = true;
     leverPivot.add(knob);
 
-    // Generous invisible touch collider around the lever for crisp mobile tapping
     const leverHitGeo = this._trackGeo(new THREE.SphereGeometry(0.56, 8, 6));
     const leverHitMat = this._trackMat(new THREE.MeshBasicMaterial({ visible: false }));
     const leverHit = new THREE.Mesh(leverHitGeo, leverHitMat);
@@ -1017,7 +1056,6 @@ export class Level1Pyramid {
 
     sledGroup.add(leverPivot);
 
-    // Build sled state object & 3 cargo slots
     const sled = {
       id: cfg.id,
       axis: cfg.axis,
@@ -1030,7 +1068,7 @@ export class Level1Pyramid {
       leverPivot,
       leverAngle: -0.42,
       targetLeverAngle: -0.42,
-      progress: 0, // 0 = start station, 1 = end station
+      progress: 0,
       targetProgress: 0,
       isAutoGliding: false,
       isDragging: false,
@@ -1047,8 +1085,8 @@ export class Level1Pyramid {
     const sledInteract = { type: 'sled', sled };
     deck.userData.interact = sledInteract;
 
-    // 3 Cargo slots mounted on the sled deck
-    const offsets = [-1.02, 0, 1.02];
+    // 3 cargo slots (or 4 when Reinforced Sled upgrade is unlocked!)
+    const offsets = this.sledCapacity === 4 ? [-1.47, -0.49, 0.49, 1.47] : [-1.02, 0, 1.02];
     offsets.forEach((off, idx) => {
       const localX = isZ ? off : 0;
       const localZ = isZ ? 0 : off;
@@ -1087,7 +1125,6 @@ export class Level1Pyramid {
       sled.group.position.x = posVal;
     }
 
-    // Keep all cargo slots and loaded blocks riding smoothly with the sled
     sled.slots.forEach((slot) => {
       this._syncSledSlotWorldPos(sled, slot);
       if (slot.block && !slot.block.isDragging && !slot.block.isTweening) {
@@ -1097,23 +1134,21 @@ export class Level1Pyramid {
   }
 
   /* ============================================================================
-   * 4. STATION 3 — L'ATELIER DE TAILLE (STONECUTTER WORKBENCH - SOUTH-WEST)
+   * 4. STATION 3 — L'ATELIER DE TAILLE (STONECUTTER WORKBENCH)
    * ========================================================================== */
   _buildStonecutterWorkshop() {
     const workshop = new THREE.Group();
     this.root.add(workshop);
 
-    const cx = -4.6;
+    const cx = this._mx(-4.6);
     const cz = 4.85;
 
-    // Stone floor apron
     const floorGeo = this._trackGeo(new THREE.BoxGeometry(3.8, 0.14, 3.6));
     const floor = new THREE.Mesh(floorGeo, this.textures.materials.foundation);
     floor.position.set(cx, 0.07, cz + 0.35);
     floor.receiveShadow = true;
     workshop.add(floor);
 
-    // Shaded timber pergola posts (4 corner cedar posts)
     const postGeo = this._trackGeo(new THREE.BoxGeometry(0.18, 2.55, 0.18));
     const postOffsets = [
       [-1.65, -1.25],
@@ -1128,7 +1163,6 @@ export class Level1Pyramid {
       workshop.add(post);
     });
 
-    // Overhead rafters
     const beamXGeo = this._trackGeo(new THREE.BoxGeometry(3.55, 0.14, 0.14));
     [-1.25, 1.35].forEach((bz) => {
       const beam = new THREE.Mesh(beamXGeo, this.textures.materials.timber);
@@ -1137,7 +1171,6 @@ export class Level1Pyramid {
       workshop.add(beam);
     });
 
-    // Open-front woven desert canopy shade (positioned slightly back so anvil stays 100% visible)
     const canopyGeo = this._trackGeo(new THREE.PlaneGeometry(3.55, 1.65, 6, 2));
     canopyGeo.rotateX(-Math.PI / 2 + 0.14);
     const canopy = new THREE.Mesh(canopyGeo, this.textures.materials.canopy);
@@ -1146,7 +1179,6 @@ export class Level1Pyramid {
     workshop.add(canopy);
     this.canopyMesh = canopy;
 
-    // Central Dressed-Stone Workbench / Anvil
     const anvilBaseGeo = this._trackGeo(new THREE.BoxGeometry(1.56, 0.48, 1.56));
     const anvilBase = new THREE.Mesh(anvilBaseGeo, this.textures.materials.limestone);
     anvilBase.position.set(cx, 0.36, cz - 0.1);
@@ -1161,7 +1193,6 @@ export class Level1Pyramid {
     anvilTop.receiveShadow = true;
     workshop.add(anvilTop);
 
-    // Mason's wooden mallet & copper chisel resting on the corner of the workbench
     const malletHandleGeo = this._trackGeo(new THREE.CylinderGeometry(0.035, 0.04, 0.42, 6));
     const malletHandle = new THREE.Mesh(malletHandleGeo, this.textures.materials.timber);
     malletHandle.position.set(cx + 0.62, 0.74, cz - 0.56);
@@ -1174,8 +1205,12 @@ export class Level1Pyramid {
     malletHead.rotation.set(0, 0.45, Math.PI / 2);
     workshop.add(malletHead);
 
+    // Gilded chisel if Ciseau d'Or upgrade is owned!
     const chiselGeo = this._trackGeo(new THREE.BoxGeometry(0.06, 0.05, 0.36));
-    const chisel = new THREE.Mesh(chiselGeo, this.textures.materials.copperTool);
+    const chiselMat = this.upgrades.golden_chisel
+      ? this.textures.materials.capstoneGold
+      : this.textures.materials.copperTool;
+    const chisel = new THREE.Mesh(chiselGeo, chiselMat);
     chisel.position.set(cx - 0.64, 0.73, cz - 0.54);
     chisel.rotation.y = -0.38;
     workshop.add(chisel);
@@ -1264,22 +1299,21 @@ export class Level1Pyramid {
     const site = new THREE.Group();
     this.root.add(site);
 
-    // Dressed-stone foundation terrace
+    const pc = this.pyramidCenter;
+
     const baseGeo = this._trackGeo(new THREE.BoxGeometry(5.9, FOUNDATION_Y, 5.9));
     const baseMesh = new THREE.Mesh(baseGeo, this.textures.materials.foundation);
-    baseMesh.position.set(PYRAMID_CENTER.x, FOUNDATION_Y * 0.5, PYRAMID_CENTER.z);
+    baseMesh.position.set(pc.x, FOUNDATION_Y * 0.5, pc.z);
     baseMesh.castShadow = true;
     baseMesh.receiveShadow = true;
     site.add(baseMesh);
 
-    // Stepped perimeter stone trim curb
     const curbGeo = this._trackGeo(new THREE.BoxGeometry(6.35, 0.12, 6.35));
     const curb = new THREE.Mesh(curbGeo, this.textures.materials.limestone);
-    curb.position.set(PYRAMID_CENTER.x, 0.06, PYRAMID_CENTER.z);
+    curb.position.set(pc.x, 0.06, pc.z);
     curb.receiveShadow = true;
     site.add(curb);
 
-    // 4 miniature sandstone corner obelisk markers around the foundation
     const obeliskBodyGeo = this._trackGeo(new THREE.BoxGeometry(0.28, 0.9, 0.28));
     const obeliskTipGeo = this._trackGeo(new THREE.ConeGeometry(0.2, 0.28, 4));
     obeliskTipGeo.rotateY(Math.PI / 4);
@@ -1290,21 +1324,40 @@ export class Level1Pyramid {
       [-cornerOff, cornerOff],
       [cornerOff, cornerOff],
     ].forEach(([cx, cz]) => {
-      const ob = new THREE.Mesh(obeliskBodyGeo, this.textures.materials.carvedBlock);
-      ob.position.set(PYRAMID_CENTER.x + cx, FOUNDATION_Y + 0.45, PYRAMID_CENTER.z + cz);
+      const ob = new THREE.Mesh(obeliskBodyGeo, this.carvedBlockMat);
+      ob.position.set(pc.x + cx, FOUNDATION_Y + 0.45, pc.z + cz);
       ob.castShadow = true;
       site.add(ob);
 
       const tip = new THREE.Mesh(obeliskTipGeo, this.textures.materials.capstoneGold);
-      tip.position.set(PYRAMID_CENTER.x + cx, FOUNDATION_Y + 1.04, PYRAMID_CENTER.z + cz);
+      tip.position.set(pc.x + cx, FOUNDATION_Y + 1.04, pc.z + cz);
       tip.castShadow = true;
       site.add(tip);
     });
 
-    // Pyramid Staging Pallet (4 slots right beside Track B's East stop)
+    // Optional Shop Upgrade: "Aura du Pyramidion" glowing perimeter halo around foundation
+    if (this.upgrades.pyramidion_aura) {
+      const auraGeo = this._trackGeo(new THREE.RingGeometry(3.35, 3.62, 40));
+      auraGeo.rotateX(-Math.PI / 2);
+      const auraMat = this._trackMat(
+        new THREE.MeshBasicMaterial({
+          color: 0xffd75e,
+          transparent: true,
+          opacity: 0.46,
+          side: THREE.DoubleSide,
+          depthWrite: false,
+        })
+      );
+      this.auraRingMesh = new THREE.Mesh(auraGeo, auraMat);
+      this.auraRingMesh.position.set(pc.x, 0.09, pc.z);
+      site.add(this.auraRingMesh);
+    }
+
+    // Pyramid Staging Pallet (4 slots beside Track B)
+    const stageCx = this._mx(4.15);
     const stagePadGeo = this._trackGeo(new THREE.BoxGeometry(2.55, 0.14, 2.55));
     const stagePad = new THREE.Mesh(stagePadGeo, this.textures.materials.foundation);
-    stagePad.position.set(4.15, 0.07, 4.85);
+    stagePad.position.set(stageCx, 0.07, 4.85);
     stagePad.receiveShadow = true;
     site.add(stagePad);
 
@@ -1315,7 +1368,7 @@ export class Level1Pyramid {
       [0.55, 0.55],
     ];
     stageOffsets.forEach(([ox, oz], idx) => {
-      const sx = 4.15 + ox;
+      const sx = stageCx + ox;
       const sz = 4.85 + oz;
       const marker = this._createSlotMarker(site, sx, 0.155, sz);
       this.stagingSlots.push({
@@ -1329,53 +1382,67 @@ export class Level1Pyramid {
       });
     });
 
-    // Build all 55 pyramid blueprint slots across 5 progressive layers (5x5 -> 4x4 -> 3x3 -> 2x2 -> 1x1)
+    // Build progressive blueprint layers (custom Roguelike blueprint OR standard 55-block 5-tier pyramid)
+    const layersDef =
+      this.runConfig && Array.isArray(this.runConfig.blueprintLayers)
+        ? this.runConfig.blueprintLayers
+        : LAYER_SIZES.map((gridSize, layer) => {
+            const centerOffset = (gridSize - 1) * 0.5;
+            const cells = [];
+            for (let gx = 0; gx < gridSize; gx++) {
+              for (let gz = 0; gz < gridSize; gz++) {
+                cells.push([gx - centerOffset, gz - centerOffset]);
+              }
+            }
+            return { cells, isCapstone: layer === LAYER_SIZES.length - 1 };
+          });
+
+    this.maxLayerIndex = layersDef.length - 1;
     let slotIdx = 0;
-    LAYER_SIZES.forEach((gridSize, layer) => {
-      const isCapstone = layer === 4;
-      const centerOffset = (gridSize - 1) * 0.5;
+
+    layersDef.forEach((layerSpec, layer) => {
+      const isCapstone = Boolean(layerSpec.isCapstone);
       const layerBaseY = FOUNDATION_Y + layer * BLOCK_H;
       const centerY = isCapstone ? layerBaseY + 0.41 : layerBaseY + BLOCK_H * 0.5;
 
-      for (let gx = 0; gx < gridSize; gx++) {
-        for (let gz = 0; gz < gridSize; gz++) {
-          const wx = PYRAMID_CENTER.x + (gx - centerOffset) * PYRAMID_STEP;
-          const wz = PYRAMID_CENTER.z + (gz - centerOffset) * PYRAMID_STEP;
+      layerSpec.cells.forEach(([dx, dz], cellIdx) => {
+        const wx = pc.x + dx * PYRAMID_STEP;
+        const wz = pc.z + dz * PYRAMID_STEP;
 
-          // Translucent glowing blueprint ghost slot
-          const ghostGroup = new THREE.Group();
-          ghostGroup.position.set(wx, centerY, wz);
+        const ghostGroup = new THREE.Group();
+        ghostGroup.position.set(wx, centerY, wz);
 
-          const ghostMesh = new THREE.Mesh(
-            isCapstone ? this.geos.ghostCapstone : this.geos.ghostBox,
-            this.mats.ghostNormal
-          );
-          const ghostLines = new THREE.LineSegments(
-            isCapstone ? this.geos.ghostCapstoneEdges : this.geos.ghostBoxEdges,
-            this.mats.ghostLineNormal
-          );
-          ghostGroup.add(ghostMesh);
-          ghostGroup.add(ghostLines);
-          ghostGroup.visible = layer === 0;
-          site.add(ghostGroup);
+        const ghostMesh = new THREE.Mesh(
+          isCapstone ? this.geos.ghostCapstone : this.geos.ghostBox,
+          this.mats.ghostNormal
+        );
+        const ghostLines = new THREE.LineSegments(
+          isCapstone ? this.geos.ghostCapstoneEdges : this.geos.ghostBoxEdges,
+          this.mats.ghostLineNormal
+        );
+        ghostGroup.add(ghostMesh);
+        ghostGroup.add(ghostLines);
+        ghostGroup.visible = layer === 0;
+        site.add(ghostGroup);
 
-          this.pyramidSlots.push({
-            id: `pyramid_L${layer}_${gx}_${gz}`,
-            index: slotIdx++,
-            zoneType: 'pyramid',
-            layer,
-            isCapstone,
-            accepts: ['carved', 'capstone'],
-            position: new THREE.Vector3(wx, centerY, wz),
-            dropIndicatorY: layerBaseY + 0.01,
-            ghostGroup,
-            ghostMesh,
-            ghostLines,
-            block: null,
-          });
-        }
-      }
+        this.pyramidSlots.push({
+          id: `pyramid_L${layer}_${cellIdx}`,
+          index: slotIdx++,
+          zoneType: 'pyramid',
+          layer,
+          isCapstone,
+          accepts: ['carved', 'capstone'],
+          position: new THREE.Vector3(wx, centerY, wz),
+          dropIndicatorY: layerBaseY + 0.01,
+          ghostGroup,
+          ghostMesh,
+          ghostLines,
+          block: null,
+        });
+      });
     });
+
+    this.totalGoal = this.pyramidSlots.length;
   }
 
   _createSlotMarker(parent, x, y, z) {
@@ -1558,8 +1625,7 @@ export class Level1Pyramid {
    * 8. STONECUTTER CARVING (3 VISUAL STAGES: TAP OR SWIPE)
    * ========================================================================== */
   _shouldForgeCapstone() {
-    if (this.placedCount < 54) return false;
-    // Only forge one capstone at a time
+    if (this.placedCount < this.totalGoal - 1) return false;
     return !this.blocks.some((b) => b.kind === 'capstone');
   }
 
@@ -1569,11 +1635,10 @@ export class Level1Pyramid {
       return false;
     }
 
-    block.carveStage += 1;
+    block.carveStage = Math.min(3, block.carveStage + this.carveStep);
     const stage = block.carveStage;
     this.audio.playChiselPing(stage);
 
-    // Directional stone chips & chisel sparks
     const burstOrigin = block.mesh.position.clone().add(new THREE.Vector3(0, 0.25, 0));
     this._spawnParticles(burstOrigin, {
       count: stage === 3 ? 16 : 11,
@@ -1592,7 +1657,6 @@ export class Level1Pyramid {
       scale: 0.55,
     });
 
-    // Visual geometry & material evolution across the 3 stages
     if (stage === 1) {
       block.mesh.geometry = this.geos.stage1Block;
       block.mesh.material = this.textures.materials.carvingStage1;
@@ -1608,7 +1672,7 @@ export class Level1Pyramid {
       } else {
         block.kind = 'carved';
         block.mesh.geometry = this.geos.carvedBlock;
-        block.mesh.material = this.textures.materials.carvedBlock;
+        block.mesh.material = this.carvedBlockMat;
       }
       block.mesh.rotation.set(0, 0, 0);
       block.mesh.userData.interact = { type: 'block', block };
@@ -1803,7 +1867,7 @@ export class Level1Pyramid {
       const dx = dragPos.x - slot.position.x;
       const dz = dragPos.z - slot.position.z;
       const dSq = dx * dx + dz * dz;
-      const snapRad = slot.zoneType === 'pyramid' ? 1.25 : 1.48;
+      const snapRad = slot.zoneType === 'pyramid' ? this.pyramidSnapRadius : 1.48;
       if (dSq < snapRad * snapRad && dSq < bestDistSq) {
         bestDistSq = dSq;
         bestSlot = slot;
@@ -1826,8 +1890,8 @@ export class Level1Pyramid {
     if (bestSlot) {
       groundY = bestSlot.dropIndicatorY;
     } else if (
-      Math.abs(dragPos.x - PYRAMID_CENTER.x) < 3.1 &&
-      Math.abs(dragPos.z - PYRAMID_CENTER.z) < 3.1
+      Math.abs(dragPos.x - this.pyramidCenter.x) < 3.1 &&
+      Math.abs(dragPos.z - this.pyramidCenter.z) < 3.1
     ) {
       groundY = Math.max(groundY, FOUNDATION_Y + this.activeLayer * BLOCK_H);
     }
@@ -1858,7 +1922,6 @@ export class Level1Pyramid {
 
     const isPyramidSnap = targetSlot.zoneType === 'pyramid';
 
-    // Seamless golden capstone transformation if placing onto Layer 5 apex slot
     if (isPyramidSnap && targetSlot.isCapstone && block.kind !== 'capstone') {
       this._convertBlockToCapstone(block);
     }
@@ -1945,20 +2008,18 @@ export class Level1Pyramid {
     });
 
     if (this.onProgress) {
-      this.onProgress(this.placedCount, Level1Pyramid.meta.totalGoal);
+      this.onProgress(this.placedCount, this.totalGoal);
     }
 
-    // Check if the current layer is fully completed
     const currentLayerSlots = this.pyramidSlots.filter((s) => s.layer === this.activeLayer);
     const layerDone = currentLayerSlots.every((s) => Boolean(s.block));
 
     if (layerDone) {
-      if (this.activeLayer < LAYER_SIZES.length - 1) {
+      if (this.activeLayer < this.maxLayerIndex) {
         const finishedTier = this.activeLayer;
         this.activeLayer += 1;
         this.audio.playLayerComplete(finishedTier);
 
-        // Reveal next tier's translucent blueprint ghost slots smoothly
         this.pyramidSlots.forEach((s) => {
           if (s.layer === this.activeLayer && !s.block) {
             s.ghostGroup.visible = true;
@@ -1966,7 +2027,6 @@ export class Level1Pyramid {
           }
         });
       } else {
-        // All 55 blocks placed! Trigger Golden Sunbeam Celebration!
         this._triggerCompletionSequence();
       }
     }
@@ -1978,10 +2038,9 @@ export class Level1Pyramid {
     this._updateCarvingPips();
     this.audio.playVictoryFanfare();
 
-    // Build Golden Sunbeam light shaft descending onto the 55th capstone
-    const apexY = FOUNDATION_Y + 4 * BLOCK_H + 0.82;
+    const apexY = FOUNDATION_Y + this.maxLayerIndex * BLOCK_H + 0.82;
     this.victoryGroup = new THREE.Group();
-    this.victoryGroup.position.set(PYRAMID_CENTER.x, apexY, PYRAMID_CENTER.z);
+    this.victoryGroup.position.set(this.pyramidCenter.x, apexY, this.pyramidCenter.z);
 
     const innerBeamGeo = this._trackGeo(new THREE.CylinderGeometry(0.45, 2.35, 11.5, 20, 1, true));
     const innerBeamMat = this._trackMat(
@@ -2035,8 +2094,12 @@ export class Level1Pyramid {
     this.root.add(this.victoryGroup);
 
     if (this.onComplete) {
+      const baseReward = (this.runConfig && this.runConfig.rewardCoins) || 150;
+      const goldMult = this.upgrades.royal_gold_stone ? 1.25 : 1.0;
+      const rewardCoins = Math.round(baseReward * goldMult);
       this.onComplete({
-        focusPoint: new THREE.Vector3(PYRAMID_CENTER.x, FOUNDATION_Y + 1.85, PYRAMID_CENTER.z),
+        focusPoint: new THREE.Vector3(this.pyramidCenter.x, FOUNDATION_Y + 1.85, this.pyramidCenter.z),
+        rewardCoins,
       });
     }
   }
@@ -2083,10 +2146,8 @@ export class Level1Pyramid {
       const tw = this.tweens[i];
       tw.elapsed += dt;
       const t = Math.min(tw.elapsed / tw.duration, 1);
-      // Cubic ease-out for crisp magnetic snap
       const ease = 1 - Math.pow(1 - t, 3);
 
-      // Keep destination fresh if landing on a sled
       const dest = tw.block.slot ? tw.block.slot.position : tw.to;
       tw.block.mesh.position.lerpVectors(tw.from, dest, ease);
       tw.block.mesh.position.y += Math.sin(t * Math.PI) * tw.arcHeight;
@@ -2156,8 +2217,7 @@ export class Level1Pyramid {
           this._updateSledTransform(s);
           this.audio.playHeavyThud();
         } else {
-          const step = Math.sign(diff) * Math.min(Math.abs(diff), dt * 1.15);
-          // Smooth speed boost in middle, gentle ease into bumpers
+          const step = Math.sign(diff) * Math.min(Math.abs(diff), dt * 1.15 * this.sledSpeedMult);
           const speedCurve = 0.55 + Math.sin(s.progress * Math.PI) * 0.75;
           s.progress = THREE.MathUtils.clamp(s.progress + step * speedCurve, 0, 1);
           this._updateSledTransform(s);
@@ -2171,9 +2231,14 @@ export class Level1Pyramid {
       }
     }
 
-    // 5. Breathing pulse on active blueprint ghost slots
+    // 5. Breathing pulse on active blueprint ghost slots & optional Pyramidion Aura ring
     const pulse = 0.38 + Math.sin(elapsed * 3.4) * 0.1;
     this.mats.ghostNormal.opacity = pulse;
+    if (this.auraRingMesh) {
+      const auraS = 1 + Math.sin(elapsed * 2.5) * 0.025;
+      this.auraRingMesh.scale.setScalar(auraS);
+      this.auraRingMesh.material.opacity = 0.34 + Math.sin(elapsed * 2.5) * 0.14;
+    }
     for (let i = 0; i < this.pyramidSlots.length; i++) {
       const s = this.pyramidSlots[i];
       if (s.ghostGroup.visible && s.ghostGroup.scale.x < 0.995) {
@@ -2223,16 +2288,16 @@ export class Level1Pyramid {
         const rad = 0.8 + Math.random() * 2.1;
         this._spawnParticles(
           new THREE.Vector3(
-            PYRAMID_CENTER.x + Math.cos(angle) * rad,
+            this.pyramidCenter.x + Math.cos(angle) * rad,
             FOUNDATION_Y + 0.5 + Math.random() * 2.2,
-            PYRAMID_CENTER.z + Math.sin(angle) * rad
+            this.pyramidCenter.z + Math.sin(angle) * rad
           ),
           {
             count: 1,
             material: this.mats.dustGold,
             speed: 0.4,
             upSpeed: 1.5,
-            gravity: -0.4, // Gently float upward!
+            gravity: -0.4,
             life: 1.6,
             scale: 0.72,
             spread: 0.15,
@@ -2278,6 +2343,10 @@ export class Level1Pyramid {
     this.particles.length = 0;
     this.palmFronds.length = 0;
     this.carvingPips.length = 0;
+    this.auraRingMesh = null;
+
+    // Restore shared terrain splat color to neutral white
+    this.textures.materials.terrainSplat.color.setHex(0xffffff);
 
     this.scene.remove(this.root);
 
