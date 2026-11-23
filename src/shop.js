@@ -281,21 +281,49 @@ export class ShopController {
   }
 
   /* ============================================================================
-   * TAB 1: MEUBLES (Sélection du Jour + Coffres Mystères + Catalogue Classique)
+   * TAB 1: MEUBLES (Sélection du Jour Stone Tablet + Coffres Mystères + Catalogue)
    * ========================================================================== */
   _renderMeublesTab() {
     const tokens = this.save.getTokens();
     const dailyDeals = this.save.getDailyDeals();
 
-    // 1. Sélection du Jour (3 PROMO bargains at 15–25 Éclats)
-    const dealsSection = document.createElement('section');
-    dealsSection.className = 'shop-section';
-    dealsSection.innerHTML = `
-      <div class="shop-section-head">
-        <h2 class="shop-section-title">✨ Sélection du Jour</h2>
-        <span class="shop-section-tag">PROMO</span>
+    const eclatSvg = `
+      <svg class="eclat-svg eclat-svg--sm" viewBox="0 0 24 24" aria-hidden="true">
+        <polygon points="12,1.5 22,12 12,22.5 2,12" fill="#18a8c7" stroke="#b6ffff" stroke-width="1.3"/>
+        <polygon points="12,1.5 18,12 12,12" fill="#b8ffff"/>
+        <polygon points="12,1.5 6,12 12,12" fill="#5cefff"/>
+        <polygon points="12,22.5 18,12 12,12" fill="#0d7a9c"/>
+        <polygon points="12,22.5 6,12 12,12" fill="#29d2e8"/>
+      </svg>
+    `;
+
+    const chestArtMap = {
+      classic: './assets/shop/chest_classic.png',
+      royal: './assets/shop/chest_royal.png',
+      legendary: './assets/shop/chest_legendary.png',
+    };
+
+    // 1. Sélection du Jour — Sculpted Light-Sandstone Tablet + Folded Red PROMO Ribbon
+    const dealsTablet = document.createElement('section');
+    dealsTablet.className = 'deals-stone-tablet';
+    dealsTablet.innerHTML = `
+      <div class="deals-stone-header">
+        <div class="deals-stone-slab-left">
+          <svg class="sparkle-svg" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M9.5 2L11.4 7.6L17 9.5L11.4 11.4L9.5 17L7.6 11.4L2 9.5L7.6 7.6Z" fill="#ffe58c" stroke="#7c4712" stroke-width="1"/>
+            <path d="M17.5 12L18.6 15.2L21.8 16.3L18.6 17.4L17.5 20.6L16.4 17.4L13.2 16.3L16.4 15.2Z" fill="#ffd460" stroke="#7c4712" stroke-width="0.9"/>
+          </svg>
+          <h2 class="deals-stone-title">Sélection du Jour</h2>
+        </div>
+        <div class="deals-stone-slab-right">
+          <span class="promo-folded-ribbon">PROMO</span>
+        </div>
       </div>
     `;
+
+    const dealsWell = document.createElement('div');
+    dealsWell.className = 'deals-stone-well';
+
     const dealsRow = document.createElement('div');
     dealsRow.className = 'deals-grid';
 
@@ -327,6 +355,7 @@ export class ShopController {
       card.addEventListener('click', () => {
         this.audio.unlock();
         this.audio.playTabBounce();
+        triggerTactileBounce(card);
         this.openPreview(item, true);
       });
 
@@ -337,7 +366,7 @@ export class ShopController {
       buyBtn.disabled = owned || !canAfford;
       buyBtn.innerHTML = owned
         ? 'Possédé ✓'
-        : `<span class="price-old">${item.price}</span> 💠 ${promoPrice}`;
+        : `<span class="price-old">${item.price}</span>${eclatSvg}<span class="price-val">${promoPrice}</span>`;
 
       buyBtn.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -357,15 +386,25 @@ export class ShopController {
       card.appendChild(buyBtn);
       dealsRow.appendChild(card);
     });
-    dealsSection.appendChild(dealsRow);
-    this.contentEl.appendChild(dealsSection);
 
-    // 2. Coffres Mystères (3 Animated Loot Boxes)
+    dealsWell.appendChild(dealsRow);
+    dealsTablet.appendChild(dealsWell);
+    this.contentEl.appendChild(dealsTablet);
+
+    // 2. Coffres Mystères — Horizontal Carved Wooden Plaques with Filigree Corners & Chest Art
     const boxesSection = document.createElement('section');
-    boxesSection.className = 'shop-section';
+    boxesSection.className = 'shop-section shop-section--chests';
     boxesSection.innerHTML = `
       <div class="shop-section-head">
-        <h2 class="shop-section-title">🎁 Coffres Mystères</h2>
+        <h2 class="shop-section-title">
+          <svg class="section-icon-svg" viewBox="0 0 24 24" aria-hidden="true">
+            <rect x="3" y="9" width="18" height="12" rx="2.5" fill="#c72f28" stroke="#f7cb63" stroke-width="1.5"/>
+            <rect x="2" y="6" width="20" height="4.5" rx="1.5" fill="#df4236" stroke="#ffdf84" stroke-width="1.3"/>
+            <rect x="10.4" y="6" width="3.2" height="15" fill="#f7c84c"/>
+            <path d="M12 6C10.5 3.5 7 3 7 5C7 6 9.5 6 12 6ZM12 6C13.5 3.5 17 3 17 5C17 6 14.5 6 12 6Z" fill="#ffd968" stroke="#8a5210" stroke-width="0.9"/>
+          </svg>
+          <span>Coffres Mystères</span>
+        </h2>
         <span class="shop-section-sub">Meubles + Bonus Or</span>
       </div>
     `;
@@ -374,6 +413,7 @@ export class ShopController {
 
     LOOT_BOXES.forEach((box) => {
       const canAfford = tokens >= box.price;
+      const chestImg = chestArtMap[box.id] || chestArtMap.classic;
       const card = document.createElement('button');
       card.type = 'button';
       card.className = `lootbox-card lootbox-card--${box.id}`;
@@ -381,12 +421,21 @@ export class ShopController {
       card.disabled = !canAfford || this.isOpeningBox;
 
       card.innerHTML = `
-        <span class="lootbox-emblem" aria-hidden="true">${box.badge}</span>
+        <span class="plaque-corner plaque-corner--tl" aria-hidden="true"></span>
+        <span class="plaque-corner plaque-corner--tr" aria-hidden="true"></span>
+        <span class="plaque-corner plaque-corner--bl" aria-hidden="true"></span>
+        <span class="plaque-corner plaque-corner--br" aria-hidden="true"></span>
+        <span class="lootbox-art-wrap" aria-hidden="true">
+          <img src="${chestImg}" alt="" class="lootbox-chest-img" />
+        </span>
         <span class="lootbox-info">
           <span class="lootbox-name">${box.name}</span>
           <span class="lootbox-desc">${box.subtitle}</span>
         </span>
-        <span class="lootbox-price-pill">💠 ${box.price}</span>
+        <span class="lootbox-stone-price">
+          ${eclatSvg}
+          <span>${box.price}</span>
+        </span>
       `;
 
       card.addEventListener('click', () => {
@@ -408,14 +457,19 @@ export class ShopController {
     boxesSection.appendChild(boxesGrid);
     this.contentEl.appendChild(boxesSection);
 
-    // 3. Catalogue Classique (All 12 transparent PNG furniture items — tap any card for live 3D preview)
+    // 3. Catalogue Classique — Matching Gold-Rimmed Wooden Cards + Progress Counter
     const ownedCount = this.save.getUnlockedFurniture().length;
     const catSection = document.createElement('section');
-    catSection.className = 'shop-section';
+    catSection.className = 'shop-section shop-section--catalog';
     catSection.innerHTML = `
       <div class="shop-section-head">
-        <h2 class="shop-section-title">🪑 Catalogue Classique</h2>
-        <span class="shop-section-sub">${ownedCount} / ${FURNITURE_CATALOG.length} débloqués</span>
+        <h2 class="shop-section-title">
+          <svg class="section-icon-svg section-icon-svg--chair" viewBox="0 0 20 20" aria-hidden="true">
+            <path d="M5 3h2.2v6h5.6v2.2H5V3zm0 8.2h2v5.8H5v-5.8zm8 0h2v5.8h-2v-5.8z" fill="#b97b42" stroke="#3c1d09" stroke-width="0.7"/>
+          </svg>
+          <span>Catalogue Classique</span>
+        </h2>
+        <span class="shop-section-sub shop-section-count">${ownedCount} / ${FURNITURE_CATALOG.length} débloqués</span>
       </div>
     `;
     const catGrid = document.createElement('div');
@@ -427,7 +481,7 @@ export class ShopController {
       const rarity = RARITY_META[item.rarity] || RARITY_META.commun;
 
       const card = document.createElement('div');
-      card.className = `furniture-card${owned ? ' is-owned' : ''}`;
+      card.className = `furniture-card furniture-card--catalog${owned ? ' is-owned' : ''}`;
       card.dataset.rarity = item.rarity;
       card.dataset.previewCatalogId = item.id;
       card.setAttribute('role', 'button');
@@ -446,6 +500,7 @@ export class ShopController {
       card.addEventListener('click', () => {
         this.audio.unlock();
         this.audio.playTabBounce();
+        triggerTactileBounce(card);
         this.openPreview(item, false);
       });
 
@@ -454,7 +509,9 @@ export class ShopController {
       buyBtn.className = `furniture-buy-btn${owned ? ' is-owned' : ''}`;
       buyBtn.dataset.furnitureId = item.id;
       buyBtn.disabled = owned || !canAfford;
-      buyBtn.textContent = owned ? 'Possédé ✓' : `💠 ${item.price} Éclats`;
+      buyBtn.innerHTML = owned
+        ? 'Possédé ✓'
+        : `${eclatSvg}<span class="price-val">${item.price} Éclats</span>`;
 
       buyBtn.addEventListener('click', (e) => {
         e.stopPropagation();

@@ -386,14 +386,27 @@ body {
 .shop-panel {
   position: relative;
   width: 100%;
-  max-width: 374px;
-  max-height: 86dvh;
+  max-width: 376px;
+  max-height: 90dvh;
   display: flex;
   flex-direction: column;
-  border-radius: 24px;
-  background: linear-gradient(180deg, #5c371a 0%, #38200d 100%);
-  border: 2.5px solid #ebbf62;
-  box-shadow: 0 22px 54px rgba(10, 5, 1, 0.68), inset 0 2px 0 rgba(255, 242, 200, 0.32);
+  border-radius: 26px;
+  background:
+    repeating-linear-gradient(
+      0deg,
+      rgba(255, 224, 172, 0.025) 0px,
+      rgba(255, 224, 172, 0.025) 2px,
+      rgba(16, 7, 2, 0.08) 2px,
+      rgba(16, 7, 2, 0.08) 14px
+    ),
+    linear-gradient(180deg, #543118 0%, #3a200e 100%);
+  border: 3px solid #ecc066;
+  box-shadow:
+    0 24px 58px rgba(8, 4, 1, 0.78),
+    0 0 0 2px #6e4116,
+    0 0 0 4.5px #d7a347,
+    inset 0 2px 0 rgba(255, 246, 210, 0.45),
+    inset 0 0 0 2px rgba(72, 38, 12, 0.72);
   overflow: hidden;
   transform: scale(0.95);
   transition: transform 0.24s cubic-bezier(0.22, 1.3, 0.36, 1);
@@ -403,96 +416,264 @@ body {
   transform: scale(1);
 }
 
+/* Warm Oak-Plank Carved Header matching IMG_0645.JPG */
 .shop-header {
+  position: relative;
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  padding: 13px 14px 10px;
-  border-bottom: 1px solid rgba(246, 208, 128, 0.26);
-  background: rgba(24, 13, 4, 0.42);
+  gap: 9px;
+  padding: 13px 13px 11px;
+  border-bottom: 3px solid #c99640;
+  background:
+    repeating-linear-gradient(
+      1deg,
+      rgba(255, 224, 170, 0.05) 0px,
+      rgba(255, 224, 170, 0.05) 2px,
+      rgba(48, 24, 7, 0.09) 2px,
+      rgba(48, 24, 7, 0.09) 13px
+    ),
+    linear-gradient(180deg, #a26733 0%, #864f21 52%, #6e3d16 100%);
+  box-shadow:
+    inset 0 2px 0 rgba(255, 232, 182, 0.34),
+    inset 0 -3px 6px rgba(34, 16, 4, 0.55),
+    0 3px 10px rgba(18, 8, 2, 0.48);
 }
 
 .shop-header-top {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-start;
+  padding-right: 48px;
 }
 
 .shop-title {
   margin: 0;
-  font-size: 19px;
-  font-weight: 800;
-  color: #ffe28e;
-  letter-spacing: 0.02em;
+  font-size: 23px;
+  font-weight: 900;
+  letter-spacing: 0.015em;
+  color: #ffeca8;
+  text-shadow:
+    0 2px 0 #4d280b,
+    0 3px 6px rgba(20, 8, 2, 0.65);
 }
 
+/* Ornate Circular Wooden-and-Gold Close Button (Top-Right) */
+.shop-close-btn {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  appearance: none;
+  -webkit-appearance: none;
+  width: 44px;
+  height: 44px;
+  padding: 4px;
+  border-radius: 50%;
+  border: 2.5px solid #f5cf7a;
+  background: radial-gradient(circle at 32% 28%, #8b5626 0%, #4d290d 65%, #321806 100%);
+  box-shadow:
+    0 4px 12px rgba(16, 7, 2, 0.62),
+    0 0 0 2px #5d3512,
+    inset 0 1.5px 2px rgba(255, 240, 192, 0.55),
+    inset 0 -2px 4px rgba(20, 8, 2, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: transform 0.14s cubic-bezier(0.22, 1.35, 0.36, 1);
+  z-index: 5;
+}
+
+.shop-close-btn:active {
+  transform: scale(0.91);
+}
+
+.shop-close-inner {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  border: 1.5px solid rgba(240, 192, 98, 0.65);
+  background: radial-gradient(circle at 50% 35%, #5b3314 0%, #2c1506 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffe28c;
+  box-shadow: inset 0 2px 5px rgba(12, 5, 1, 0.65);
+}
+
+.shop-close-x {
+  width: 18px;
+  height: 18px;
+  filter: drop-shadow(0 1.5px 1px rgba(28, 12, 3, 0.85));
+}
+
+/* Recessed Stone & Gold Filigree Currency Pills */
 .shop-currencies {
   display: flex;
   align-items: center;
   gap: 8px;
+  padding-right: 46px;
 }
 
+.carved-currency {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  padding: 2.5px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #f3cd7a 0%, #b57c28 52%, #7c4c12 100%);
+  box-shadow:
+    0 3px 8px rgba(22, 10, 3, 0.52),
+    inset 0 1px 0 rgba(255, 248, 214, 0.7);
+}
+
+.carved-currency-inner {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px 4px 8px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  box-shadow: inset 0 2px 6px rgba(8, 5, 2, 0.72), inset 0 -1px 0 rgba(255, 240, 198, 0.16);
+}
+
+.carved-currency--eclats .carved-currency-inner {
+  background: linear-gradient(180deg, #274e72 0%, #17304a 100%);
+  color: #eefbff;
+  text-shadow: 0 1.5px 2px rgba(8, 18, 30, 0.85);
+}
+
+.carved-currency--gold .carved-currency-inner {
+  background: linear-gradient(180deg, #563114 0%, #341a08 100%);
+  color: #ffefc4;
+  text-shadow: 0 1.5px 2px rgba(22, 9, 2, 0.85);
+}
+
+.filigree-cap {
+  position: absolute;
+  top: 50%;
+  width: 9px;
+  height: 18px;
+  transform: translateY(-50%);
+  pointer-events: none;
+  background-repeat: no-repeat;
+  background-size: contain;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 24'%3E%3Cpath d='M11 2C5 2 2 6 2 12C2 18 5 22 11 22' fill='none' stroke='%23f7d47c' stroke-width='2.4' stroke-linecap='round'/%3E%3Ccircle cx='3.5' cy='12' r='2.2' fill='%23ffe9a6'/%3E%3C/svg%3E");
+}
+
+.filigree-cap--left {
+  left: -4px;
+}
+
+.filigree-cap--right {
+  right: -4px;
+  transform: translateY(-50%) scaleX(-1);
+}
+
+.eclat-svg {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+  filter: drop-shadow(0 0 4px rgba(82, 236, 255, 0.65));
+}
+
+.eclat-svg--sm {
+  width: 14px;
+  height: 14px;
+}
+
+.gold-coin-svg {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+  filter: drop-shadow(0 1px 2px rgba(22, 10, 2, 0.65));
+}
+
+/* Carved Wooden Sub-Tabs */
 .shop-tabs {
   display: grid;
-  grid-template-columns: 0.88fr 1.04fr 1.24fr;
-  gap: 5px;
+  grid-template-columns: 0.86fr 1.04fr 1.24fr;
+  gap: 6px;
+  margin-top: 2px;
 }
 
 .shop-tab-btn {
+  position: relative;
   appearance: none;
   -webkit-appearance: none;
-  padding: 8px 4px;
-  border-radius: 12px;
-  border: 1.5px solid rgba(246, 208, 128, 0.3);
-  background: rgba(28, 16, 6, 0.62);
-  color: rgba(255, 240, 205, 0.82);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 7px 5px;
+  min-height: 34px;
+  border-radius: 999px;
+  border: 2px solid #966432;
+  background: linear-gradient(180deg, #5d3619 0%, #3d200d 100%);
+  color: #f6e0b8;
   font-family: var(--font-ui);
-  font-size: 10.2px;
+  font-size: 10.5px;
   font-weight: 800;
-  line-height: 1.15;
+  line-height: 1.1;
+  white-space: nowrap;
   cursor: pointer;
   touch-action: manipulation;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  box-shadow:
+    0 3px 6px rgba(24, 10, 3, 0.45),
+    inset 0 1px 0 rgba(255, 224, 174, 0.22),
+    inset 0 -2px 3px rgba(22, 10, 3, 0.55);
   transition: transform 0.14s ease, border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
 }
 
 .shop-tab-btn.is-active {
-  background: linear-gradient(180deg, #f8d47c 0%, #d49632 100%);
-  border-color: #fff2bd;
-  color: #2b1808;
-  box-shadow: 0 4px 14px rgba(240, 178, 56, 0.38), inset 0 1px 0 rgba(255, 252, 232, 0.72);
+  background: linear-gradient(180deg, #ffdd82 0%, #e5a93b 54%, #ba761b 100%);
+  border-color: #fff0b4;
+  color: #321805;
+  text-shadow: 0 1px 0 rgba(255, 246, 208, 0.55);
+  box-shadow:
+    0 4px 12px rgba(240, 174, 48, 0.42),
+    inset 0 1.5px 0 rgba(255, 252, 232, 0.82),
+    inset 0 -2px 4px rgba(132, 72, 10, 0.5);
 }
 
 .shop-tab-btn:active {
   transform: scale(0.94);
 }
 
-.shop-close-btn {
-  appearance: none;
-  -webkit-appearance: none;
-  width: 34px;
-  height: 34px;
-  border-radius: 999px;
-  border: 1.5px solid rgba(247, 212, 138, 0.45);
-  background: rgba(28, 16, 6, 0.72);
-  color: #fdf4df;
-  font-size: 15px;
-  font-weight: 800;
-  cursor: pointer;
-  touch-action: manipulation;
+.tab-icon-svg {
+  width: 13px;
+  height: 13px;
+  flex: 0 0 auto;
 }
 
-.shop-close-btn:active {
-  transform: scale(0.92);
+.shop-tab-btn--tresors {
+  overflow: visible;
+}
+
+.tab-soon-badge {
+  position: absolute;
+  top: -8px;
+  right: 6px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #523015 0%, #311a09 100%);
+  border: 1px solid #d4a458;
+  color: #ffe6b2;
+  font-size: 7.5px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  box-shadow: 0 2px 5px rgba(14, 6, 2, 0.55);
+  pointer-events: none;
 }
 
 .shop-tab-content {
-  padding: 12px 13px 16px;
+  padding: 11px 11px 16px;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 13px;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   touch-action: pan-y;
@@ -923,8 +1104,125 @@ body {
 }
 
 /* ============================================================================
- * FURNITURE SHOP: SÉLECTION DU JOUR, COFFRES MYSTÈRES & CATALOGUE CLASSIQUE
+ * FURNITURE SHOP: SCULPTED SANDSTONE TABLET, CARVED WOOD PLAQUES & CATALOGUE
+ * Faithful to IMG_0645.JPG
  * ========================================================================== */
+.deals-stone-tablet {
+  position: relative;
+  border-radius: 16px;
+  padding: 0 7px 8px;
+  background:
+    repeating-linear-gradient(
+      90deg,
+      rgba(255, 248, 232, 0.05) 0px,
+      rgba(255, 248, 232, 0.05) 1px,
+      transparent 1px,
+      transparent 28px
+    ),
+    linear-gradient(180deg, #cbb390 0%, #b59a75 55%, #9f8461 100%);
+  border: 2px solid #dfd0b4;
+  box-shadow:
+    0 6px 16px rgba(16, 8, 2, 0.52),
+    inset 0 2px 0 rgba(255, 250, 238, 0.65),
+    inset 0 -3px 5px rgba(82, 62, 38, 0.55);
+}
+
+.deals-stone-header {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  margin: 0 -7px 7px;
+  padding: 7px 0 7px 9px;
+  border-bottom: 2px solid rgba(92, 69, 44, 0.45);
+  background: linear-gradient(180deg, #d7c3a3 0%, #bea581 100%);
+  border-radius: 14px 14px 0 0;
+  box-shadow: inset 0 1px 0 rgba(255, 252, 244, 0.72);
+}
+
+/* Chiseled vertical stone block joint crack */
+.deals-stone-header::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: 102px;
+  width: 2px;
+  background: linear-gradient(180deg, rgba(84, 62, 38, 0.48), rgba(255, 246, 224, 0.35));
+  pointer-events: none;
+}
+
+.deals-stone-slab-left {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.sparkle-svg {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+  filter: drop-shadow(0 1px 2px rgba(48, 24, 5, 0.5));
+}
+
+.deals-stone-title {
+  margin: 0;
+  font-size: 14.5px;
+  font-weight: 900;
+  letter-spacing: 0.01em;
+  color: #fff2b8;
+  text-shadow:
+    0 1.5px 0 #5b3812,
+    0 2px 4px rgba(38, 22, 6, 0.65);
+}
+
+.deals-stone-slab-right {
+  position: relative;
+  display: flex;
+  align-items: center;
+  margin-right: -11px;
+}
+
+/* Folded Red PROMO Ribbon Banner wrapping over right stone edge */
+.promo-folded-ribbon {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 14px 4px 16px;
+  background: linear-gradient(180deg, #e53a3a 0%, #bc1f24 62%, #981419 100%);
+  color: #fffaf0;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.05em;
+  text-shadow: 0 1.5px 2px rgba(72, 8, 10, 0.78);
+  border-radius: 3px 6px 2px 3px;
+  box-shadow:
+    0 3px 8px rgba(42, 6, 8, 0.5),
+    inset 0 1px 0 rgba(255, 190, 184, 0.55);
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%, 7px 50%);
+}
+
+/* Folded underside shadow flap */
+.promo-folded-ribbon::after {
+  content: "";
+  position: absolute;
+  right: 0;
+  bottom: -5px;
+  width: 7px;
+  height: 5px;
+  background: #610a0d;
+  clip-path: polygon(0 0, 100% 0, 0 100%);
+}
+
+.deals-stone-well {
+  padding: 5px;
+  border-radius: 11px;
+  background: rgba(64, 46, 28, 0.42);
+  box-shadow: inset 0 2px 6px rgba(34, 22, 10, 0.58), 0 1px 0 rgba(255, 248, 232, 0.4);
+}
+
 .shop-section {
   display: flex;
   flex-direction: column;
@@ -936,37 +1234,39 @@ body {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
+  padding: 0 2px;
 }
 
 .shop-section-title {
   margin: 0;
-  font-size: 13.5px;
-  font-weight: 800;
-  color: #ffe28e;
-  letter-spacing: 0.015em;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14.5px;
+  font-weight: 900;
+  color: #ffefc0;
+  letter-spacing: 0.01em;
+  text-shadow: 0 1.5px 3px rgba(18, 8, 2, 0.75);
 }
 
-.shop-section-tag {
-  padding: 2px 8px;
-  border-radius: 999px;
-  background: linear-gradient(180deg, #ff7048 0%, #c9331d 100%);
-  color: #fff9ef;
-  font-size: 10px;
-  font-weight: 900;
-  letter-spacing: 0.05em;
-  box-shadow: 0 2px 8px rgba(201, 51, 29, 0.45);
+.section-icon-svg {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+  filter: drop-shadow(0 1.5px 2px rgba(18, 8, 2, 0.55));
 }
 
 .shop-section-sub {
-  font-size: 11px;
+  font-size: 11.5px;
   font-weight: 700;
-  color: rgba(246, 230, 198, 0.72);
+  color: #f0d7ac;
+  text-shadow: 0 1px 2px rgba(18, 8, 2, 0.65);
 }
 
 .deals-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 7px;
+  gap: 6px;
 }
 
 .catalog-grid {
@@ -975,31 +1275,50 @@ body {
   gap: 9px;
 }
 
+/* Carved Furniture Cards (Promo & Catalogue) */
 .furniture-card {
   position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 5px;
-  padding: 9px 7px 8px;
-  border-radius: 15px;
-  background: rgba(24, 13, 4, 0.6);
-  border: 1.5px solid rgba(240, 198, 114, 0.28);
+  padding: 23px 6px 7px;
+  border-radius: 13px;
+  background: linear-gradient(180deg, #3c2f23 0%, #271e16 100%);
+  border: 2px solid #8c7455;
+  box-shadow:
+    0 4px 10px rgba(14, 7, 2, 0.48),
+    inset 0 1px 0 rgba(255, 238, 200, 0.2),
+    inset 0 0 14px rgba(0, 0, 0, 0.25);
   text-align: center;
+  transition: transform 0.14s cubic-bezier(0.22, 1.32, 0.36, 1);
+}
+
+.furniture-card:active {
+  transform: scale(0.96);
 }
 
 .furniture-card[data-rarity="rare"] {
-  border-color: rgba(110, 196, 255, 0.42);
+  background: linear-gradient(180deg, #2a3a4f 0%, #1b2535 100%);
+  border-color: #668fbe;
 }
 
 .furniture-card[data-rarity="legendaire"] {
-  border-color: rgba(255, 210, 90, 0.56);
-  background: linear-gradient(180deg, rgba(64, 42, 12, 0.65) 0%, rgba(28, 15, 5, 0.7) 100%);
+  background: linear-gradient(180deg, #543714 0%, #2d1b08 100%);
+  border-color: #e4b550;
 }
 
 .furniture-card.is-owned {
-  border-color: rgba(154, 224, 132, 0.58);
-  background: rgba(30, 48, 24, 0.52);
+  background: linear-gradient(180deg, #434f24 0%, #2b3516 100%);
+  border-color: #93ab52;
+}
+
+.furniture-card--catalog {
+  padding: 10px 8px 9px;
+  border-radius: 15px;
+  box-shadow:
+    0 5px 12px rgba(14, 7, 2, 0.5),
+    inset 0 1px 0 rgba(255, 238, 200, 0.22);
 }
 
 .promo-ribbon {
@@ -1008,11 +1327,13 @@ body {
   left: 5px;
   padding: 2px 6px;
   border-radius: 999px;
-  background: linear-gradient(180deg, #ff6a42 0%, #c72e19 100%);
-  color: #fff9ef;
-  font-size: 8.5px;
+  background: linear-gradient(180deg, #e03434 0%, #9f161b 100%);
+  border: 1px solid rgba(255, 180, 174, 0.45);
+  color: #fffaf0;
+  font-size: 8.2px;
   font-weight: 900;
   letter-spacing: 0.04em;
+  box-shadow: 0 2px 5px rgba(42, 6, 8, 0.45);
   z-index: 2;
 }
 
@@ -1023,9 +1344,9 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 12px;
-  background: radial-gradient(circle at 50% 62%, rgba(255, 228, 165, 0.22) 0%, rgba(255, 228, 165, 0.02) 72%);
-  padding: 4px;
+  border-radius: 10px;
+  background: radial-gradient(circle at 50% 66%, rgba(255, 232, 176, 0.16) 0%, transparent 72%);
+  padding: 2px;
 }
 
 .furniture-card--deal .furniture-thumb {
@@ -1036,80 +1357,122 @@ body {
   max-width: 100%;
   max-height: 100%;
   object-fit: contain;
-  filter: drop-shadow(0 5px 8px rgba(10, 5, 1, 0.5));
+  filter: drop-shadow(0 5px 7px rgba(10, 5, 1, 0.55));
 }
 
 .furniture-name {
-  color: #fff7e2;
+  color: #fff8e8;
   font-size: 11.5px;
   font-weight: 800;
-  line-height: 1.2;
+  line-height: 1.18;
   min-height: 27px;
   display: flex;
   align-items: center;
   justify-content: center;
+  text-shadow: 0 1px 2px rgba(14, 7, 2, 0.78);
 }
 
 .furniture-card--deal .furniture-name {
-  font-size: 10.2px;
+  font-size: 10px;
   min-height: 24px;
 }
 
+/* Rarity Pills matching IMG_0645.JPG (Sapphire-Slate Rare / Forest-Slate Commun / Gold Légendaire) */
 .rarity-badge {
   display: inline-block;
-  padding: 2px 7px;
+  padding: 2px 8px;
   border-radius: 999px;
-  font-size: 9.2px;
+  font-size: 9px;
   font-weight: 800;
-  letter-spacing: 0.03em;
-  color: var(--rarity-color, #9ad6a8);
-  background: rgba(14, 10, 6, 0.58);
-  border: 1px solid var(--rarity-color, #9ad6a8);
+  letter-spacing: 0.02em;
+  color: #e6f4ff;
+  background: rgba(24, 34, 46, 0.85);
+  border: 1.3px solid var(--rarity-color, #9ad6a8);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.45);
 }
 
+.rarity-badge--rare {
+  background: linear-gradient(180deg, #253d5c 0%, #192b42 100%);
+  border-color: #6eaef0;
+  color: #d6ecff;
+}
+
+.rarity-badge--commun {
+  background: linear-gradient(180deg, #28422b 0%, #1b2f1e 100%);
+  border-color: #7bbf72;
+  color: #d7f5d0;
+}
+
+.rarity-badge--legendaire {
+  background: linear-gradient(180deg, #5c3d12 0%, #3b2408 100%);
+  border-color: #f7c954;
+  color: #ffefc0;
+}
+
+/* Embossed Carved Stone & Gold Purchase Buttons */
 .furniture-buy-btn {
   margin-top: auto;
   width: 100%;
   appearance: none;
   -webkit-appearance: none;
-  border: 1.5px solid rgba(154, 228, 255, 0.72);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  border: 2px solid #c79c56;
   border-radius: 999px;
-  padding: 6px 8px;
-  background: linear-gradient(180deg, #56c2f0 0%, #2678b5 100%);
-  color: #f4fcff;
+  padding: 5px 5px;
+  min-height: 28px;
+  background: linear-gradient(180deg, #2b4562 0%, #1a2d42 100%);
+  color: #fff2c6;
   font-family: var(--font-ui);
   font-size: 11px;
   font-weight: 800;
   font-variant-numeric: tabular-nums;
+  text-shadow: 0 1px 2px rgba(8, 16, 26, 0.85);
+  box-shadow:
+    0 2px 5px rgba(10, 5, 1, 0.5),
+    inset 0 1px 0 rgba(255, 240, 200, 0.25),
+    inset 0 -2px 3px rgba(10, 18, 28, 0.65);
   cursor: pointer;
   touch-action: manipulation;
   transition: transform 0.12s ease, opacity 0.15s ease;
 }
 
 .furniture-buy-btn:active:not(:disabled) {
-  transform: scale(0.94);
+  transform: scale(0.93);
 }
 
 .furniture-buy-btn:disabled:not(.is-owned) {
-  opacity: 0.42;
+  opacity: 0.48;
   cursor: not-allowed;
 }
 
 .furniture-buy-btn.is-owned {
-  background: rgba(84, 152, 74, 0.88);
-  border-color: rgba(190, 242, 168, 0.7);
-  color: #f4ffef;
+  background: linear-gradient(180deg, #747533 0%, #4e501e 100%);
+  border-color: #d6cb7a;
+  color: #fff8d4;
   cursor: default;
 }
 
 .price-old {
+  position: relative;
   text-decoration: line-through;
-  opacity: 0.72;
+  text-decoration-color: #e64242;
+  text-decoration-thickness: 1.8px;
+  color: rgba(232, 224, 212, 0.78);
   font-size: 9.5px;
-  margin-right: 2px;
+  margin-right: 1px;
 }
 
-/* Loot Box Store Cards */
+.price-val {
+  color: #fff2c2;
+  font-weight: 900;
+}
+
+/* ============================================================================
+ * COFFRES MYSTÈRES — HORIZONTAL CARVED WOODEN PLAQUES WITH GOLD FILIGREE
+ * ========================================================================== */
 .lootbox-grid {
   display: flex;
   flex-direction: column;
@@ -1117,19 +1480,34 @@ body {
 }
 
 .lootbox-card {
+  position: relative;
   appearance: none;
   -webkit-appearance: none;
   width: 100%;
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 10px 12px;
-  border-radius: 16px;
+  gap: 9px;
+  padding: 8px 10px 8px 10px;
+  border-radius: 14px;
   text-align: left;
   cursor: pointer;
   touch-action: manipulation;
   font-family: var(--font-ui);
-  transition: transform 0.14s ease, filter 0.14s ease, opacity 0.15s ease;
+  background:
+    repeating-linear-gradient(
+      0deg,
+      rgba(255, 224, 170, 0.03) 0px,
+      rgba(255, 224, 170, 0.03) 2px,
+      rgba(16, 7, 2, 0.1) 2px,
+      rgba(16, 7, 2, 0.1) 11px
+    ),
+    linear-gradient(180deg, #5d3518 0%, #46250f 55%, #341a09 100%);
+  border: 2.5px solid #d49f47;
+  box-shadow:
+    0 5px 12px rgba(12, 5, 1, 0.56),
+    inset 0 1.5px 0 rgba(255, 232, 176, 0.32),
+    inset 0 0 0 2px rgba(42, 20, 6, 0.75);
+  transition: transform 0.14s cubic-bezier(0.22, 1.32, 0.36, 1), filter 0.14s ease, opacity 0.15s ease;
 }
 
 .lootbox-card:active:not(:disabled) {
@@ -1137,37 +1515,60 @@ body {
 }
 
 .lootbox-card:disabled {
-  opacity: 0.48;
+  opacity: 0.55;
   cursor: not-allowed;
 }
 
-.lootbox-card--classic {
-  background: linear-gradient(135deg, rgba(132, 82, 36, 0.85) 0%, rgba(74, 42, 16, 0.92) 100%);
-  border: 1.5px solid #e6b86a;
-}
-
 .lootbox-card--royal {
-  background: linear-gradient(135deg, rgba(32, 86, 134, 0.9) 0%, rgba(22, 46, 86, 0.95) 100%);
-  border: 1.5px solid #76d4ff;
-  box-shadow: 0 4px 16px rgba(56, 178, 240, 0.24);
+  border-color: #dfae52;
 }
 
 .lootbox-card--legendary {
-  background: linear-gradient(135deg, rgba(162, 102, 22, 0.92) 0%, rgba(96, 36, 102, 0.94) 100%);
-  border: 1.5px solid #ffe076;
-  box-shadow: 0 6px 20px rgba(255, 206, 78, 0.3);
+  border-color: #f3c862;
+  box-shadow:
+    0 6px 16px rgba(18, 8, 2, 0.62),
+    0 0 14px rgba(255, 204, 84, 0.2),
+    inset 0 1.5px 0 rgba(255, 240, 188, 0.42),
+    inset 0 0 0 2px rgba(56, 26, 8, 0.75);
 }
 
-.lootbox-emblem {
-  flex: 0 0 40px;
-  height: 40px;
-  border-radius: 12px;
-  background: rgba(18, 10, 4, 0.42);
-  border: 1px solid rgba(255, 238, 186, 0.35);
+/* Ornate Golden Filigree Corner Brackets matching IMG_0645.JPG */
+.plaque-corner {
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  pointer-events: none;
+  background-repeat: no-repeat;
+  background-size: contain;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3E%3Cpath d='M2 18V5C2 3.3 3.3 2 5 2H18L13 6.5H6.5V13L2 18Z' fill='%23e8b552' stroke='%2363390c' stroke-width='1.1'/%3E%3Ccircle cx='5.5' cy='5.5' r='1.7' fill='%23fff1b4'/%3E%3C/svg%3E");
+}
+
+.plaque-corner--tl { top: 1px; left: 1px; }
+.plaque-corner--tr { top: 1px; right: 1px; transform: scaleX(-1); }
+.plaque-corner--bl { bottom: 1px; left: 1px; transform: scaleY(-1); }
+.plaque-corner--br { bottom: 1px; right: 1px; transform: scale(-1, -1); }
+
+.lootbox-art-wrap {
+  flex: 0 0 56px;
+  height: 54px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 21px;
+  position: relative;
+  z-index: 1;
+}
+
+.lootbox-chest-img {
+  width: 58px;
+  height: 58px;
+  object-fit: contain;
+  filter: drop-shadow(0 4px 6px rgba(12, 5, 1, 0.65));
+}
+
+.lootbox-card--legendary .lootbox-chest-img {
+  width: 62px;
+  height: 62px;
+  filter: drop-shadow(0 0 10px rgba(255, 206, 86, 0.55));
 }
 
 .lootbox-info {
@@ -1176,30 +1577,45 @@ body {
   display: flex;
   flex-direction: column;
   gap: 2px;
+  z-index: 1;
 }
 
 .lootbox-name {
-  color: #fff8e6;
-  font-size: 13.5px;
-  font-weight: 800;
+  color: #fff9ec;
+  font-size: 14px;
+  font-weight: 900;
+  text-shadow: 0 1.5px 2px rgba(18, 8, 2, 0.85);
 }
 
 .lootbox-desc {
-  color: rgba(255, 242, 214, 0.82);
-  font-size: 11px;
-  line-height: 1.25;
+  color: #e8cfa4;
+  font-size: 10.8px;
+  font-weight: 600;
+  line-height: 1.24;
 }
 
-.lootbox-price-pill {
+/* Chiseled Recessed Slate-Stone Éclat Price Button on Right */
+.lootbox-stone-price {
   flex: 0 0 auto;
-  padding: 7px 11px;
-  border-radius: 999px;
-  background: rgba(18, 28, 52, 0.86);
-  border: 1.5px solid #8ce0ff;
-  color: #bdf0ff;
-  font-size: 12px;
+  min-width: 68px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 8px 10px;
+  border-radius: 9px;
+  background: linear-gradient(180deg, #4b5864 0%, #313b45 55%, #232b33 100%);
+  border: 2px solid #1b2128;
+  box-shadow:
+    0 2px 6px rgba(10, 5, 1, 0.58),
+    inset 0 1.5px 0 rgba(206, 224, 240, 0.35),
+    inset 0 -2px 3px rgba(12, 16, 22, 0.72);
+  color: #fff6df;
+  font-size: 13.5px;
   font-weight: 900;
   font-variant-numeric: tabular-nums;
+  text-shadow: 0 1.5px 2px rgba(10, 14, 20, 0.85);
+  z-index: 1;
 }
 
 /* Trésors • Bientôt Tab */
@@ -1985,14 +2401,16 @@ body {
   position: absolute;
   top: 5px;
   right: 5px;
-  padding: 2px 5px;
+  padding: 2px 6px;
   border-radius: 6px;
-  background: rgba(24, 15, 6, 0.82);
-  border: 1px solid rgba(255, 222, 128, 0.56);
-  color: #ffe390;
-  font-size: 8.5px;
+  background: linear-gradient(180deg, #e0b86c 0%, #a07335 100%);
+  border: 1px solid #ffe8a8;
+  box-shadow: 0 2px 4px rgba(14, 7, 2, 0.5), inset 0 1px 0 rgba(255, 250, 224, 0.55);
+  color: #2b1504;
+  font-size: 9px;
   font-weight: 900;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.03em;
+  line-height: 1.1;
   z-index: 2;
 }
 
@@ -2023,7 +2441,7 @@ body {
   border-radius: 24px;
   background: linear-gradient(180deg, #5d381b 0%, #331c0b 100%);
   border: 2.5px solid #f0c467;
-  box-shadow: 0 24px 56px rgba(8, 4, 1, 0.72), inset 0 2px 0 rgba(255, 244, 206, 0.34);
+  box-shadow: 0 24px 56px rgba(8, 4, 1, 0.72), 0 0 0 2px #6b3d14, inset 0 2px 0 rgba(255, 244, 206, 0.34);
   overflow: hidden;
   transform: scale(0.94);
   transition: transform 0.24s cubic-bezier(0.22, 1.32, 0.36, 1);
@@ -2040,8 +2458,18 @@ body {
   justify-content: space-between;
   gap: 10px;
   padding: 13px 14px 10px;
-  border-bottom: 1px solid rgba(246, 208, 128, 0.24);
-  background: rgba(20, 11, 4, 0.38);
+  border-bottom: 2px solid #c99640;
+  background: linear-gradient(180deg, #985f2c 0%, #6f3f17 100%);
+}
+
+.preview-header .shop-close-btn {
+  position: static;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  color: #ffe28c;
+  font-size: 16px;
+  font-weight: 900;
 }
 
 .preview-title-wrap {

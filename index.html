@@ -98,25 +98,51 @@
       </nav>
     </section>
 
-    <!-- OVERHAULED BOUTIQUE MODAL (3 Sub-Tabs: Meubles • Améliorations • Trésors) -->
+    <!-- OVERHAULED BOUTIQUE MODAL (Carved Wood, Stone & Gold UI faithful to IMG_0645.JPG) -->
     <div id="shop-modal" class="shop-modal" hidden role="dialog" aria-modal="true" aria-labelledby="shop-title">
       <div id="shop-backdrop" class="shop-backdrop"></div>
       <div class="shop-panel">
         <div class="shop-header">
+          <button id="shop-close-btn" class="shop-close-btn" type="button" aria-label="Fermer la boutique">
+            <span class="shop-close-inner" aria-hidden="true">
+              <svg viewBox="0 0 24 24" class="shop-close-x"><path d="M6.5 6.5L17.5 17.5M17.5 6.5L6.5 17.5" stroke="currentColor" stroke-width="3.4" stroke-linecap="round"/></svg>
+            </span>
+          </button>
+
           <div class="shop-header-top">
             <h1 id="shop-title" class="shop-title">Boutique</h1>
-            <button id="shop-close-btn" class="shop-close-btn" type="button" aria-label="Fermer la boutique">✕</button>
           </div>
+
           <div class="shop-currencies">
-            <div class="token-pill coin-pill--sm">
-              <span class="coin-icon" aria-hidden="true">💠</span>
-              <span id="shop-tokens-val">45 Éclats</span>
+            <div class="carved-currency carved-currency--eclats">
+              <span class="filigree-cap filigree-cap--left" aria-hidden="true"></span>
+              <span class="carved-currency-inner">
+                <svg class="eclat-svg" viewBox="0 0 24 24" aria-hidden="true">
+                  <polygon points="12,1.5 22,12 12,22.5 2,12" fill="#18a8c7" stroke="#b6ffff" stroke-width="1.2"/>
+                  <polygon points="12,1.5 18,12 12,12" fill="#b8ffff"/>
+                  <polygon points="12,1.5 6,12 12,12" fill="#5cefff"/>
+                  <polygon points="12,22.5 18,12 12,12" fill="#0d7a9c"/>
+                  <polygon points="12,22.5 6,12 12,12" fill="#29d2e8"/>
+                </svg>
+                <span id="shop-tokens-val">45 Éclats</span>
+              </span>
+              <span class="filigree-cap filigree-cap--right" aria-hidden="true"></span>
             </div>
-            <div class="coin-pill coin-pill--sm">
-              <span class="coin-icon" aria-hidden="true">🪙</span>
-              <span id="shop-coins-val">100 Or</span>
+
+            <div class="carved-currency carved-currency--gold">
+              <span class="filigree-cap filigree-cap--left" aria-hidden="true"></span>
+              <span class="carved-currency-inner">
+                <svg class="gold-coin-svg" viewBox="0 0 24 24" aria-hidden="true">
+                  <circle cx="12" cy="12" r="10.2" fill="#d99422" stroke="#ffea9c" stroke-width="1.5"/>
+                  <circle cx="12" cy="12" r="7.4" fill="#f7c84c" stroke="#9e6212" stroke-width="1.1"/>
+                  <path d="M12 7.2L15.6 12L12 16.8L8.4 12Z" fill="#ffe999" stroke="#a66812" stroke-width="0.9"/>
+                </svg>
+                <span id="shop-coins-val">100 Or</span>
+              </span>
+              <span class="filigree-cap filigree-cap--right" aria-hidden="true"></span>
             </div>
           </div>
+
           <div class="shop-tabs" role="tablist" aria-label="Catégories de la boutique">
             <button
               type="button"
@@ -125,7 +151,10 @@
               aria-selected="true"
               data-shop-tab="meubles"
             >
-              🪑 Meubles
+              <svg class="tab-icon-svg" viewBox="0 0 20 20" aria-hidden="true">
+                <path d="M5 3h2.2v6h5.6v2.2H5V3zm0 8.2h2v5.8H5v-5.8zm8 0h2v5.8h-2v-5.8z" fill="currentColor"/>
+              </svg>
+              <span>Meubles</span>
             </button>
             <button
               type="button"
@@ -134,16 +163,23 @@
               aria-selected="false"
               data-shop-tab="ameliorations"
             >
-              ⛏️ Améliorations
+              <svg class="tab-icon-svg" viewBox="0 0 20 20" aria-hidden="true">
+                <path d="M4.5 14.5l6.8-6.8 1.4 1.4-6.8 6.8-1.4-1.4zm5.2-8.8c1.9-1.1 4.4-.9 6.2.6l-1.5 1.5c-1-.6-2.3-.7-3.4-.2l-1.3-1.9zm1.7 5.2l4.2 4.2-1.4 1.4-4.2-4.2 1.4-1.4z" fill="currentColor"/>
+              </svg>
+              <span>Améliorations</span>
             </button>
             <button
               type="button"
-              class="shop-tab-btn"
+              class="shop-tab-btn shop-tab-btn--tresors"
               role="tab"
               aria-selected="false"
               data-shop-tab="tresors"
             >
-              🏺 Trésors • Bientôt
+              <span class="tab-soon-badge" aria-hidden="true">Bientôt</span>
+              <svg class="tab-icon-svg" viewBox="0 0 20 20" aria-hidden="true">
+                <path d="M6.5 4h7l-1 2.2h-5L6.5 4zm-.8 3.2h8.6c1 1.6 1.2 4.6-.4 7.3-.7 1.1-1.9 1.8-3.9 1.8s-3.2-.7-3.9-1.8c-1.6-2.7-1.4-5.7-.4-7.3z" fill="currentColor"/>
+              </svg>
+              <span>Trésors • Bientôt</span>
             </button>
           </div>
         </div>
