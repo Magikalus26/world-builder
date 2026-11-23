@@ -238,6 +238,33 @@ export class WorldMapScene {
           metalness: 0.18,
         })
       ),
+      mayaJungle: this._trackMat(
+        new THREE.MeshStandardMaterial({
+          color: new THREE.Color('#3f7f44'),
+          roughness: 0.86,
+        })
+      ),
+      mayaStone: this._trackMat(
+        new THREE.MeshStandardMaterial({
+          color: new THREE.Color('#cfc39c'),
+          roughness: 0.82,
+        })
+      ),
+      mayaRedOchre: this._trackMat(
+        new THREE.MeshStandardMaterial({
+          color: new THREE.Color('#ad412d'),
+          roughness: 0.7,
+        })
+      ),
+      mayaJade: this._trackMat(
+        new THREE.MeshStandardMaterial({
+          color: new THREE.Color('#22b47c'),
+          emissive: new THREE.Color('#0c4c34'),
+          emissiveIntensity: 0.25,
+          roughness: 0.28,
+          metalness: 0.2,
+        })
+      ),
       lockStone: this._trackMat(
         new THREE.MeshStandardMaterial({
           color: new THREE.Color('#9e978b'),
@@ -427,6 +454,7 @@ export class WorldMapScene {
     this._buildEgyptIsland();
     this._buildRomeIsland();
     this._buildChinaIsland();
+    this._buildMayaIsland();
   }
 
   _addIslandBadge(parent, label, unlocked, yHeight) {
@@ -1050,8 +1078,153 @@ export class WorldMapScene {
     this.nodes.push(node);
   }
 
+  /**
+   * Level 4 — Maya : Le Temple Maya de Kukulcán (UNLOCKED & PLAYABLE — 52 blocs)
+   */
+  _buildMayaIsland() {
+    const pos = new THREE.Vector3(4.35, 0, -4.35);
+    const group = new THREE.Group();
+    group.position.copy(pos);
+    this.root.add(group);
+
+    // Lush tropical Yucatán jungle island mound
+    const moundGeo = this._trackGeo(createIslandMoundGeometry(2.45, 2.25, 0.7, 9.2));
+    const mound = new THREE.Mesh(moundGeo, this.mats.mayaJungle);
+    mound.position.y = 0.14;
+    mound.castShadow = true;
+    mound.receiveShadow = true;
+    group.add(mound);
+    this._addShoreFoamRing(group, 2.58, 2.38);
+
+    // Glowing golden base ring indicating UNLOCKED & PLAYABLE
+    const ringGeo = this._trackGeo(new THREE.RingGeometry(2.76, 3.02, 36));
+    ringGeo.rotateX(-Math.PI / 2);
+    const ringMesh = new THREE.Mesh(ringGeo, this.mats.goldRing);
+    ringMesh.position.y = 0.11;
+    ringMesh.scale.set(1, 1, 2.52 / 2.76);
+    group.add(ringMesh);
+
+    const haloGeo = this._trackGeo(new THREE.RingGeometry(3.02, 3.4, 36));
+    haloGeo.rotateX(-Math.PI / 2);
+    const haloMesh = new THREE.Mesh(haloGeo, this.mats.goldHalo);
+    haloMesh.position.y = 0.095;
+    haloMesh.scale.set(1, 1, 2.52 / 2.76);
+    group.add(haloMesh);
+
+    this.unlockedRings.push({
+      nodeId: 'level4_maya',
+      ringMesh,
+      haloMesh,
+      ratioZ: 2.52 / 2.76,
+      phase: 4.65,
+    });
+
+    // Miniature crystal-turquoise Sacred Cenote sinkhole ringed by mossy rocks
+    const cenote = new THREE.Mesh(
+      this._trackGeo(new THREE.CircleGeometry(0.52, 16)),
+      this.textures.materials.oasisWater
+    );
+    cenote.rotation.x = -Math.PI / 2;
+    cenote.position.set(1.12, 0.72, -0.58);
+    group.add(cenote);
+
+    const rockGeo = this._trackGeo(new THREE.DodecahedronGeometry(0.14, 0));
+    for (let r = 0; r < 6; r++) {
+      const a = (r / 6) * Math.PI * 2;
+      const rk = new THREE.Mesh(rockGeo, this.mats.mayaStone);
+      rk.position.set(1.12 + Math.cos(a) * 0.54, 0.76, -0.58 + Math.sin(a) * 0.48);
+      group.add(rk);
+    }
+
+    // Miniature 3D Mayan Stepped Temple of Kukulcán (3 limestone tiers + front stair + red-ochre shrine + jade crest)
+    const temple = new THREE.Group();
+    temple.position.set(-0.22, 0.74, 0.14);
+    temple.rotation.y = -0.18;
+
+    [
+      { w: 1.48, h: 0.24, y: 0.12, mat: this.mats.mayaStone },
+      { w: 1.12, h: 0.24, y: 0.36, mat: this.mats.mayaStone },
+      { w: 0.78, h: 0.22, y: 0.59, mat: this.mats.mayaRedOchre },
+    ].forEach((t) => {
+      const tier = new THREE.Mesh(this._trackGeo(new THREE.BoxGeometry(t.w, t.h, t.w)), t.mat);
+      tier.position.y = t.y;
+      tier.castShadow = true;
+      tier.receiveShadow = true;
+      temple.add(tier);
+    });
+
+    // Front ceremonial staircase climbing up the South face
+    const stair = new THREE.Mesh(
+      this._trackGeo(new THREE.BoxGeometry(0.32, 0.72, 0.55)),
+      this.mats.mayaStone
+    );
+    stair.position.set(0, 0.34, 0.56);
+    stair.rotation.x = -0.52;
+    stair.castShadow = true;
+    temple.add(stair);
+
+    // Summit temple shrine + carved roof comb + gleaming emerald-jade crest jewel
+    const shrine = new THREE.Mesh(
+      this._trackGeo(new THREE.BoxGeometry(0.52, 0.28, 0.44)),
+      this.mats.mayaRedOchre
+    );
+    shrine.position.set(0, 0.84, -0.04);
+    shrine.castShadow = true;
+    temple.add(shrine);
+
+    const comb = new THREE.Mesh(
+      this._trackGeo(new THREE.BoxGeometry(0.46, 0.18, 0.12)),
+      this.mats.mayaRedOchre
+    );
+    comb.position.set(0, 1.06, -0.1);
+    temple.add(comb);
+
+    const jadeJewel = new THREE.Mesh(
+      this._trackGeo(new THREE.OctahedronGeometry(0.085, 0)),
+      this.mats.mayaJade
+    );
+    jadeJewel.position.set(0, 1.19, -0.1);
+    temple.add(jadeJewel);
+
+    group.add(temple);
+
+    // Tropical Jungle Palms & Ceiba trees framing the temple
+    this._createMiniPalm(group, -1.35, 0.65, 0.58, 0.78, 0.18);
+    this._createMiniPalm(group, 1.25, 0.65, 0.68, 0.74, -0.18);
+    this._createMiniPalm(group, -1.18, 0.68, -0.82, 0.82, 0.12);
+
+    // Floating crisp diegetic label
+    const badge = this._addIslandBadge(group, 'Niveau 4 • Jouable', true, 2.85);
+
+    // Generous touch hitbox
+    const hitGeo = this._trackGeo(new THREE.CylinderGeometry(2.6, 2.7, 2.5, 12));
+    const hitbox = new THREE.Mesh(hitGeo, this.mats.hitbox);
+    hitbox.position.y = 1.15;
+    group.add(hitbox);
+
+    const node = {
+      id: 'level4_maya',
+      levelIndex: 3,
+      unlocked: true,
+      title: 'Niveau 4 : Le Temple Maya de Kukulcán (52 blocs)',
+      shortLabel: 'Maya',
+      position: pos,
+      focusDistance: 17.5,
+      focusElevation: 40,
+      focusAzimuth: -0.22,
+      group,
+      badge,
+      hitbox,
+      bounceTime: 0,
+    };
+
+    hitbox.userData.interact = { type: 'map-node', node };
+    mound.userData.interact = { type: 'map-node', node };
+    this.nodes.push(node);
+  }
+
   /* ============================================================================
-   * 4. DOTTED STONE ROAD CONNECTING THE 3 CIVILIZATION ISLANDS
+   * 4. DOTTED STONE ROAD CONNECTING THE 4 CIVILIZATION ISLANDS
    * ========================================================================== */
   _buildDottedStoneRoads() {
     const stoneGeo = this._trackGeo(new THREE.CylinderGeometry(0.24, 0.29, 0.22, 8));
@@ -1086,6 +1259,15 @@ export class WorldMapScene {
       new THREE.Vector3(1.15, 0, -3.55),
       new THREE.Vector3(-0.05, 0, -3.95),
       6,
+      this.textures.materials.foundation
+    );
+
+    // Road Segment 3: Japon -> Maya (UNLOCKED)
+    layCurve(
+      new THREE.Vector3(0.45, 0, -4.55),
+      new THREE.Vector3(1.55, 0, -5.05),
+      new THREE.Vector3(2.45, 0, -4.55),
+      5,
       this.textures.materials.foundation
     );
   }

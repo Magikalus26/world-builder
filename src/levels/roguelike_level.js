@@ -371,6 +371,122 @@ export const ROGUELIKE_THEMES = [
       },
     ],
   },
+  {
+    id: 'maya',
+    levelNum: 4,
+    shortName: 'Maya',
+    title: 'Niveau 4 : Maya — Jungle du Yucatán',
+    biomeLabel: 'Jungle Émeraude, Calcaire & Cénote',
+    skyColor: '#cde8dc',
+    terrainTint: '#cce2c6',
+    stoneTint: '#eee4c4',
+    accentColor: '#36d692',
+    rewardRangeLabel: '+30 à +55 Éclats',
+    structures: [
+      {
+        id: 'maya_kukulkan_pyramid',
+        name: 'La Pyramide à Degrés de Kukulcán',
+        subtitle: 'Pyramide sacrée à 4 gradins & crête',
+        // 16 + 9 + 4 + 4 + 1 = 34 blocks
+        layers: [
+          { cells: makeRectCells(4, 4) },
+          { cells: makeRectCells(3, 3) },
+          { cells: makeRectCells(2, 2) },
+          { cells: makeRectCells(2, 2) },
+          { cells: [[0, 0]], isCapstone: true },
+        ],
+      },
+      {
+        id: 'maya_el_caracol',
+        name: "L'Observatoire Astronomique El Caracol",
+        subtitle: 'Tour octogonale & dôme céleste maya',
+        // 12 + 9 + 4 + 2 + 1 = 28 blocks
+        layers: [
+          { cells: makeRectCells(4, 4, true) },
+          { cells: makeRectCells(3, 3) },
+          { cells: makeRectCells(2, 2) },
+          { cells: [[-0.5, 0], [0.5, 0]] },
+          { cells: [[0, 0]], isCapstone: true },
+        ],
+      },
+      {
+        id: 'maya_ballcourt',
+        name: 'Le Jeu de Pelote Maya',
+        subtitle: 'Doubles remparts inclinés & anneaux sacrés',
+        // 12 + 12 + 6 = 30 blocks
+        layers: [
+          {
+            cells: [
+              [-2, -1], [-1, -1], [-2, 0], [-1, 0], [-2, 1], [-1, 1],
+              [1, -1], [2, -1], [1, 0], [2, 0], [1, 1], [2, 1],
+            ],
+          },
+          {
+            cells: [
+              [-2, -1], [-1, -1], [-2, 0], [-1, 0], [-2, 1], [-1, 1],
+              [1, -1], [2, -1], [1, 0], [2, 0], [1, 1], [2, 1],
+            ],
+          },
+          {
+            cells: [
+              [-2, -1], [-2, 0], [-2, 1],
+              [2, -1], [2, 0], [2, 1],
+            ],
+          },
+        ],
+      },
+      {
+        id: 'maya_labna_arch',
+        name: "L'Arc Cérémoniel de Labná",
+        subtitle: 'Arche à encorbellement & crête faîtière',
+        // 8 + 8 + 5 + 3 = 24 blocks
+        layers: [
+          {
+            cells: [
+              [-2, -0.5], [-1, -0.5], [-2, 0.5], [-1, 0.5],
+              [1, -0.5], [2, -0.5], [1, 0.5], [2, 0.5],
+            ],
+          },
+          {
+            cells: [
+              [-2, -0.5], [-1, -0.5], [-2, 0.5], [-1, 0.5],
+              [1, -0.5], [2, -0.5], [1, 0.5], [2, 0.5],
+            ],
+          },
+          {
+            cells: [[-2, 0], [-1, 0], [0, 0], [1, 0], [2, 0]],
+          },
+          {
+            cells: [[-1, 0], [0, 0], [1, 0]],
+          },
+        ],
+      },
+      {
+        id: 'maya_cenote_sanctuary',
+        name: 'Le Sanctuaire du Cénote Sacré',
+        subtitle: 'Portique à piliers & autel cérémoniel',
+        // 12 + 8 + 10 + 2 = 32 blocks
+        layers: [
+          { cells: makeRectCells(4, 3) },
+          {
+            cells: [
+              [-1.5, -1], [-0.5, -1], [0.5, -1], [1.5, -1],
+              [-0.5, 0], [0.5, 0],
+              [-1.5, 1], [1.5, 1],
+            ],
+          },
+          {
+            cells: [
+              [-1.5, -1], [-0.5, -1], [0.5, -1], [1.5, -1],
+              [-1.5, 0], [1.5, 0],
+              [-1.5, 1], [-0.5, 1], [0.5, 1], [1.5, 1],
+            ],
+          },
+          { cells: [[-0.5, -0.5], [0.5, -0.5]] },
+        ],
+      },
+    ],
+  },
 ];
 
 /** 4 randomized gameplay run modifiers */

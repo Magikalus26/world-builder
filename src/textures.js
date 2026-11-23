@@ -1651,6 +1651,131 @@ export function createTextureLibrary(renderer) {
     return japanPack;
   }
 
+  // Lazy-cached Level 4 (Mayan Civilization) 512x512 procedural PBR material pack
+  let mayaPack = null;
+  const mayaTextures = [];
+  const mayaMaterials = [];
+
+  function ensureMayaPack() {
+    if (mayaPack) return mayaPack;
+
+    const jungleMoss = buildMayaJungleMossPBR(anisotropy);
+    const sacbeRoad = buildMayaSacbeCausewayPBR(anisotropy);
+    const limestoneDust = buildMayaLimestoneDustPBR(anisotropy);
+    const cenoteMoss = buildMayaCenoteMossPBR(anisotropy);
+    const limestone = buildMayaLimestonePBR(anisotropy);
+    const relief = buildMayaReliefPBR(anisotropy);
+    const stucco = buildMayaRedStuccoPBR(anisotropy);
+
+    [jungleMoss, sacbeRoad, limestoneDust, cenoteMoss].forEach((b) => {
+      mayaTextures.push(b.albedo, b.normalRough);
+    });
+    [limestone, relief, stucco].forEach((pack) => {
+      if (pack.map) mayaTextures.push(pack.map);
+      if (pack.normalMap) mayaTextures.push(pack.normalMap);
+      if (pack.roughnessMap) mayaTextures.push(pack.roughnessMap);
+    });
+
+    const mayaTerrainSplat = createTerrainSplatMaterial({
+      sand: jungleMoss, // Biome 0: Lush tropical jungle moss, ferns & loam
+      earthPath: sacbeRoad, // Biome 1: Sun-baked clay & ancient Sacbé stone causeway
+      quarryDust: limestoneDust, // Biome 2: Pale-gold & jade-tinted limestone quarry dust
+      oasisGrass: cenoteMoss, // Biome 3: Deep wet cenote rim moss & tropical fern loam
+    });
+    mayaTerrainSplat.customProgramCacheKey = () => 'workd-builder-maya-terrain-splat-v1';
+
+    const mMats = {
+      terrainSplat: mayaTerrainSplat,
+      mayaLimestone: new THREE.MeshStandardMaterial({
+        map: limestone.map,
+        normalMap: limestone.normalMap,
+        normalScale: new THREE.Vector2(1.2, 1.2),
+        roughnessMap: limestone.roughnessMap,
+        roughness: 1.0,
+        metalness: 0.04,
+      }),
+      mayaRelief: new THREE.MeshStandardMaterial({
+        map: relief.map,
+        normalMap: relief.normalMap,
+        normalScale: new THREE.Vector2(1.35, 1.35),
+        roughnessMap: relief.roughnessMap,
+        roughness: 0.96,
+        metalness: 0.1,
+      }),
+      mayaStucco: new THREE.MeshStandardMaterial({
+        map: stucco.map,
+        normalMap: stucco.normalMap,
+        normalScale: new THREE.Vector2(1.25, 1.25),
+        roughnessMap: stucco.roughnessMap,
+        roughness: 0.94,
+        metalness: 0.08,
+      }),
+      mayaCliff: new THREE.MeshStandardMaterial({
+        map: limestone.map,
+        normalMap: limestone.normalMap,
+        normalScale: new THREE.Vector2(1.3, 1.3),
+        color: new THREE.Color('#c5be9f'),
+        roughness: 0.9,
+        metalness: 0.03,
+      }),
+      rawMayaStone: new THREE.MeshStandardMaterial({
+        map: limestoneDust.albedo,
+        normalMap: limestone.normalMap,
+        normalScale: new THREE.Vector2(1.35, 1.35),
+        roughnessMap: limestone.roughnessMap,
+        color: new THREE.Color('#dfd5b6'),
+        roughness: 1.0,
+        metalness: 0.04,
+      }),
+      jadeInlay: new THREE.MeshStandardMaterial({
+        color: new THREE.Color('#1ea874'),
+        emissive: new THREE.Color('#0d4d35'),
+        emissiveIntensity: 0.25,
+        roughness: 0.24,
+        metalness: 0.22,
+      }),
+      redOchre: new THREE.MeshStandardMaterial({
+        color: new THREE.Color('#a83c2a'),
+        roughness: 0.72,
+        metalness: 0.04,
+      }),
+      jungleCanopy: new THREE.MeshStandardMaterial({
+        color: new THREE.Color('#2d6b34'),
+        roughness: 0.78,
+        metalness: 0.02,
+      }),
+      jungleCanopyLight: new THREE.MeshStandardMaterial({
+        color: new THREE.Color('#478e42'),
+        roughness: 0.74,
+        metalness: 0.02,
+      }),
+      ceibaTrunk: new THREE.MeshStandardMaterial({
+        color: new THREE.Color('#5a4636'),
+        roughness: 0.9,
+        metalness: 0.02,
+      }),
+      hardwoodLog: new THREE.MeshStandardMaterial({
+        color: new THREE.Color('#5c3922'),
+        roughness: 0.82,
+        metalness: 0.04,
+      }),
+      thatchRoof: new THREE.MeshStandardMaterial({
+        color: new THREE.Color('#b8924c'),
+        roughness: 0.92,
+        metalness: 0.01,
+      }),
+      obsidianBlade: new THREE.MeshStandardMaterial({
+        color: new THREE.Color('#1c222a'),
+        roughness: 0.16,
+        metalness: 0.65,
+      }),
+    };
+
+    Object.values(mMats).forEach((m) => mayaMaterials.push(m));
+    mayaPack = { materials: mMats };
+    return mayaPack;
+  }
+
   return {
     maps: {
       blueprint: blueprintMap,
@@ -1661,6 +1786,7 @@ export function createTextureLibrary(renderer) {
     materials,
     ensureRomePack,
     ensureJapanPack,
+    ensureMayaPack,
     dispose() {
       textures.forEach((t) => t.dispose());
       Object.values(materials).forEach((m) => m.dispose());
@@ -1668,6 +1794,8 @@ export function createTextureLibrary(renderer) {
       romeMaterials.forEach((m) => m.dispose());
       japanTextures.forEach((t) => t.dispose());
       japanMaterials.forEach((m) => m.dispose());
+      mayaTextures.forEach((t) => t.dispose());
+      mayaMaterials.forEach((m) => m.dispose());
     },
   };
 }
@@ -2559,4 +2687,373 @@ function buildJapanEngawaDeckPBR(anisotropy) {
     roughnessMap: wrapTexture(roughCanvas, { isColor: false, anisotropy }),
   };
 }
+
+/* ============================================================================
+ * LEVEL 4 (MAYAN CIVILIZATION) — PROCEDURAL 512x512 YUCATÁN JUNGLE & TEMPLE PBR
+ * ========================================================================== */
+
+/** Maya Biome 0: Lush Tropical Jungle Moss, Ferns & Rich Loam Soil (512x512) */
+function buildMayaJungleMossPBR(anisotropy) {
+  const size = 512;
+  const albedoCanvas = makeCanvas(size);
+  const ctx = albedoCanvas.getContext('2d');
+  const img = ctx.createImageData(size, size);
+  const data = img.data;
+  const height = new Float32Array(size * size);
+  const rough = new Float32Array(size * size);
+
+  for (let y = 0; y < size; y++) {
+    const v = y / size;
+    for (let x = 0; x < size; x++) {
+      const u = x / size;
+      const i = y * size + x;
+      const canopy = tileFBM(u, v, 5, 3, 3109);
+      const fern = tileFBM(u, v, 20, 2, 3121);
+      const grain = hash2i(x, y, 3137);
+
+      height[i] = clamp01(0.4 + (canopy - 0.5) * 0.28 + (fern - 0.5) * 0.34 + (grain - 0.5) * 0.14);
+      // Deep tropical Yucatan emerald-moss & rich soil patches
+      const loam = smoothstep(0.62, 0.85, 1 - canopy);
+      const r = lerp(42 + canopy * 34 + fern * 22, 74, loam) + (grain - 0.5) * 10;
+      const g = lerp(96 + canopy * 48 + fern * 28, 66, loam) + (grain - 0.5) * 12;
+      const b = lerp(40 + canopy * 18 + fern * 12, 42, loam) + (grain - 0.5) * 8;
+
+      rough[i] = clamp01(0.84 + (0.5 - fern) * 0.16);
+      const idx = i * 4;
+      data[idx] = Math.min(255, Math.max(0, Math.round(r)));
+      data[idx + 1] = Math.min(255, Math.max(0, Math.round(g)));
+      data[idx + 2] = Math.min(255, Math.max(0, Math.round(b)));
+      data[idx + 3] = 255;
+    }
+  }
+
+  ctx.putImageData(img, 0, 0);
+  const normalPacked = buildSobelNormalCanvas(height, size, 2.7, rough);
+  return {
+    albedo: wrapTexture(albedoCanvas, { isColor: true, anisotropy }),
+    normalRough: wrapTexture(normalPacked, { isColor: false, anisotropy }),
+  };
+}
+
+/** Maya Biome 1: Sun-Baked Clay & Ancient Sacbé Limestone Causeway (512x512) */
+function buildMayaSacbeCausewayPBR(anisotropy) {
+  const size = 512;
+  const albedoCanvas = makeCanvas(size);
+  const ctx = albedoCanvas.getContext('2d');
+  const img = ctx.createImageData(size, size);
+  const data = img.data;
+  const height = new Float32Array(size * size);
+  const rough = new Float32Array(size * size);
+
+  for (let y = 0; y < size; y++) {
+    const v = y / size;
+    for (let x = 0; x < size; x++) {
+      const u = x / size;
+      const i = y * size + x;
+      const cell = tileWorley(u, v, 7, 3203);
+      const stoneMask = smoothstep(0.06, 0.17, cell.f2 - cell.f1);
+      const texture = tileFBM(u, v, 14, 2, 3221);
+      const grit = hash2i(x, y, 3251);
+
+      height[i] = clamp01(0.2 + stoneMask * (0.62 + (texture - 0.5) * 0.22));
+      // Warm sun-baked Yucatán limestone flagstones set in red-ochre clay soil
+      const sShade = 0.86 + cell.id * 0.16 + (texture - 0.5) * 0.12 + (grit - 0.5) * 0.06;
+      const r = lerp(146, 206 * sShade, stoneMask);
+      const g = lerp(104, 186 * sShade, stoneMask);
+      const b = lerp(74, 142 * sShade, stoneMask);
+
+      rough[i] = clamp01(0.86 - stoneMask * 0.12 + (grit - 0.5) * 0.08);
+      const idx = i * 4;
+      data[idx] = Math.min(255, Math.max(0, Math.round(r)));
+      data[idx + 1] = Math.min(255, Math.max(0, Math.round(g)));
+      data[idx + 2] = Math.min(255, Math.max(0, Math.round(b)));
+      data[idx + 3] = 255;
+    }
+  }
+
+  ctx.putImageData(img, 0, 0);
+  const normalPacked = buildSobelNormalCanvas(height, size, 3.3, rough);
+  return {
+    albedo: wrapTexture(albedoCanvas, { isColor: true, anisotropy }),
+    normalRough: wrapTexture(normalPacked, { isColor: false, anisotropy }),
+  };
+}
+
+/** Maya Biome 2: Pale-Gold & Jade-Tinted Yucatán Limestone Quarry Dust (512x512) */
+function buildMayaLimestoneDustPBR(anisotropy) {
+  const size = 512;
+  const albedoCanvas = makeCanvas(size);
+  const ctx = albedoCanvas.getContext('2d');
+  const img = ctx.createImageData(size, size);
+  const data = img.data;
+  const height = new Float32Array(size * size);
+  const rough = new Float32Array(size * size);
+
+  for (let y = 0; y < size; y++) {
+    const v = y / size;
+    for (let x = 0; x < size; x++) {
+      const u = x / size;
+      const i = y * size + x;
+      const macro = tileFBM(u, v, 8, 3, 3307);
+      const chips = tileFBM(u, v, 24, 2, 3323);
+      const jadeVein = smoothstep(0.68, 0.86, tileFBM(u * 1.4, v * 1.4, 9, 2, 3343));
+      const grit = hash2i(x, y, 3361);
+
+      height[i] = clamp01(0.42 + (macro - 0.5) * 0.3 + (chips - 0.5) * 0.32);
+      const shade = 0.84 + macro * 0.24 + (chips - 0.5) * 0.16 + (grit - 0.5) * 0.08;
+      const r = lerp(212 * shade, 118, jadeVein * 0.55);
+      const g = lerp(198 * shade, 168, jadeVein * 0.55);
+      const b = lerp(152 * shade, 134, jadeVein * 0.55);
+
+      rough[i] = clamp01(0.84 - jadeVein * 0.22 + (grit - 0.5) * 0.08);
+      const idx = i * 4;
+      data[idx] = Math.min(255, Math.max(0, Math.round(r)));
+      data[idx + 1] = Math.min(255, Math.max(0, Math.round(g)));
+      data[idx + 2] = Math.min(255, Math.max(0, Math.round(b)));
+      data[idx + 3] = 255;
+    }
+  }
+
+  ctx.putImageData(img, 0, 0);
+  const normalPacked = buildSobelNormalCanvas(height, size, 2.9, rough);
+  return {
+    albedo: wrapTexture(albedoCanvas, { isColor: true, anisotropy }),
+    normalRough: wrapTexture(normalPacked, { isColor: false, anisotropy }),
+  };
+}
+
+/** Maya Biome 3: Deep Wet Cenote Rim Moss & Dark Tropical Soil (512x512) */
+function buildMayaCenoteMossPBR(anisotropy) {
+  const size = 512;
+  const albedoCanvas = makeCanvas(size);
+  const ctx = albedoCanvas.getContext('2d');
+  const img = ctx.createImageData(size, size);
+  const data = img.data;
+  const height = new Float32Array(size * size);
+  const rough = new Float32Array(size * size);
+
+  for (let y = 0; y < size; y++) {
+    const v = y / size;
+    for (let x = 0; x < size; x++) {
+      const u = x / size;
+      const i = y * size + x;
+      const moss = tileFBM(u, v, 8, 3, 3407);
+      const fine = tileFBM(u, v, 24, 2, 3433);
+      height[i] = clamp01(0.45 + (moss - 0.5) * 0.3 + (fine - 0.5) * 0.22);
+
+      const r = 34 + moss * 26 + fine * 14;
+      const g = 88 + moss * 44 + fine * 20;
+      const b = 52 + moss * 24 + fine * 12;
+
+      rough[i] = clamp01(0.72 + (0.5 - moss) * 0.16);
+      const idx = i * 4;
+      data[idx] = Math.min(255, Math.max(0, Math.round(r)));
+      data[idx + 1] = Math.min(255, Math.max(0, Math.round(g)));
+      data[idx + 2] = Math.min(255, Math.max(0, Math.round(b)));
+      data[idx + 3] = 255;
+    }
+  }
+
+  ctx.putImageData(img, 0, 0);
+  const normalPacked = buildSobelNormalCanvas(height, size, 2.6, rough);
+  return {
+    albedo: wrapTexture(albedoCanvas, { isColor: true, anisotropy }),
+    normalRough: wrapTexture(normalPacked, { isColor: false, anisotropy }),
+  };
+}
+
+/** Weathered Mayan Yucatán Limestone Ashlar Blocks with Moss Crevices (512x512) */
+function buildMayaLimestonePBR(anisotropy) {
+  const size = 512;
+  const albedoCanvas = makeCanvas(size);
+  const ctx = albedoCanvas.getContext('2d');
+  const img = ctx.createImageData(size, size);
+  const data = img.data;
+  const height = new Float32Array(size * size);
+  const rough = new Float32Array(size * size);
+
+  const rows = 4;
+  const cols = 3;
+
+  for (let y = 0; y < size; y++) {
+    const v = y / size;
+    const rowIdx = Math.floor(v * rows);
+    const rowFrac = (v * rows) % 1;
+    const rowShift = (rowIdx % 2) * 0.5;
+
+    for (let x = 0; x < size; x++) {
+      const u = x / size;
+      const i = y * size + x;
+      const colRaw = (u * cols + rowShift) % cols;
+      const colIdx = Math.floor(colRaw);
+      const colFrac = colRaw % 1;
+
+      const edgeX = Math.min(colFrac, 1 - colFrac);
+      const edgeY = Math.min(rowFrac, 1 - rowFrac);
+      const mortar = Math.min(smoothstep(0.025, 0.08, edgeX), smoothstep(0.03, 0.09, edgeY));
+
+      const blockVar = hash2i(colIdx + rowIdx * 9, rowIdx, 3511);
+      const weather = tileFBM(u, v, 12, 3, 3527);
+      const moss = smoothstep(0.56, 0.82, tileFBM(u, v, 7, 2, 3541));
+      const grain = hash2i(x, y, 3557);
+
+      height[i] = clamp01(0.16 + mortar * (0.66 + (weather - 0.5) * 0.2 + (grain - 0.5) * 0.08));
+
+      // Warm aged Yucatan limestone with mossy tropical crevices
+      const tone = 0.82 + blockVar * 0.22 + (weather - 0.5) * 0.16 + (grain - 0.5) * 0.06;
+      const mossFactor = (1 - mortar) * moss * 0.72 + mortar * smoothstep(0.75, 0.92, moss) * 0.22;
+      const r = lerp(206 * tone * (0.54 + mortar * 0.46), 74, mossFactor);
+      const g = lerp(188 * tone * (0.54 + mortar * 0.46), 116, mossFactor);
+      const b = lerp(142 * tone * (0.54 + mortar * 0.46), 64, mossFactor);
+
+      rough[i] = clamp01(0.86 - mortar * 0.1 + (grain - 0.5) * 0.08);
+      const idx = i * 4;
+      data[idx] = Math.min(255, Math.max(0, Math.round(r)));
+      data[idx + 1] = Math.min(255, Math.max(0, Math.round(g)));
+      data[idx + 2] = Math.min(255, Math.max(0, Math.round(b)));
+      data[idx + 3] = 255;
+    }
+  }
+
+  ctx.putImageData(img, 0, 0);
+  const normalCanvas = buildSobelNormalCanvas(height, size, 3.6);
+  const roughCanvas = buildRoughnessCanvas(rough, size);
+  return {
+    map: wrapTexture(albedoCanvas, { isColor: true, anisotropy }),
+    normalMap: wrapTexture(normalCanvas, { isColor: false, anisotropy }),
+    roughnessMap: wrapTexture(roughCanvas, { isColor: false, anisotropy }),
+  };
+}
+
+/** Carved Mayan Feathered-Serpent Relief & Jade-Inlaid Stone (512x512) */
+function buildMayaReliefPBR(anisotropy) {
+  const size = 512;
+  const albedoCanvas = makeCanvas(size);
+  const ctx = albedoCanvas.getContext('2d');
+  const img = ctx.createImageData(size, size);
+  const data = img.data;
+  const height = new Float32Array(size * size);
+  const rough = new Float32Array(size * size);
+
+  for (let y = 0; y < size; y++) {
+    const v = y / size;
+    for (let x = 0; x < size; x++) {
+      const u = x / size;
+      const i = y * size + x;
+      const stone = tileFBM(u, v, 14, 3, 3607);
+      const grit = hash2i(x, y, 3617);
+
+      // Stepped Mesoamerican fret frieze band across middle (v in 0.24..0.76) + cornice borders
+      const isBorder = v < 0.16 || v > 0.84;
+      const bandV = clamp01((v - 0.18) / 0.64);
+      const cellU = (u * 4) % 1;
+      // Stepped Mayan key/diamond motif & central emerald-jade glyph medallion
+      const dx = Math.abs(cellU - 0.5);
+      const dy = Math.abs(bandV - 0.5);
+      const isFret = !isBorder && (dx + dy > 0.28 && dx + dy < 0.44);
+      const isJade = !isBorder && Math.hypot(dx * 1.15, dy * 1.15) < 0.16;
+
+      let r, g, b;
+      if (isJade) {
+        // Gleaming polished emerald-jade medallion inlay
+        const gleam = 0.86 + stone * 0.28;
+        r = 32 * gleam;
+        g = 172 * gleam;
+        b = 118 * gleam;
+        height[i] = 0.86;
+        rough[i] = 0.26;
+      } else {
+        const reliefH = isBorder ? 0.82 : isFret ? 0.78 : 0.42;
+        const shade = (0.78 + reliefH * 0.28 + (stone - 0.5) * 0.14 + (grit - 0.5) * 0.06);
+        r = 202 * shade;
+        g = 182 * shade;
+        b = 136 * shade;
+        height[i] = clamp01(reliefH + (stone - 0.5) * 0.14);
+        rough[i] = clamp01(0.84 - reliefH * 0.1);
+      }
+
+      const idx = i * 4;
+      data[idx] = Math.min(255, Math.max(0, Math.round(r)));
+      data[idx + 1] = Math.min(255, Math.max(0, Math.round(g)));
+      data[idx + 2] = Math.min(255, Math.max(0, Math.round(b)));
+      data[idx + 3] = 255;
+    }
+  }
+
+  ctx.putImageData(img, 0, 0);
+  const normalCanvas = buildSobelNormalCanvas(height, size, 4.0);
+  const roughCanvas = buildRoughnessCanvas(rough, size);
+  return {
+    map: wrapTexture(albedoCanvas, { isColor: true, anisotropy }),
+    normalMap: wrapTexture(normalCanvas, { isColor: false, anisotropy }),
+    roughnessMap: wrapTexture(roughCanvas, { isColor: false, anisotropy }),
+  };
+}
+
+/** Red-Ochre Mayan Stucco Temple Trim & Jade-Inlaid Cornice (512x512) */
+function buildMayaRedStuccoPBR(anisotropy) {
+  const size = 512;
+  const albedoCanvas = makeCanvas(size);
+  const ctx = albedoCanvas.getContext('2d');
+  const img = ctx.createImageData(size, size);
+  const data = img.data;
+  const height = new Float32Array(size * size);
+  const rough = new Float32Array(size * size);
+
+  for (let y = 0; y < size; y++) {
+    const v = y / size;
+    for (let x = 0; x < size; x++) {
+      const u = x / size;
+      const i = y * size + x;
+      const plaster = tileFBM(u, v, 10, 3, 3709);
+      const chip = smoothstep(0.66, 0.84, tileFBM(u, v, 16, 2, 3727));
+      const grit = hash2i(x, y, 3739);
+
+      const isJadeStripe = v > 0.14 && v < 0.24;
+      const isLimestoneTrim = v < 0.12 || v > 0.86;
+
+      let r, g, b;
+      if (isJadeStripe) {
+        const seg = smoothstep(0.06, 0.14, Math.abs(((u * 8) % 1) - 0.5));
+        const glow = 0.84 + plaster * 0.25;
+        r = lerp(52, 34 * glow, seg);
+        g = lerp(96, 166 * glow, seg);
+        b = lerp(74, 114 * glow, seg);
+        height[i] = 0.84;
+        rough[i] = 0.34;
+      } else if (isLimestoneTrim) {
+        const s = 0.88 + (plaster - 0.5) * 0.16;
+        r = 212 * s;
+        g = 194 * s;
+        b = 148 * s;
+        height[i] = 0.78;
+        rough[i] = 0.78;
+      } else {
+        // Rich ceremonial Mayan red-ochre stucco weathered softly to pale limestone beneath
+        const s = 0.82 + plaster * 0.28 + (grit - 0.5) * 0.08;
+        r = lerp(176 * s, 206 * s, chip * 0.65);
+        g = lerp(66 * s, 184 * s, chip * 0.65);
+        b = lerp(48 * s, 142 * s, chip * 0.65);
+        height[i] = clamp01(0.62 - chip * 0.22 + (plaster - 0.5) * 0.12);
+        rough[i] = clamp01(0.76 + chip * 0.14);
+      }
+
+      const idx = i * 4;
+      data[idx] = Math.min(255, Math.max(0, Math.round(r)));
+      data[idx + 1] = Math.min(255, Math.max(0, Math.round(g)));
+      data[idx + 2] = Math.min(255, Math.max(0, Math.round(b)));
+      data[idx + 3] = 255;
+    }
+  }
+
+  ctx.putImageData(img, 0, 0);
+  const normalCanvas = buildSobelNormalCanvas(height, size, 3.6);
+  const roughCanvas = buildRoughnessCanvas(rough, size);
+  return {
+    map: wrapTexture(albedoCanvas, { isColor: true, anisotropy }),
+    normalMap: wrapTexture(normalCanvas, { isColor: false, anisotropy }),
+    roughnessMap: wrapTexture(roughCanvas, { isColor: false, anisotropy }),
+  };
+}
+
 

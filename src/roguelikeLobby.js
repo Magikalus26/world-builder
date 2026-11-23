@@ -174,6 +174,70 @@ function buildMiniatureIsland(themeId) {
     return root;
   }
 
+  if (themeId === 'maya') {
+    const jungleGrass = new THREE.MeshStandardMaterial({ color: '#3f7f44', roughness: 0.85 });
+    const stoneMat = new THREE.MeshStandardMaterial({ color: '#d4c69c', roughness: 0.82 });
+    const redMat = new THREE.MeshStandardMaterial({ color: '#ad412d', roughness: 0.7 });
+    const jadeMat = new THREE.MeshStandardMaterial({
+      color: '#22b47c',
+      emissive: '#0c4c34',
+      emissiveIntensity: 0.25,
+      roughness: 0.25,
+      metalness: 0.2,
+    });
+    const cenoteMat = new THREE.MeshStandardMaterial({
+      color: '#28c4ce',
+      roughness: 0.16,
+      metalness: 0.12,
+    });
+    const leafMat = new THREE.MeshStandardMaterial({ color: '#2c6b34', roughness: 0.78 });
+    const trunkMat = new THREE.MeshStandardMaterial({ color: '#5c4230', roughness: 0.9 });
+
+    const island = new THREE.Mesh(new THREE.CylinderGeometry(0.98, 1.14, 0.28, 18), jungleGrass);
+    island.position.y = 0.12;
+    island.receiveShadow = true;
+    root.add(island);
+
+    // Miniature Sacred Cenote pool
+    const pool = new THREE.Mesh(new THREE.CircleGeometry(0.3, 14), cenoteMat);
+    pool.rotation.x = -Math.PI / 2;
+    pool.position.set(0.56, 0.27, 0.22);
+    root.add(pool);
+
+    // Miniature stepped Temple of Kukulcán
+    [
+      { w: 0.78, h: 0.16, y: 0.34, mat: stoneMat },
+      { w: 0.56, h: 0.16, y: 0.5, mat: stoneMat },
+      { w: 0.36, h: 0.14, y: 0.65, mat: redMat },
+    ].forEach((t) => {
+      const m = new THREE.Mesh(new THREE.BoxGeometry(t.w, t.h, t.w), t.mat);
+      m.position.set(-0.14, t.y, -0.06);
+      m.castShadow = true;
+      root.add(m);
+    });
+
+    const jewel = new THREE.Mesh(new THREE.OctahedronGeometry(0.08, 0), jadeMat);
+    jewel.position.set(-0.14, 0.82, -0.06);
+    root.add(jewel);
+
+    // Miniature Ceiba jungle trees
+    [
+      [-0.66, 0.4],
+      [0.44, -0.52],
+      [-0.58, -0.44],
+    ].forEach(([tx, tz]) => {
+      const tr = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.06, 0.28, 6), trunkMat);
+      tr.position.set(tx, 0.38, tz);
+      root.add(tr);
+      const lf = new THREE.Mesh(new THREE.IcosahedronGeometry(0.18, 1), leafMat);
+      lf.position.set(tx, 0.56, tz);
+      lf.scale.set(1.2, 0.65, 1.2);
+      lf.castShadow = true;
+      root.add(lf);
+    });
+    return root;
+  }
+
   // 'china': Terraced Jade Mountain Island + 3-Roof Red & Gold Pagoda + Bamboo
   const jadeGrass = new THREE.MeshStandardMaterial({ color: '#7ea870', roughness: 0.84 });
   const rockMat = new THREE.MeshStandardMaterial({ color: '#9ea89e', roughness: 0.88 });

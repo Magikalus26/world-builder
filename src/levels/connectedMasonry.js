@@ -806,6 +806,130 @@ export function createKawaraCornerRoofGeometry({
 }
 
 /**
+ * Builds a zero-gap carved Mayan ceremonial staircase block with 4 crisp limestone treads
+ * ascending from +Z (front) to -Z (temple terrace) and twin sloped alfarda balustrades.
+ */
+export function createMayanStairBlockGeometry(w = 0.96, h = 0.64, d = 0.96, steps = 4) {
+  const hx = w * 0.5;
+  const hy = h * 0.5;
+  const hz = d * 0.5;
+  const sideW = w * 0.14;
+  const innerHX = hx - sideW;
+
+  const positions = [];
+  const uvs = [];
+
+  const uvTop = (p) => [p[0] / w + 0.5, p[2] / d + 0.5];
+  const uvFront = (p) => [p[0] / w + 0.5, p[1] / h + 0.5];
+  const uvSide = (p) => [p[2] / d + 0.5, p[1] / h + 0.5];
+
+  const pushBox = (x0, x1, y0, y1, z0, z1) => {
+    pushQuadOriented(positions, uvs, [x0, y1, z1], [x1, y1, z1], [x1, y1, z0], [x0, y1, z0], [0, 1, 0], uvTop);
+    pushQuadOriented(positions, uvs, [x0, y0, z0], [x1, y0, z0], [x1, y0, z1], [x0, y0, z1], [0, -1, 0], uvTop);
+    pushQuadOriented(positions, uvs, [x0, y0, z1], [x1, y0, z1], [x1, y1, z1], [x0, y1, z1], [0, 0, 1], uvFront);
+    pushQuadOriented(positions, uvs, [x1, y0, z0], [x0, y0, z0], [x0, y1, z0], [x1, y1, z0], [0, 0, -1], uvFront);
+    pushQuadOriented(positions, uvs, [x1, y0, z1], [x1, y0, z0], [x1, y1, z0], [x1, y1, z1], [1, 0, 0], uvSide);
+    pushQuadOriented(positions, uvs, [x0, y0, z0], [x0, y0, z1], [x0, y1, z1], [x0, y1, z0], [-1, 0, 0], uvSide);
+  };
+
+  // 4 Stepped limestone risers & treads spanning exact block height & depth (zero-gap vertical & horizontal fit)
+  for (let s = 0; s < steps; s++) {
+    const zFront = hz - (s * d) / steps;
+    const zBack = hz - ((s + 1) * d) / steps;
+    const yTop = -hy + ((s + 1) * h) / steps;
+    pushBox(-innerHX, innerHX, -hy, yTop, zBack, zFront);
+  }
+
+  // Twin sloped Mesoamerican stone balustrades (alfardas) flanking left & right edges
+  const bLowY = -hy + h * 0.24;
+  const bHighY = hy + 0.04;
+  [
+    [-hx, -innerHX],
+    [innerHX, hx],
+  ].forEach(([x0, x1]) => {
+    // Sloped top ramp
+    pushQuadOriented(
+      positions,
+      uvs,
+      [x0, bLowY, hz],
+      [x1, bLowY, hz],
+      [x1, bHighY, -hz],
+      [x0, bHighY, -hz],
+      [0, 1, 0.4],
+      uvTop
+    );
+    // Bottom
+    pushQuadOriented(positions, uvs, [x0, -hy, -hz], [x1, -hy, -hz], [x1, -hy, hz], [x0, -hy, hz], [0, -1, 0], uvTop);
+    // Front vertical end
+    pushQuadOriented(positions, uvs, [x0, -hy, hz], [x1, -hy, hz], [x1, bLowY, hz], [x0, bLowY, hz], [0, 0, 1], uvFront);
+    // Back vertical end
+    pushQuadOriented(positions, uvs, [x1, -hy, -hz], [x0, -hy, -hz], [x0, bHighY, -hz], [x1, bHighY, -hz], [0, 0, -1], uvFront);
+    // Outer & inner side quads
+    pushQuadOriented(positions, uvs, [x0, -hy, -hz], [x0, -hy, hz], [x0, bLowY, hz], [x0, bHighY, -hz], [-1, 0, 0], uvSide);
+    pushQuadOriented(positions, uvs, [x1, -hy, hz], [x1, -hy, -hz], [x1, bHighY, -hz], [x1, bLowY, hz], [1, 0, 0], uvSide);
+  });
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geo.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+  geo.computeVertexNormals();
+  return geo;
+}
+
+/**
+ * Builds the crowning Mayan Summit Temple Roof Slab & Carved Roof Comb (Crestería).
+ * Rests flat at local y = 0 directly across the 5 Tier-4 summit sanctuary walls & doorway lintel.
+ */
+export function createMayanRoofCombGeometry({
+  slabW = 2.98,
+  slabD = 2.02,
+  slabH = 0.22,
+  combW = 2.48,
+  combH = 0.62,
+  combD = 0.42,
+} = {}) {
+  const positions = [];
+  const uvs = [];
+
+  const uvTop = (p) => [p[0] / 0.96 + 0.5, p[2] / 0.96 + 0.5];
+  const uvFront = (p) => [p[0] / 0.96 + 0.5, p[1] / 0.64 + 0.5];
+  const uvSide = (p) => [p[2] / 0.96 + 0.5, p[1] / 0.64 + 0.5];
+
+  const pushBox = (x0, x1, y0, y1, z0, z1) => {
+    pushQuadOriented(positions, uvs, [x0, y1, z1], [x1, y1, z1], [x1, y1, z0], [x0, y1, z0], [0, 1, 0], uvTop);
+    pushQuadOriented(positions, uvs, [x0, y0, z0], [x1, y0, z0], [x1, y0, z1], [x0, y0, z1], [0, -1, 0], uvTop);
+    pushQuadOriented(positions, uvs, [x0, y0, z1], [x1, y0, z1], [x1, y1, z1], [x0, y1, z1], [0, 0, 1], uvFront);
+    pushQuadOriented(positions, uvs, [x1, y0, z0], [x0, y0, z0], [x0, y1, z0], [x1, y1, z0], [0, 0, -1], uvFront);
+    pushQuadOriented(positions, uvs, [x1, y0, z1], [x1, y0, z0], [x1, y1, z0], [x1, y1, z1], [1, 0, 0], uvSide);
+    pushQuadOriented(positions, uvs, [x0, y0, z0], [x0, y0, z1], [x0, y1, z1], [x0, y1, z0], [-1, 0, 0], uvSide);
+  };
+
+  // Lower overhanging temple cornice slab bridging the entire 3x2 summit sanctuary & doorway lintel
+  pushBox(-slabW * 0.5, slabW * 0.5, 0, slabH, -slabD * 0.5, slabD * 0.5);
+
+  // Upper stepped frieze molding
+  const fW = slabW * 0.92;
+  const fD = slabD * 0.88;
+  pushBox(-fW * 0.5, fW * 0.5, slabH, slabH + 0.14, -fD * 0.5, fD * 0.5);
+
+  // Iconic Mayan stepped roof comb (crestería) rising along the temple crown
+  const cY0 = slabH + 0.14;
+  const cZ0 = -combD * 0.5 - 0.18;
+  const cZ1 = combD * 0.5 - 0.18;
+  pushBox(-combW * 0.5, combW * 0.5, cY0, cY0 + combH * 0.48, cZ0, cZ1);
+  // Central stepped crest pinnacle + flanking stepped finials
+  pushBox(-combW * 0.24, combW * 0.24, cY0 + combH * 0.48, cY0 + combH, cZ0 + 0.04, cZ1 - 0.04);
+  pushBox(-combW * 0.46, -combW * 0.28, cY0 + combH * 0.48, cY0 + combH * 0.78, cZ0 + 0.05, cZ1 - 0.05);
+  pushBox(combW * 0.28, combW * 0.46, cY0 + combH * 0.48, cY0 + combH * 0.78, cZ0 + 0.05, cZ1 - 0.05);
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geo.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
+  geo.computeVertexNormals();
+  return geo;
+}
+
+/**
  * Per-level shared geometry cache for Connected Masonry blocks.
  * Guarantees < 0.2 ms neighbor updates and clean GPU disposal on scene exit.
  */
