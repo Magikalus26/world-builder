@@ -203,6 +203,7 @@ function createDefaultSave() {
     },
     furniture: [], // Array of unlocked furniture IDs (e.g. ['item_01'])
     decorations: {}, // Map of levelKey -> [{ uid, itemId, x, z, rotY }]
+    completedLevels: {}, // Map of levelId -> true for first-completion rewards
     stats: {
       levelsCompleted: 0,
       roguelikeCompleted: 0,
@@ -237,6 +238,13 @@ export class SaveManager {
           ? parsed.decorations
           : {};
 
+      const completedLevels =
+        parsed.completedLevels &&
+        typeof parsed.completedLevels === 'object' &&
+        !Array.isArray(parsed.completedLevels)
+          ? parsed.completedLevels
+          : {};
+
       return {
         coins:
           typeof parsed.coins === 'number' && Number.isFinite(parsed.coins)
@@ -249,6 +257,7 @@ export class SaveManager {
         upgrades: { ...fallback.upgrades, ...(parsed.upgrades || {}) },
         furniture,
         decorations,
+        completedLevels,
         stats: { ...fallback.stats, ...(parsed.stats || {}) },
       };
     } catch (_) {
@@ -262,6 +271,18 @@ export class SaveManager {
     } catch (_) {
       // Ignore storage quota / private mode errors cleanly
     }
+  }
+
+  hasCompletedLevel(levelId) {
+    return Boolean(this.data.completedLevels && this.data.completedLevels[levelId]);
+  }
+
+  markLevelCompleted(levelId) {
+    if (!levelId) return { firstTime: false };
+    const firstTime = !this.hasCompletedLevel(levelId);
+    this.data.completedLevels[levelId] = true;
+    this._persist();
+    return { firstTime };
   }
 
   /* ---- Dual Currency ---- */

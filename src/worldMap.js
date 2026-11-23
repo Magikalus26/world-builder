@@ -99,10 +99,9 @@ export class WorldMapScene {
     this.selectedNode = null;
     this.animatedProps = [];
     this.shoreRings = [];
+    this.unlockedRings = [];
     this.oceanGeo = null;
     this.oceanBaseY = null;
-    this.goldRingMesh = null;
-    this.goldHaloMesh = null;
 
     this._initMaterials();
     this._buildTabletopFrameAndCompass();
@@ -496,19 +495,27 @@ export class WorldMapScene {
     this._addShoreFoamRing(group, 2.82, 2.55);
 
     // Glowing golden base ring indicating UNLOCKED & PLAYABLE
-    const ringGeo = this._trackGeo(new THREE.RingGeometry(2.82, 3.06, 36));
+    const ringGeo = this._trackGeo(new THREE.RingGeometry(2.86, 3.12, 36));
     ringGeo.rotateX(-Math.PI / 2);
-    this.goldRingMesh = new THREE.Mesh(ringGeo, this.mats.goldRing);
-    this.goldRingMesh.position.y = 0.06;
-    this.goldRingMesh.scale.set(1, 1, 2.55 / 2.82);
-    group.add(this.goldRingMesh);
+    const ringMesh = new THREE.Mesh(ringGeo, this.mats.goldRing);
+    ringMesh.position.y = 0.11;
+    ringMesh.scale.set(1, 1, 2.58 / 2.86);
+    group.add(ringMesh);
 
-    const haloGeo = this._trackGeo(new THREE.RingGeometry(3.06, 3.45, 36));
+    const haloGeo = this._trackGeo(new THREE.RingGeometry(3.12, 3.52, 36));
     haloGeo.rotateX(-Math.PI / 2);
-    this.goldHaloMesh = new THREE.Mesh(haloGeo, this.mats.goldHalo);
-    this.goldHaloMesh.position.y = 0.05;
-    this.goldHaloMesh.scale.set(1, 1, 2.55 / 2.82);
-    group.add(this.goldHaloMesh);
+    const haloMesh = new THREE.Mesh(haloGeo, this.mats.goldHalo);
+    haloMesh.position.y = 0.095;
+    haloMesh.scale.set(1, 1, 2.58 / 2.86);
+    group.add(haloMesh);
+
+    this.unlockedRings.push({
+      nodeId: 'level1_pyramid',
+      ringMesh,
+      haloMesh,
+      ratioZ: 2.58 / 2.86,
+      phase: 0,
+    });
 
     // Tiny 5-tier stepped sandstone pyramid crowned with golden capstone!
     const pyrGroup = new THREE.Group();
@@ -618,7 +625,7 @@ export class WorldMapScene {
   }
 
   /**
-   * Level 2 — Rome : L'Aqueduc Impérial (LOCKED PREVIEW)
+   * Level 2 — Rome : La Domus Romaine (UNLOCKED & PLAYABLE)
    */
   _buildRomeIsland() {
     const pos = new THREE.Vector3(2.4, 0, -0.35);
@@ -635,6 +642,29 @@ export class WorldMapScene {
     group.add(mound);
     this._addShoreFoamRing(group, 2.58, 2.35);
 
+    // Glowing golden base ring indicating UNLOCKED & PLAYABLE
+    const ringGeo = this._trackGeo(new THREE.RingGeometry(2.78, 3.04, 36));
+    ringGeo.rotateX(-Math.PI / 2);
+    const ringMesh = new THREE.Mesh(ringGeo, this.mats.goldRing);
+    ringMesh.position.y = 0.11;
+    ringMesh.scale.set(1, 1, 2.52 / 2.78);
+    group.add(ringMesh);
+
+    const haloGeo = this._trackGeo(new THREE.RingGeometry(3.04, 3.42, 36));
+    haloGeo.rotateX(-Math.PI / 2);
+    const haloMesh = new THREE.Mesh(haloGeo, this.mats.goldHalo);
+    haloMesh.position.y = 0.095;
+    haloMesh.scale.set(1, 1, 2.52 / 2.78);
+    group.add(haloMesh);
+
+    this.unlockedRings.push({
+      nodeId: 'level2_rome',
+      ringMesh,
+      haloMesh,
+      ratioZ: 2.52 / 2.78,
+      phase: 1.55,
+    });
+
     // Sculpted upper marble terrace hill
     const hill = new THREE.Mesh(
       this._trackGeo(new THREE.CylinderGeometry(1.15, 1.65, 0.42, 16)),
@@ -644,64 +674,83 @@ export class WorldMapScene {
     hill.receiveShadow = true;
     group.add(hill);
 
-    // Miniature Roman Imperial Aqueduct (4 travertine piers + 3 semicircular arches + water channel)
+    // Miniature Roman Imperial Aqueduct along rear ridge
     const aqGroup = new THREE.Group();
-    aqGroup.position.set(0.05, 0.65, -0.05);
-    aqGroup.rotation.y = -0.34;
+    aqGroup.position.set(-0.2, 0.68, -0.62);
+    aqGroup.rotation.y = -0.22;
 
-    const pierGeo = this._trackGeo(new THREE.BoxGeometry(0.24, 0.85, 0.28));
-    const archGeo = this._trackGeo(new THREE.TorusGeometry(0.31, 0.08, 7, 14, Math.PI));
-    const spacing = 0.78;
+    const pierGeo = this._trackGeo(new THREE.BoxGeometry(0.18, 0.68, 0.22));
+    const archGeo = this._trackGeo(new THREE.TorusGeometry(0.24, 0.065, 7, 14, Math.PI));
+    const spacing = 0.62;
 
     for (let i = 0; i < 4; i++) {
       const px = (i - 1.5) * spacing;
       const pier = new THREE.Mesh(pierGeo, this.mats.romanMarble);
-      pier.position.set(px, 0.42, 0);
+      pier.position.set(px, 0.34, 0);
       pier.castShadow = true;
       aqGroup.add(pier);
 
       if (i < 3) {
         const arch = new THREE.Mesh(archGeo, this.mats.romanMarble);
-        arch.position.set(px + spacing * 0.5, 0.64, 0);
+        arch.position.set(px + spacing * 0.5, 0.52, 0);
         arch.castShadow = true;
         aqGroup.add(arch);
       }
     }
 
-    // Aqueduct entablature deck & turquoise water trough
     const deck = new THREE.Mesh(
-      this._trackGeo(new THREE.BoxGeometry(2.65, 0.16, 0.32)),
+      this._trackGeo(new THREE.BoxGeometry(2.12, 0.13, 0.25)),
       this.mats.romanMarble
     );
-    deck.position.y = 0.96;
+    deck.position.y = 0.77;
     deck.castShadow = true;
     aqGroup.add(deck);
 
     const troughWater = new THREE.Mesh(
-      this._trackGeo(new THREE.BoxGeometry(2.55, 0.05, 0.14)),
+      this._trackGeo(new THREE.BoxGeometry(2.04, 0.04, 0.11)),
       this.textures.materials.oasisWater
     );
-    troughWater.position.y = 1.05;
+    troughWater.position.y = 0.85;
     aqGroup.add(troughWater);
     group.add(aqGroup);
 
-    // Tiny terracotta-roofed Roman villa beside the aqueduct
-    const villa = new THREE.Mesh(
-      this._trackGeo(new THREE.BoxGeometry(0.65, 0.36, 0.52)),
+    // Miniature 3D Roman Domus Villa (marble courtyard walls + sunken turquoise impluvium + 4-sided terracotta compluvium roof!)
+    const domusGroup = new THREE.Group();
+    domusGroup.position.set(0.15, 0.74, 0.42);
+    domusGroup.rotation.y = 0.18;
+
+    const domusBase = new THREE.Mesh(
+      this._trackGeo(new THREE.BoxGeometry(1.18, 0.34, 1.08)),
       this.mats.romanMarble
     );
-    villa.position.set(0.85, 1.06, -0.58);
-    villa.castShadow = true;
-    group.add(villa);
+    domusBase.position.y = 0.17;
+    domusBase.castShadow = true;
+    domusBase.receiveShadow = true;
+    domusGroup.add(domusBase);
 
-    const roof = new THREE.Mesh(
-      this._trackGeo(new THREE.ConeGeometry(0.52, 0.24, 4)),
-      this.mats.terracotta
+    // 4-sided terracotta roof ring framing the open atrium compluvium
+    const roofNS = this._trackGeo(new THREE.BoxGeometry(1.26, 0.16, 0.32));
+    const roofEW = this._trackGeo(new THREE.BoxGeometry(0.32, 0.16, 0.52));
+    [
+      [0, 0.41, -0.4, roofNS],
+      [0, 0.41, 0.4, roofNS],
+      [-0.47, 0.41, 0, roofEW],
+      [0.47, 0.41, 0, roofEW],
+    ].forEach(([rx, ry, rz, g]) => {
+      const rMesh = new THREE.Mesh(g, this.mats.terracotta);
+      rMesh.position.set(rx, ry, rz);
+      rMesh.castShadow = true;
+      domusGroup.add(rMesh);
+    });
+
+    // Tiny turquoise impluvium visible inside the atrium courtyard
+    const miniImpluvium = new THREE.Mesh(
+      this._trackGeo(new THREE.BoxGeometry(0.36, 0.05, 0.32)),
+      this.textures.materials.oasisWater
     );
-    roof.position.set(0.85, 1.36, -0.58);
-    roof.rotation.y = Math.PI / 4;
-    roof.castShadow = true;
-    group.add(roof);
+    miniImpluvium.position.y = 0.35;
+    domusGroup.add(miniImpluvium);
+    group.add(domusGroup);
 
     // 5 Slender Italian Cypress trees
     const cypressGeo = this._trackGeo(new THREE.ConeGeometry(0.16, 0.95, 7));
@@ -709,7 +758,7 @@ export class WorldMapScene {
       [-1.35, 0.92, -0.45],
       [-1.15, 0.88, 0.65],
       [1.35, 0.9, 0.55],
-      [0.15, 1.15, -1.05],
+      [0.65, 1.15, -1.05],
       [1.52, 0.88, -0.35],
     ];
     cypressPos.forEach(([cx, cy, cz], idx) => {
@@ -720,11 +769,8 @@ export class WorldMapScene {
       group.add(tree);
     });
 
-    // Subtle 3D Stone Padlock Badge
-    const lock = this._addPadlockBadge(group, 0, 1.08, 1.48);
-
-    // Floating label
-    const badge = this._addIslandBadge(group, 'Niveau 2 • Bientôt', false, 2.85);
+    // Floating crisp diegetic label
+    const badge = this._addIslandBadge(group, 'Niveau 2 • Jouable', true, 2.85);
 
     // Generous touch hitbox
     const hitGeo = this._trackGeo(new THREE.CylinderGeometry(2.6, 2.7, 2.4, 12));
@@ -735,15 +781,14 @@ export class WorldMapScene {
     const node = {
       id: 'level2_rome',
       levelIndex: 1,
-      unlocked: false,
-      title: 'Niveau 2 : L’Aqueduc Impérial',
+      unlocked: true,
+      title: 'Niveau 2 : La Domus Romaine (48 blocs)',
       shortLabel: 'Rome',
       position: pos,
-      focusDistance: 23.0,
-      focusElevation: 46,
-      focusAzimuth: -0.08,
+      focusDistance: 17.5,
+      focusElevation: 40,
+      focusAzimuth: -0.15,
       group,
-      lock,
       badge,
       hitbox,
       bounceTime: 0,
@@ -1005,15 +1050,20 @@ export class WorldMapScene {
       pos.needsUpdate = true;
     }
 
-    // 2. Pulsing golden base ring around unlocked Level 1 (Égypte)
-    if (this.goldRingMesh && this.goldHaloMesh) {
-      const selectedBoost = this.selectedNode && this.selectedNode.unlocked ? 1.07 : 1.0;
-      const pulse = 1 + Math.sin(elapsed * 3.1) * 0.035;
-      this.goldRingMesh.scale.set(pulse * selectedBoost, 1, (2.55 / 2.82) * pulse * selectedBoost);
-      this.mats.goldRing.opacity = 0.72 + Math.sin(elapsed * 3.1) * 0.22;
+    // 2. Pulsing golden base rings around all unlocked islands (Level 1 Égypte & Level 2 Rome)
+    for (let i = 0; i < this.unlockedRings.length; i++) {
+      const r = this.unlockedRings[i];
+      const isSelected = this.selectedNode && this.selectedNode.id === r.nodeId;
+      const selectedBoost = isSelected ? 1.07 : 1.0;
+      const pulse = 1 + Math.sin(elapsed * 3.1 + r.phase) * 0.035;
+      r.ringMesh.scale.set(pulse * selectedBoost, 1, r.ratioZ * pulse * selectedBoost);
 
-      const haloPulse = 1 + ((elapsed * 0.45) % 1) * 0.16;
-      this.goldHaloMesh.scale.set(haloPulse, 1, (2.55 / 2.82) * haloPulse);
+      const haloPhase = (elapsed * 0.45 + r.phase * 0.25) % 1;
+      const haloPulse = 1 + haloPhase * 0.16;
+      r.haloMesh.scale.set(haloPulse, 1, r.ratioZ * haloPulse);
+    }
+    if (this.unlockedRings.length > 0) {
+      this.mats.goldRing.opacity = 0.72 + Math.sin(elapsed * 3.1) * 0.22;
       this.mats.goldHalo.opacity = (1 - ((elapsed * 0.45) % 1)) * 0.42;
     }
 
@@ -1052,6 +1102,7 @@ export class WorldMapScene {
     this.hitTargets.length = 0;
     this.animatedProps.length = 0;
     this.shoreRings.length = 0;
+    this.unlockedRings.length = 0;
     this.selectedNode = null;
 
     this.scene.remove(this.root);

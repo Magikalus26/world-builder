@@ -19,9 +19,10 @@ import { MainMenuController } from './mainMenu.js';
 import { DecorationSystem } from './decorationSystem.js';
 import { RoguelikeLobbyController } from './roguelikeLobby.js';
 import { Level1Pyramid } from './levels/level1_pyramid.js';
+import { Level2Rome } from './levels/level2_rome.js';
 import { RoguelikeLevel, generateRoguelikeConfig } from './levels/roguelike_level.js';
 
-const LEVEL_REGISTRY = [Level1Pyramid];
+const LEVEL_REGISTRY = [Level1Pyramid, Level2Rome];
 
 class WorkdBuilderApp {
   constructor() {
@@ -532,8 +533,9 @@ class WorkdBuilderApp {
     this.mainMenu.hide();
 
     this.mode = 'level';
-    this.scene.background.set('#efd3a2');
-    this.scene.fog.color.set('#efd3a2');
+    const skyHex = (LevelClass.meta && LevelClass.meta.skyColor) || '#efd3a2';
+    this.scene.background.set(skyHex);
+    this.scene.fog.color.set(skyHex);
 
     this.hudMapTop.hidden = true;
     this.hudGameTop.hidden = false;
@@ -652,7 +654,13 @@ class WorkdBuilderApp {
     }
   }
 
-  _handleLevelComplete({ focusPoint, rewardCoins = 150, rewardTokens = 0 }) {
+  _handleLevelComplete({
+    levelId = null,
+    focusPoint,
+    rewardCoins = 150,
+    rewardTokens = 0,
+    firstCompletionTokens = 0,
+  }) {
     if (this.decorationSystem && this.decorationSystem.isActive()) {
       this.decorationSystem.setActive(false);
     }
@@ -660,11 +668,22 @@ class WorkdBuilderApp {
     this.interaction.cancelActiveInteraction();
     this.cameraController.startVictoryOrbit(focusPoint);
 
-    // Award persistent Gold Coins + exclusive Roguelike Éclats d'Architecte
+    // Award persistent Gold Coins + Roguelike Éclats (or campaign first-completion Éclats bonus)
     const parts = [];
+    let totalTokensAwarded = 0;
+
     if (this.mode === 'roguelike' && rewardTokens > 0) {
-      this.save.addRoguelikeTokens(rewardTokens);
-      parts.push(`💠 +${rewardTokens} Éclats`);
+      totalTokensAwarded += rewardTokens;
+    } else if (this.mode === 'level' && levelId) {
+      const { firstTime } = this.save.markLevelCompleted(levelId);
+      if (firstTime && firstCompletionTokens > 0) {
+        totalTokensAwarded += firstCompletionTokens;
+      }
+    }
+
+    if (totalTokensAwarded > 0) {
+      this.save.addRoguelikeTokens(totalTokensAwarded);
+      parts.push(`💠 +${totalTokensAwarded} Éclats`);
     }
     if (rewardCoins > 0) {
       this.save.addCoins(rewardCoins, this.mode);

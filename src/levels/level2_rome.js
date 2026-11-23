@@ -1,0 +1,1090 @@
+/**
+ * Workd Builder — Level 2: Ancient Rome ("La Domus Romaine Classique" — 48 Blocks)
+ * Sculpted 128x128 Mediterranean Tuscan/Latium terrain with multi-layer PBR splatting
+ * (olive-green grass & wildflowers, cobblestone Roman Via road, crushed travertine dust,
+ * turquoise Roman cistern), Italian cypresses, terracotta amphorae, Travertine Marble Quarry,
+ * Roman Cargo Sleds, Pergola Stonemason Workshop, and a 4-tier 48-block Roman Domus with
+ * geometric mosaic atrium, sunken impluvium, fluted marble columns, and sloped terracotta
+ * compluvium roof tiles (tegulae).
+ */
+
+import * as THREE from 'three';
+import { Level1Pyramid } from './level1_pyramid.js';
+
+const BLOCK_W = 0.96;
+const BLOCK_H = 0.62;
+const BLOCK_D = 0.96;
+const DOMUS_STEP = 1.04;
+const DOMUS_CENTER = new THREE.Vector3(3.6, 0, -0.8);
+const FOUNDATION_Y = 0.24;
+
+const TERRAIN_W = 20.4;
+const TERRAIN_D = 19.2;
+const TERRAIN_SEGS = 128;
+const WATER_LEVEL = -0.14;
+
+function clamp01(v) {
+  return v < 0 ? 0 : v > 1 ? 1 : v;
+}
+
+function smoothstep(edge0, edge1, x) {
+  const t = clamp01((x - edge0) / (edge1 - edge0));
+  return t * t * (3 - 2 * t);
+}
+
+function rectFlatMask(x, z, cx, cz, halfW, halfD, feather = 1.35) {
+  const dx = Math.max(Math.abs(x - cx) - halfW, 0);
+  const dz = Math.max(Math.abs(z - cz) - halfD, 0);
+  return 1.0 - smoothstep(0.0, feather, Math.hypot(dx, dz));
+}
+
+function segmentDist(px, pz, ax, az, bx, bz) {
+  const vx = bx - ax;
+  const vz = bz - az;
+  const wx = px - ax;
+  const wz = pz - az;
+  const lenSq = vx * vx + vz * vz;
+  const t = lenSq > 0 ? clamp01((wx * vx + wz * vz) / lenSq) : 0;
+  return Math.hypot(px - (ax + vx * t), pz - (az + vz * t));
+}
+
+/**
+ * Unified 128x128 Mediterranean Tuscan/Latium terrain heightfield.
+ * Rolling cypress hills around the perimeter, travertine quarry pit in NW,
+ * sunken Roman cistern channel in NE, and flat compacted work pads under all 4 stations.
+ */
+function sampleRomanTerrainHeight(x, z) {
+  const hillBase =
+    Math.sin(x * 0.3 + z * 0.24 + 0.5) * 0.28 +
+    Math.cos(x * 0.22 - z * 0.34) * 0.24 +
+    Math.sin(x * 0.62 + z * 0.45) * 0.08;
+
+  // Perimeter Tuscan hills & terraced cypress hillside
+  const edgeX = Math.max(0, Math.abs(x) - 5.9);
+  const edgeZ = Math.max(0, Math.abs(z) - 5.6);
+  const perimeterHill =
+    smoothstep(0.0, 4.4, Math.hypot(edgeX, edgeZ)) *
+    (0.88 + Math.sin(x * 0.52 - z * 0.38) * 0.28);
+
+  // Subtle vineyard terrace steps on North & South hillside rims
+  const northTerrace =
+    smoothstep(-5.8, -8.8, z) * (1.0 - smoothstep(2.0, 6.2, x)) * 0.48;
+  const southRidge = smoothstep(6.0, 9.0, z) * 0.34;
+  const westHill = smoothstep(-6.2, -9.6, x) * 0.44;
+
+  let h = 0.06 + hillBase * 0.44 + perimeterHill + northTerrace + southRidge + westHill;
+
+  // Decorative Roman water cistern / channel basin in NE corner
+  const cisDist = Math.hypot((x - 7.5) / 3.0, (z + 5.75) / 2.65);
+  const cisternMask = 1.0 - smoothstep(0.45, 1.38, cisDist);
+  h -= cisternMask * 0.72;
+
+  // Excavated white travertine marble quarry pit in NW
+  const quarryPit = rectFlatMask(x, z, -4.6, -4.45, 2.35, 1.8, 1.55);
+  h = h * (1.0 - quarryPit) + -0.055 * quarryPit;
+
+  // Flat compacted pads for Roman Via tracks, Pergola Workshop, Staging & Domus
+  const flatMask = Math.max(
+    rectFlatMask(x, z, -4.6, -1.75, 2.3, 1.35, 1.2),
+    rectFlatMask(x, z, -4.55, 0.75, 1.55, 2.65, 1.15),
+    rectFlatMask(x, z, -4.6, 5.0, 2.4, 1.95, 1.3),
+    rectFlatMask(x, z, 0.2, 4.75, 3.0, 1.4, 1.2),
+    rectFlatMask(x, z, 4.1, 4.75, 1.5, 1.4, 1.1),
+    rectFlatMask(x, z, 3.6, -0.8, 3.35, 3.35, 1.45),
+    rectFlatMask(x, z, -1.6, 1.0, 2.6, 3.0, 1.65)
+  );
+  h *= 1.0 - flatMask;
+
+  // Gentle beveled island perimeter skirt
+  const rimT = Math.max(smoothstep(9.5, 10.2, Math.abs(x)), smoothstep(8.9, 9.6, Math.abs(z)));
+  h -= rimT * 0.24;
+
+  return h;
+}
+
+/**
+ * 4-Biome Roman Terrain Splat Weights:
+ *   x = Olive-Green Grass & Wildflowers
+ *   y = Warm Terracotta Earth & Cobblestone Roman Via Road
+ *   z = Pale Crushed Travertine & Marble Quarry Dust
+ *   w = Lush Cistern Bank & Hillside Moss
+ */
+function computeRomanSplatWeights(x, z, h) {
+  const jitter = Math.sin(x * 1.15 + z * 0.92) * 0.34 + Math.cos(x * 1.7 - z * 1.3) * 0.18;
+
+  // Biome 2 (z): Pale Crushed Travertine & Marble Quarry Dust around NW quarry & SW pergola
+  const wQuarry = Math.max(
+    rectFlatMask(x + jitter * 0.28, z + jitter * 0.24, -4.6, -4.35, 2.7, 2.15, 1.95),
+    rectFlatMask(x + jitter * 0.22, z + jitter * 0.22, -4.6, 5.0, 2.05, 1.65, 1.5) * 0.84,
+    rectFlatMask(x + jitter * 0.18, z + jitter * 0.18, 3.6, -0.8, 2.95, 2.95, 1.15) * 0.42
+  );
+
+  // Biome 1 (y): Compacted Terracotta Earth & Cobblestone Roman Via Road under tracks & walkways
+  const dTrackA = segmentDist(x, z, -4.55, -2.2, -4.55, 3.2);
+  const dTrackB = segmentDist(x, z, -2.6, 4.75, 3.2, 4.75);
+  const dViaPath = segmentDist(x, z, -2.0, -1.0, 1.6, 2.0);
+  const dDomusApron = segmentDist(x, z, 3.6, 2.4, 3.6, 4.75);
+
+  const wPath = Math.max(
+    1.0 - smoothstep(0.95, 2.1, dTrackA + jitter * 0.35),
+    1.0 - smoothstep(0.95, 2.1, dTrackB + jitter * 0.35),
+    (1.0 - smoothstep(0.75, 1.85, dViaPath + jitter * 0.3)) * 0.85,
+    (1.0 - smoothstep(0.9, 1.95, dDomusApron + jitter * 0.28)) * 0.88,
+    rectFlatMask(x, z, 4.1, 4.75, 1.4, 1.3, 1.0) * 0.9
+  );
+
+  // Biome 3 (w): Lush Cistern Bank & Hillside Cypress Moss around NE cistern & groves
+  const dCistern = Math.hypot((x - 7.5) / 3.35, (z + 5.75) / 2.95);
+  const wCistern = 1.0 - smoothstep(0.7, 1.52, dCistern + jitter * 0.2);
+
+  // Biome 0 (x): Lush Mediterranean Olive-Green Grass & Wildflowers everywhere else
+  const used = clamp01(wQuarry * 0.95 + wPath * 0.9 + wCistern * 0.85);
+  let w0 = Math.max(0.14, 1.0 - used);
+  let w1 = wPath * (1.0 - wCistern * 0.55);
+  let w2 = wQuarry * (1.0 - wCistern * 0.7);
+  let w3 = wCistern;
+
+  const sum = w0 + w1 + w2 + w3;
+  w0 /= sum;
+  w1 /= sum;
+  w2 /= sum;
+  w3 /= sum;
+
+  const wetness = 1.0 - smoothstep(WATER_LEVEL - 0.04, WATER_LEVEL + 0.16, h);
+  return { w0, w1, w2, w3, wetness };
+}
+
+/**
+ * Builds an inward-sloping terracotta roof wedge geometry (tegulae compluvium slope).
+ * Slopes downward toward +Z (rotated per slot around Y so every roof section slopes toward the central impluvium!).
+ */
+function createCompluviumRoofGeometry(width, height, depth) {
+  const geo = new THREE.BoxGeometry(width, height, depth, 2, 1, 2);
+  const pos = geo.attributes.position;
+  for (let i = 0; i < pos.count; i++) {
+    const y = pos.getY(i);
+    const z = pos.getZ(i);
+    if (y > 0) {
+      // Higher outer eave at -Z, lower inner compluvium drip edge at +Z
+      const t = (z + depth * 0.5) / depth; // 0 at outer edge, 1 at inner edge
+      pos.setY(i, height * 0.5 + (1 - t) * 0.34 - t * 0.08);
+    }
+  }
+  geo.computeVertexNormals();
+  return geo;
+}
+
+/**
+ * Builds a classical fluted Roman marble column geometry with base plinth & Doric capital.
+ */
+function createFlutedColumnGeometry(height) {
+  const pts = [
+    new THREE.Vector2(0.0, -height * 0.5),
+    new THREE.Vector2(0.36, -height * 0.5),
+    new THREE.Vector2(0.36, -height * 0.38),
+    new THREE.Vector2(0.27, -height * 0.34),
+    new THREE.Vector2(0.24, height * 0.32),
+    new THREE.Vector2(0.33, height * 0.4),
+    new THREE.Vector2(0.36, height * 0.42),
+    new THREE.Vector2(0.36, height * 0.5),
+    new THREE.Vector2(0.0, height * 0.5),
+  ];
+  const geo = new THREE.LatheGeometry(pts, 16);
+  geo.computeVertexNormals();
+  return geo;
+}
+
+/**
+ * Defines the 48-block, 4-tier Classical Roman Domus Blueprint:
+ *   Tier 1 (16 blocks): Perimeter travertine foundation around mosaic atrium & impluvium
+ *   Tier 2 (14 blocks): 10 perimeter Roman Ashlar walls (with front doorway & garden arch) + 4 fluted marble atrium columns
+ *   Tier 3 (10 blocks): Carved stone lintels, architrave beams & upper frieze
+ *   Tier 4 (8 blocks):  Sloped terracotta-red compluvium roof sections sloping inward toward the central impluvium
+ */
+function buildDomusBlueprintTiers() {
+  // Tier 1: 5x5 outer perimeter ring = 16 blocks
+  const tier1 = [];
+  for (let gx = -2; gx <= 2; gx++) {
+    for (let gz = -2; gz <= 2; gz++) {
+      if (Math.abs(gx) === 2 || Math.abs(gz) === 2) {
+        tier1.push({ dx: gx, dz: gz, pieceType: 'ashlar', rotY: 0 });
+      }
+    }
+  }
+
+  // Tier 2: 10 perimeter Ashlar walls (South doorway [0,2] & North garden vista [0,-2] open) + 4 fluted columns = 14 blocks
+  const tier2Walls = [
+    [-2, -2], [-1, -2], [1, -2], [2, -2],
+    [-2, 0], [2, 0],
+    [-2, 2], [-1, 2], [1, 2], [2, 2],
+  ].map(([dx, dz]) => ({ dx, dz, pieceType: 'ashlar', rotY: 0 }));
+
+  const tier2Columns = [
+    [-1, -1], [1, -1], [-1, 1], [1, 1],
+  ].map(([dx, dz]) => ({ dx, dz, pieceType: 'column', rotY: 0 }));
+
+  const tier2 = [...tier2Walls, ...tier2Columns];
+
+  // Tier 3: Entablature lintels bridging the doorway, garden arch & side peristyle = 10 blocks
+  const tier3 = [
+    [-1, -2], [0, -2], [1, -2],
+    [-2, -1], [2, -1],
+    [-2, 1], [2, 1],
+    [-1, 2], [0, 2], [1, 2],
+  ].map(([dx, dz]) => ({ dx, dz, pieceType: 'ashlar', rotY: 0 }));
+
+  // Tier 4: 8 sloped terracotta compluvium roof sections sloping inward toward (0,0)
+  const tier4 = [
+    { dx: -1, dz: -1, pieceType: 'roof', rotY: 0 }, // North slope -> toward +Z
+    { dx: 0, dz: -1, pieceType: 'roof', rotY: 0 },
+    { dx: 1, dz: -1, pieceType: 'roof', rotY: 0 },
+    { dx: 1, dz: 0, pieceType: 'roof', rotY: -Math.PI * 0.5 }, // East slope -> toward -X
+    { dx: 1, dz: 1, pieceType: 'roof', rotY: Math.PI }, // South slope -> toward -Z
+    { dx: 0, dz: 1, pieceType: 'roof', rotY: Math.PI },
+    { dx: -1, dz: 1, pieceType: 'roof', rotY: Math.PI },
+    { dx: -1, dz: 0, pieceType: 'roof', rotY: Math.PI * 0.5 }, // West slope -> toward +X
+  ];
+
+  return [tier1, tier2, tier3, tier4];
+}
+
+export class Level2Rome extends Level1Pyramid {
+  static meta = {
+    id: 'level2_rome',
+    title: 'Niveau 2 : La Domus Romaine (48 blocs)',
+    hudLabel: 'Rome • Domus',
+    skyColor: '#cde4f0',
+    totalGoal: 48,
+    rewardCoins: 120,
+    firstCompletionTokens: 15,
+  };
+
+  constructor(opts) {
+    super({
+      ...opts,
+      runConfig: null,
+    });
+    this.root.name = 'Level2RomeRoot';
+    this.totalGoal = Level2Rome.meta.totalGoal;
+    this.hudLabel = Level2Rome.meta.hudLabel;
+  }
+
+  _beforeBuild() {
+    this.rome = this.textures.ensureRomePack();
+    this.totalGoal = Level2Rome.meta.totalGoal;
+    this.hudLabel = Level2Rome.meta.hudLabel;
+
+    // Upgrade Roman ashlar material with Royal Gold sheen if player purchased the upgrade
+    if (this.upgrades.royal_gold_stone) {
+      const m = this._trackMat(this.rome.materials.romanAshlar.clone());
+      m.emissive = new THREE.Color('#6b4708');
+      m.emissiveIntensity = 0.15;
+      m.metalness = 0.22;
+      this.carvedBlockMat = m;
+    } else {
+      this.carvedBlockMat = this.rome.materials.romanAshlar;
+    }
+  }
+
+  _getRawBlockMaterial() {
+    return this.rome.materials.rawTravertine;
+  }
+
+  _initSharedGeometries() {
+    super._initSharedGeometries();
+
+    // Roman specialized architectural geometries (Fluted Column + Sloped Compluvium Roof Tile)
+    this.geos.romanColumn = this._trackGeo(createFlutedColumnGeometry(BLOCK_H * 1.18));
+    this.geos.ghostColumn = this._trackGeo(new THREE.CylinderGeometry(0.32, 0.34, BLOCK_H * 1.16, 12));
+    this.geos.ghostColumnEdges = this._trackGeo(new THREE.EdgesGeometry(this.geos.ghostColumn));
+
+    this.geos.romanRoof = this._trackGeo(createCompluviumRoofGeometry(BLOCK_W * 1.06, BLOCK_H * 0.72, BLOCK_D * 1.06));
+    this.geos.ghostRoof = this._trackGeo(createCompluviumRoofGeometry(BLOCK_W * 1.02, BLOCK_H * 0.7, BLOCK_D * 1.02));
+    this.geos.ghostRoofEdges = this._trackGeo(new THREE.EdgesGeometry(this.geos.ghostRoof));
+
+    // Pale travertine dust particle color for Roman chipping
+    this.mats.dustLimestone.color.set('#f4efe4');
+    this.mats.dustSand.color.set('#d2a472');
+  }
+
+  getTerrainHeight(x, z) {
+    return sampleRomanTerrainHeight(x * this.mirrorX, z);
+  }
+
+  /* ============================================================================
+   * 1. SCULPTED 128x128 MEDITERRANEAN TUSCAN TERRAIN, CISTERN, CYPRESS & AMPHORAE
+   * ========================================================================== */
+  _buildDioramaBase() {
+    const env = new THREE.Group();
+    this.root.add(env);
+
+    // Unified 128x128 sculpted Mediterranean terrain mesh with 4-biome PBR splatting
+    const terrainGeo = this._trackGeo(
+      new THREE.PlaneGeometry(TERRAIN_W, TERRAIN_D, TERRAIN_SEGS, TERRAIN_SEGS)
+    );
+    terrainGeo.rotateX(-Math.PI / 2);
+
+    const pos = terrainGeo.attributes.position;
+    const count = pos.count;
+    const splats = new Float32Array(count * 4);
+    const wetnessArr = new Float32Array(count);
+
+    for (let i = 0; i < count; i++) {
+      const x = pos.getX(i);
+      const z = pos.getZ(i);
+      const sx = x * this.mirrorX;
+      const h = sampleRomanTerrainHeight(sx, z);
+      pos.setY(i, h);
+
+      const { w0, w1, w2, w3, wetness } = computeRomanSplatWeights(sx, z, h);
+      const i4 = i * 4;
+      splats[i4] = w0;
+      splats[i4 + 1] = w1;
+      splats[i4 + 2] = w2;
+      splats[i4 + 3] = w3;
+      wetnessArr[i] = wetness;
+    }
+
+    terrainGeo.setAttribute('aSplat', new THREE.BufferAttribute(splats, 4));
+    terrainGeo.setAttribute('aWetness', new THREE.BufferAttribute(wetnessArr, 1));
+    terrainGeo.computeVertexNormals();
+
+    const terrainMesh = new THREE.Mesh(terrainGeo, this.rome.materials.terrainSplat);
+    terrainMesh.receiveShadow = true;
+    env.add(terrainMesh);
+
+    // Contoured earthen/travertine island plinth skirt
+    const skirtGeo = this._buildContouredPlinthSkirt();
+    const skirtMesh = new THREE.Mesh(skirtGeo, this.textures.materials.plinth);
+    skirtMesh.receiveShadow = true;
+    env.add(skirtMesh);
+
+    const bottomCapGeo = this._trackGeo(new THREE.PlaneGeometry(TERRAIN_W, TERRAIN_D));
+    bottomCapGeo.rotateX(Math.PI / 2);
+    const bottomCap = new THREE.Mesh(bottomCapGeo, this.textures.materials.plinth);
+    bottomCap.position.y = -1.65;
+    env.add(bottomCap);
+
+    // Decorative turquoise Roman water cistern / channel edge in North-East
+    this._buildRomanCistern(env);
+
+    // Stylized Mediterranean Cypress trees across the Tuscan hillside & cistern edge
+    const cypressSpecs = [
+      [4.5, -6.95, 1.16],
+      [8.25, -7.25, 1.02],
+      [5.75, -8.35, 0.94],
+      [7.8, 5.7, 1.08],
+      [-7.9, 6.25, 0.96],
+      [-8.3, -1.8, 1.05],
+      [0.4, -7.9, 1.12],
+      [8.4, 2.2, 0.9],
+    ];
+    cypressSpecs.forEach(([cx, cz, sc]) => {
+      this._createRomanCypress(env, this._mx(cx), cz, sc);
+    });
+
+    // Cut white travertine Roman Via stepping flagstones
+    const stepGeo = this._trackGeo(new THREE.BoxGeometry(0.95, 0.08, 0.72));
+    [
+      [-1.7, -0.8],
+      [-1.15, 0.3],
+      [-0.55, 1.4],
+      [0.05, 2.5],
+      [3.6, 2.95],
+      [3.6, 3.85],
+    ].forEach(([sx, sz], i) => {
+      const wx = this._mx(sx);
+      const h = this.getTerrainHeight(wx, sz);
+      const stone = new THREE.Mesh(stepGeo, this.rome.materials.romanAshlar);
+      stone.position.set(wx, h + 0.015, sz);
+      stone.rotation.y = (i % 2 === 0 ? 0.08 : -0.1) * this.mirrorX;
+      stone.receiveShadow = true;
+      env.add(stone);
+    });
+
+    // Stylized Terracotta Roman Amphorae props around the diorama edge & workshop
+    this._buildTerracottaAmphorae(env);
+  }
+
+  _buildRomanCistern(parent) {
+    // Shimmering turquoise cistern water surface
+    const waterGeo = this._trackGeo(new THREE.CircleGeometry(3.15, 32));
+    waterGeo.rotateX(-Math.PI / 2);
+    const water = new THREE.Mesh(waterGeo, this.textures.materials.oasisWater);
+    water.position.set(this._mx(7.5), WATER_LEVEL, -5.75);
+    water.scale.set(1.02, 1, 0.88);
+    water.receiveShadow = true;
+    parent.add(water);
+    this.nileWaterMesh = water;
+
+    // Carved travertine Roman cistern stone coping curb along the inner shoreline
+    const curbGeo = this._trackGeo(new THREE.BoxGeometry(1.1, 0.24, 0.34));
+    [
+      [4.7, -5.2, 0.55],
+      [5.4, -4.1, 0.95],
+      [6.5, -3.55, 1.42],
+      [7.7, -3.45, 1.65],
+    ].forEach(([cx, cz, rot]) => {
+      const wx = this._mx(cx);
+      const h = Math.max(this.getTerrainHeight(wx, cz), WATER_LEVEL + 0.02);
+      const curb = new THREE.Mesh(curbGeo, this.rome.materials.travertineCliff);
+      curb.position.set(wx, h + 0.08, cz);
+      curb.rotation.y = rot * this.mirrorX;
+      curb.castShadow = true;
+      curb.receiveShadow = true;
+      parent.add(curb);
+    });
+  }
+
+  _createRomanCypress(parent, x, z, scale = 1.0) {
+    const group = new THREE.Group();
+    const groundY = this.getTerrainHeight(x, z);
+    group.position.set(x, groundY - 0.04, z);
+    group.scale.setScalar(scale);
+
+    const trunk = new THREE.Mesh(
+      this._trackGeo(new THREE.CylinderGeometry(0.08, 0.13, 0.6, 6)),
+      this.textures.materials.palmTrunk
+    );
+    trunk.position.y = 0.28;
+    trunk.castShadow = true;
+    group.add(trunk);
+
+    const crown = new THREE.Group();
+    crown.position.y = 0.45;
+    const tiers = [
+      { r: 0.44, h: 1.4, y: 0.65, mat: this.rome.materials.cypressLeaf },
+      { r: 0.34, h: 1.25, y: 1.38, mat: this.rome.materials.cypressLeafLight },
+      { r: 0.22, h: 0.95, y: 2.02, mat: this.rome.materials.cypressLeaf },
+    ];
+    tiers.forEach((t) => {
+      const cone = new THREE.Mesh(this._trackGeo(new THREE.ConeGeometry(t.r, t.h, 8)), t.mat);
+      cone.position.y = t.y;
+      cone.castShadow = true;
+      crown.add(cone);
+    });
+
+    group.add(crown);
+    this.palmFronds.push({ group: crown, phase: x * 0.65 + z * 0.4 });
+    parent.add(group);
+  }
+
+  _buildTerracottaAmphorae(parent) {
+    const ampPts = [
+      new THREE.Vector2(0.0, 0.0),
+      new THREE.Vector2(0.11, 0.0),
+      new THREE.Vector2(0.17, 0.14),
+      new THREE.Vector2(0.22, 0.32),
+      new THREE.Vector2(0.18, 0.48),
+      new THREE.Vector2(0.09, 0.58),
+      new THREE.Vector2(0.12, 0.68),
+      new THREE.Vector2(0.09, 0.69),
+    ];
+    const ampGeo = this._trackGeo(new THREE.LatheGeometry(ampPts, 12));
+
+    [
+      [-7.2, 4.4, 1.0],
+      [-6.7, 4.9, 0.85],
+      [6.4, 4.4, 0.95],
+      [6.95, 4.75, 0.8],
+      [-1.8, -5.8, 0.92],
+      [3.9, -5.5, 0.88],
+    ].forEach(([ax, az, sc]) => {
+      const wx = this._mx(ax);
+      const y = this.getTerrainHeight(wx, az);
+      const mesh = new THREE.Mesh(ampGeo, this.rome.materials.amphoraClay);
+      mesh.position.set(wx, y - 0.02, az);
+      mesh.scale.setScalar(sc);
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      parent.add(mesh);
+    });
+  }
+
+  /* ============================================================================
+   * 2. ZONE 1 — LA CARRIÈRE DE MARBRE & TRAVERTIN (NORTH-WEST)
+   * ========================================================================== */
+  _buildQuarryStation() {
+    const quarryGroup = new THREE.Group();
+    this.root.add(quarryGroup);
+
+    // Stepped white-and-cream travertine marble cliff ledges
+    const terraceSpecs = [
+      { pos: [this._mx(-4.6), 0.72, -6.35], size: [5.5, 1.45, 2.3] },
+      { pos: [this._mx(-4.7), 1.68, -6.9], size: [4.5, 1.05, 1.55] },
+      { pos: [this._mx(-6.55), 0.55, -5.1], size: [1.8, 1.1, 2.4] },
+      { pos: [this._mx(-2.7), 0.46, -5.35], size: [1.6, 0.92, 1.9] },
+      { pos: [this._mx(-4.6), 0.34, -5.35], size: [2.7, 0.68, 1.35] },
+    ];
+    terraceSpecs.forEach((t) => {
+      const mesh = new THREE.Mesh(
+        this._trackGeo(new THREE.BoxGeometry(t.size[0], t.size[1], t.size[2])),
+        this.rome.materials.travertineCliff
+      );
+      mesh.position.set(t.pos[0], t.pos[1], t.pos[2]);
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      quarryGroup.add(mesh);
+    });
+
+    // Roman timber & bronze crane beam over quarry cliff
+    const postGeo = this._trackGeo(new THREE.CylinderGeometry(0.08, 0.1, 1.35, 8));
+    const post = new THREE.Mesh(postGeo, this.textures.materials.timberDark);
+    post.position.set(this._mx(-3.0), 1.45, -6.2);
+    post.castShadow = true;
+    quarryGroup.add(post);
+
+    const beam = new THREE.Mesh(
+      this._trackGeo(new THREE.BoxGeometry(1.6, 0.12, 0.12)),
+      this.textures.materials.timber
+    );
+    beam.position.set(this._mx(-3.55), 2.02, -5.95);
+    beam.rotation.y = 0.25 * this.mirrorX;
+    beam.castShadow = true;
+    quarryGroup.add(beam);
+
+    // 3 Extractable Travertine Marble Rock Nodes nestled into the excavated quarry pit
+    const nodePositions = [
+      new THREE.Vector3(this._mx(-6.05), this.getTerrainHeight(this._mx(-6.05), -4.55) + 0.44, -4.55),
+      new THREE.Vector3(this._mx(-4.6), this.getTerrainHeight(this._mx(-4.6), -4.78) + 0.48, -4.78),
+      new THREE.Vector3(this._mx(-3.15), this.getTerrainHeight(this._mx(-3.15), -4.55) + 0.44, -4.55),
+    ];
+
+    const nodeGeo = this._trackGeo(new THREE.DodecahedronGeometry(0.62, 0));
+    const hitSphereGeo = this._trackGeo(new THREE.SphereGeometry(0.84, 8, 6));
+    const hitMat = this._trackMat(new THREE.MeshBasicMaterial({ visible: false }));
+
+    nodePositions.forEach((pos, idx) => {
+      const nodeGroup = new THREE.Group();
+      nodeGroup.position.copy(pos);
+
+      const mat = this._trackMat(this.rome.materials.rawTravertine.clone());
+      mat.emissive = new THREE.Color(0x3a3222);
+      mat.emissiveIntensity = 0.08;
+
+      const rockMesh = new THREE.Mesh(nodeGeo, mat);
+      rockMesh.scale.set(1.12, 0.86, 1.04);
+      rockMesh.rotation.set(idx * 0.4, idx * 1.1, idx * 0.25);
+      rockMesh.castShadow = true;
+      rockMesh.receiveShadow = true;
+      nodeGroup.add(rockMesh);
+
+      const nodeData = {
+        index: idx,
+        group: nodeGroup,
+        mesh: rockMesh,
+        material: mat,
+        basePos: pos.clone(),
+        hits: 0,
+        maxHits: this.quarryMaxHits,
+        depleted: false,
+        regenTimer: 0,
+        shakeTime: 0,
+      };
+
+      const hitbox = new THREE.Mesh(hitSphereGeo, hitMat);
+      hitbox.userData.interact = { type: 'quarry-node', node: nodeData };
+      rockMesh.userData.interact = { type: 'quarry-node', node: nodeData };
+      nodeGroup.add(hitbox);
+
+      quarryGroup.add(nodeGroup);
+      this.quarryNodes.push(nodeData);
+    });
+
+    // Travertine Stone Quarry Output Pad (5 neat slots right in front of the rock nodes)
+    const pad = new THREE.Mesh(
+      this._trackGeo(new THREE.BoxGeometry(5.6, 0.14, 1.35)),
+      this.rome.materials.romanAshlar
+    );
+    pad.position.set(this._mx(-4.6), 0.07, -3.15);
+    pad.receiveShadow = true;
+    quarryGroup.add(pad);
+
+    for (let i = 0; i < 5; i++) {
+      const sx = this._mx(-6.6 + i * 1.0);
+      const sz = -3.15;
+      const marker = this._createSlotMarker(quarryGroup, sx, 0.155, sz);
+      this.quarrySlots.push({
+        id: `quarry_${i}`,
+        zoneType: 'quarry',
+        accepts: ['raw'],
+        position: new THREE.Vector3(sx, 0.14 + BLOCK_H * 0.5, sz),
+        dropIndicatorY: 0.15,
+        marker,
+        block: null,
+      });
+    }
+  }
+
+  /* ============================================================================
+   * 3. ZONE 3 — L'ATELIER DU TAILLEUR ROMAIN (TIMBER PERGOLA + MARBLE WORKBENCH)
+   * ========================================================================== */
+  _buildStonecutterWorkshop() {
+    const ws = new THREE.Group();
+    this.root.add(ws);
+
+    const cx = this._mx(-4.6);
+    const cz = 5.0;
+
+    // Travertine stone workshop patio floor
+    const floor = new THREE.Mesh(
+      this._trackGeo(new THREE.BoxGeometry(4.4, 0.14, 3.2)),
+      this.rome.materials.romanAshlar
+    );
+    floor.position.set(cx, 0.07, cz);
+    floor.receiveShadow = true;
+    ws.add(floor);
+
+    // Roman Timber Pergola (4 carved stone plinth bases + dark cedar posts + open pergola beams)
+    const plinthGeo = this._trackGeo(new THREE.BoxGeometry(0.32, 0.24, 0.32));
+    const postGeo = this._trackGeo(new THREE.CylinderGeometry(0.085, 0.1, 2.2, 8));
+    [
+      [cx - 1.85, cz - 1.3],
+      [cx + 1.85, cz - 1.3],
+      [cx - 1.85, cz + 1.3],
+      [cx + 1.85, cz + 1.3],
+    ].forEach(([px, pz]) => {
+      const plinth = new THREE.Mesh(plinthGeo, this.rome.materials.travertineCliff);
+      plinth.position.set(px, 0.24, pz);
+      plinth.castShadow = true;
+      ws.add(plinth);
+
+      const post = new THREE.Mesh(postGeo, this.textures.materials.timberDark);
+      post.position.set(px, 1.42, pz);
+      post.castShadow = true;
+      ws.add(post);
+    });
+
+    // Pergola main girders & cross rafters
+    const girderGeo = this._trackGeo(new THREE.BoxGeometry(4.15, 0.14, 0.16));
+    [-1.3, 1.3].forEach((dz) => {
+      const girder = new THREE.Mesh(girderGeo, this.textures.materials.timberDark);
+      girder.position.set(cx, 2.52, cz + dz);
+      girder.castShadow = true;
+      ws.add(girder);
+    });
+
+    const rafterGroup = new THREE.Group();
+    rafterGroup.position.set(cx, 2.64, cz);
+    const rafterGeo = this._trackGeo(new THREE.BoxGeometry(0.11, 0.1, 3.1));
+    for (let i = -3; i <= 3; i++) {
+      const rafter = new THREE.Mesh(rafterGeo, this.textures.materials.timber);
+      rafter.position.set(i * 0.58, 0, 0);
+      rafter.castShadow = true;
+      rafterGroup.add(rafter);
+    }
+    // Mediterranean vine foliage clusters draped across pergola rafters
+    const vineGeo = this._trackGeo(new THREE.SphereGeometry(0.28, 7, 6));
+    [
+      [-1.35, 0.1, -0.8],
+      [-0.6, 0.12, -1.1],
+      [0.95, 0.1, -0.95],
+      [1.45, 0.1, 0.55],
+      [-1.1, 0.1, 0.9],
+    ].forEach(([vx, vy, vz]) => {
+      const v = new THREE.Mesh(vineGeo, this.rome.materials.cypressLeafLight);
+      v.position.set(vx, vy, vz);
+      v.scale.set(1.4, 0.45, 1.1);
+      rafterGroup.add(v);
+    });
+    this.canopyMesh = rafterGroup;
+    ws.add(rafterGroup);
+
+    // White Travertine Marble Workbench (centered under pergola)
+    const wbX = cx - this._mx(0.55);
+    const wbZ = cz - 0.12;
+    const benchBase = new THREE.Mesh(
+      this._trackGeo(new THREE.BoxGeometry(1.58, 0.62, 1.38)),
+      this.textures.materials.timberDark
+    );
+    benchBase.position.set(wbX, 0.44, wbZ);
+    benchBase.castShadow = true;
+    benchBase.receiveShadow = true;
+    ws.add(benchBase);
+
+    const benchTop = new THREE.Mesh(
+      this._trackGeo(new THREE.BoxGeometry(1.72, 0.14, 1.52)),
+      this.rome.materials.travertineCliff
+    );
+    benchTop.position.set(wbX, 0.8, wbZ);
+    benchTop.castShadow = true;
+    benchTop.receiveShadow = true;
+    ws.add(benchTop);
+
+    // Iron chisels & bronze mallet resting on marble workbench
+    const malletHandle = new THREE.Mesh(
+      this._trackGeo(new THREE.CylinderGeometry(0.035, 0.035, 0.4, 6)),
+      this.textures.materials.timber
+    );
+    malletHandle.position.set(wbX - this._mx(0.6), 0.91, wbZ + 0.46);
+    malletHandle.rotation.set(Math.PI / 2, 0.35, 0);
+    ws.add(malletHandle);
+
+    const malletHead = new THREE.Mesh(
+      this._trackGeo(new THREE.CylinderGeometry(0.085, 0.085, 0.22, 8)),
+      this.rome.materials.romanBronze
+    );
+    malletHead.position.set(wbX - this._mx(0.67), 0.93, wbZ + 0.3);
+    malletHead.rotation.z = Math.PI / 2;
+    ws.add(malletHead);
+
+    const chiselMat = this.upgrades.golden_chisel
+      ? this.textures.materials.capstoneGold
+      : this.rome.materials.romanBronze;
+    const chisel = new THREE.Mesh(this._trackGeo(new THREE.BoxGeometry(0.06, 0.05, 0.36)), chiselMat);
+    chisel.position.set(wbX + this._mx(0.62), 0.9, wbZ - 0.42);
+    chisel.rotation.y = -0.38;
+    ws.add(chisel);
+
+    // Workbench active carving slot
+    const wbY = 0.87;
+    const wbMarker = this._createSlotMarker(ws, wbX, wbY + 0.015, wbZ);
+    this.workbenchSlot = {
+      id: 'workbench_anvil',
+      zoneType: 'workbench',
+      accepts: ['raw'],
+      position: new THREE.Vector3(wbX, wbY + BLOCK_H * 0.5, wbZ),
+      dropIndicatorY: wbY + 0.01,
+      marker: wbMarker,
+      block: null,
+    };
+
+    // Generous invisible carve-swipe hitbox over the marble workbench
+    const carveHitGeo = this._trackGeo(new THREE.BoxGeometry(1.9, 1.35, 1.9));
+    const carveHitMat = this._trackMat(new THREE.MeshBasicMaterial({ visible: false }));
+    this.workbenchCarveHitbox = new THREE.Mesh(carveHitGeo, carveHitMat);
+    this.workbenchCarveHitbox.position.set(wbX, wbY + 0.45, wbZ);
+    this.workbenchCarveHitbox.visible = false;
+    ws.add(this.workbenchCarveHitbox);
+
+    // 3 Diegetic Glowing Carving Progress Pips above workbench
+    const pipGeo = this._trackGeo(new THREE.OctahedronGeometry(0.095, 0));
+    this.carvingPips = [];
+    for (let i = 0; i < 3; i++) {
+      const pipMat = this._trackMat(
+        new THREE.MeshBasicMaterial({ color: 0xffe49e, transparent: true, opacity: 0.35 })
+      );
+      const pip = new THREE.Mesh(pipGeo, pipMat);
+      pip.position.set(wbX + (i - 1) * 0.32, wbY + 1.24, wbZ);
+      pip.visible = false;
+      ws.add(pip);
+      this.carvingPips.push({ mesh: pip, mat: pipMat });
+    }
+
+    // 2 Finished Stone Output Slots (right side of Pergola patio)
+    const outPositions = [
+      [cx + this._mx(1.05), cz - 0.55],
+      [cx + this._mx(1.05), cz + 0.55],
+    ];
+    outPositions.forEach(([ox, oz], idx) => {
+      const marker = this._createSlotMarker(ws, ox, 0.155, oz);
+      this.outputSlots.push({
+        id: `workshop_out_${idx}`,
+        zoneType: 'output',
+        accepts: ['carved', 'capstone'],
+        position: new THREE.Vector3(ox, 0.14 + BLOCK_H * 0.5, oz),
+        dropIndicatorY: 0.15,
+        marker,
+        block: null,
+      });
+    });
+  }
+
+  /* ============================================================================
+   * 4. ZONE 4 — CHANTIER DE LA DOMUS ROMAINE CLASSIQUE (48 BLOCKS, 4 TIERS)
+   * ========================================================================== */
+  _buildPyramidSite() {
+    const site = new THREE.Group();
+    this.root.add(site);
+
+    const dc = this.pyramidCenter;
+
+    // Raised Travertine Domus Construction Terrace
+    const basePlatform = new THREE.Mesh(
+      this._trackGeo(new THREE.BoxGeometry(5.9, FOUNDATION_Y, 5.9)),
+      this.rome.materials.travertineCliff
+    );
+    basePlatform.position.set(dc.x, FOUNDATION_Y * 0.5, dc.z);
+    basePlatform.receiveShadow = true;
+    basePlatform.castShadow = true;
+    site.add(basePlatform);
+
+    // Geometric Roman Mosaic Atrium Floor inside the Domus footprint
+    const mosaicFloor = new THREE.Mesh(
+      this._trackGeo(new THREE.PlaneGeometry(5.2, 5.2)),
+      this.rome.materials.mosaicFloor
+    );
+    mosaicFloor.rotation.x = -Math.PI / 2;
+    mosaicFloor.position.set(dc.x, FOUNDATION_Y + 0.008, dc.z);
+    mosaicFloor.receiveShadow = true;
+    site.add(mosaicFloor);
+
+    // Central Sunken Roman Impluvium Pool (carved marble curb + shimmering turquoise rainwater)
+    const impRim = new THREE.Mesh(
+      this._trackGeo(new THREE.BoxGeometry(1.78, 0.12, 1.78)),
+      this.rome.materials.travertineCliff
+    );
+    impRim.position.set(dc.x, FOUNDATION_Y + 0.05, dc.z);
+    impRim.receiveShadow = true;
+    site.add(impRim);
+
+    const impWater = new THREE.Mesh(
+      this._trackGeo(new THREE.PlaneGeometry(1.42, 1.42)),
+      this.textures.materials.oasisWater
+    );
+    impWater.rotation.x = -Math.PI / 2;
+    impWater.position.set(dc.x, FOUNDATION_Y + 0.116, dc.z);
+    site.add(impWater);
+
+    // 4 Corner Roman Bronze Torches / Markers framing the site
+    const postGeo = this._trackGeo(new THREE.CylinderGeometry(0.08, 0.11, 0.72, 8));
+    const capGeo = this._trackGeo(new THREE.SphereGeometry(0.11, 8, 8));
+    [
+      [-2.85, -2.85],
+      [2.85, -2.85],
+      [-2.85, 2.85],
+      [2.85, 2.85],
+    ].forEach(([ox, oz]) => {
+      const post = new THREE.Mesh(postGeo, this.rome.materials.travertineCliff);
+      post.position.set(dc.x + ox, FOUNDATION_Y + 0.34, dc.z + oz);
+      post.castShadow = true;
+      site.add(post);
+
+      const cap = new THREE.Mesh(capGeo, this.rome.materials.romanBronze);
+      cap.position.set(dc.x + ox, FOUNDATION_Y + 0.74, dc.z + oz);
+      site.add(cap);
+    });
+
+    // Aura du Pyramidion upgrade support (golden glowing construction halo)
+    if (this.upgrades.pyramidion_aura) {
+      const auraGeo = this._trackGeo(new THREE.RingGeometry(3.38, 3.68, 40));
+      auraGeo.rotateX(-Math.PI / 2);
+      const auraMat = this._trackMat(
+        new THREE.MeshBasicMaterial({
+          color: 0xffd75e,
+          transparent: true,
+          opacity: 0.45,
+          side: THREE.DoubleSide,
+          depthWrite: false,
+        })
+      );
+      this.auraRingMesh = new THREE.Mesh(auraGeo, auraMat);
+      this.auraRingMesh.position.set(dc.x, FOUNDATION_Y + 0.025, dc.z);
+      site.add(this.auraRingMesh);
+    }
+
+    // Staging Pallet beside Track B end (2x2 = 4 slots)
+    const palletX = this._mx(4.1);
+    const palletZ = 4.75;
+    const pallet = new THREE.Mesh(
+      this._trackGeo(new THREE.BoxGeometry(2.35, 0.14, 2.35)),
+      this.rome.materials.romanAshlar
+    );
+    pallet.position.set(palletX, 0.07, palletZ);
+    pallet.receiveShadow = true;
+    site.add(pallet);
+
+    [
+      [-0.56, -0.56],
+      [0.56, -0.56],
+      [-0.56, 0.56],
+      [0.56, 0.56],
+    ].forEach(([ox, oz], idx) => {
+      const sx = palletX + ox;
+      const sz = palletZ + oz;
+      const marker = this._createSlotMarker(site, sx, 0.155, sz);
+      this.stagingSlots.push({
+        id: `staging_${idx}`,
+        zoneType: 'staging',
+        accepts: ['carved', 'capstone'],
+        position: new THREE.Vector3(sx, 0.14 + BLOCK_H * 0.5, sz),
+        dropIndicatorY: 0.15,
+        marker,
+        block: null,
+      });
+    });
+
+    // Build all 48 progressive blueprint slots across the 4 Roman Domus tiers
+    const tiers = buildDomusBlueprintTiers();
+    this.maxLayerIndex = tiers.length - 1;
+    let slotIdx = 0;
+
+    tiers.forEach((tierCells, layer) => {
+      const layerBaseY = FOUNDATION_Y + layer * BLOCK_H;
+
+      tierCells.forEach((cell, cellIdx) => {
+        const wx = dc.x + cell.dx * DOMUS_STEP;
+        const wz = dc.z + cell.dz * DOMUS_STEP;
+        const isColumn = cell.pieceType === 'column';
+        const isRoof = cell.pieceType === 'roof';
+        const centerY = isColumn
+          ? layerBaseY + BLOCK_H * 0.59
+          : isRoof
+          ? layerBaseY + BLOCK_H * 0.36
+          : layerBaseY + BLOCK_H * 0.5;
+
+        const ghostGroup = new THREE.Group();
+        ghostGroup.position.set(wx, centerY, wz);
+        ghostGroup.rotation.y = cell.rotY || 0;
+
+        const gGeo = isColumn
+          ? this.geos.ghostColumn
+          : isRoof
+          ? this.geos.ghostRoof
+          : this.geos.ghostBox;
+        const gEdges = isColumn
+          ? this.geos.ghostColumnEdges
+          : isRoof
+          ? this.geos.ghostRoofEdges
+          : this.geos.ghostBoxEdges;
+
+        const ghostMesh = new THREE.Mesh(gGeo, this.mats.ghostNormal);
+        const ghostLines = new THREE.LineSegments(gEdges, this.mats.ghostLineNormal);
+        ghostGroup.add(ghostMesh);
+        ghostGroup.add(ghostLines);
+        ghostGroup.visible = layer === 0;
+        site.add(ghostGroup);
+
+        this.pyramidSlots.push({
+          id: `domus_L${layer}_${cellIdx}`,
+          index: slotIdx++,
+          zoneType: 'pyramid',
+          layer,
+          isCapstone: false,
+          pieceType: cell.pieceType,
+          rotY: cell.rotY || 0,
+          accepts: ['carved', 'capstone'],
+          position: new THREE.Vector3(wx, centerY, wz),
+          dropIndicatorY: layerBaseY + 0.01,
+          ghostGroup,
+          ghostMesh,
+          ghostLines,
+          block: null,
+        });
+      });
+    });
+
+    this.totalGoal = this.pyramidSlots.length; // 48 blocks
+  }
+
+  /* ============================================================================
+   * 5. ROMAN STONECUTTING (ASHLAR / FLUTED COLUMN / TERRACOTTA ROOF CORNICE)
+   * ========================================================================== */
+  _shouldForgeCapstone() {
+    // Level 2 finishes with terracotta compluvium roof tiles instead of an Egyptian golden pyramidion
+    return false;
+  }
+
+  _pickNextCarvedPieceType() {
+    const remaining = this.pyramidSlots.filter((s) => s.layer === this.activeLayer && !s.block);
+    if (remaining.some((s) => s.pieceType === 'roof')) return 'roof';
+    if (remaining.some((s) => s.pieceType === 'column')) return 'column';
+    return 'ashlar';
+  }
+
+  carveWorkbenchBlock(swipeVec) {
+    const stillRaw = super.carveWorkbenchBlock(swipeVec);
+    const block = this.workbenchSlot ? this.workbenchSlot.block : null;
+    if (block && block.kind === 'carved' && !stillRaw) {
+      const pieceType = this._pickNextCarvedPieceType();
+      this._applyRomanPieceVisual(block, pieceType);
+    }
+    return stillRaw;
+  }
+
+  _applyRomanPieceVisual(block, pieceType) {
+    block.pieceType = pieceType;
+    if (pieceType === 'column') {
+      block.mesh.geometry = this.geos.romanColumn;
+      block.mesh.material = this.rome.materials.flutedColumn;
+    } else if (pieceType === 'roof') {
+      block.mesh.geometry = this.geos.romanRoof;
+      block.mesh.material = this.rome.materials.terracottaRoof;
+    } else {
+      block.mesh.geometry = this.geos.carvedBlock;
+      block.mesh.material = this.carvedBlockMat;
+    }
+  }
+
+  _fitPlacedBlock(block, slot) {
+    if (!slot || !slot.pieceType) return;
+    this._applyRomanPieceVisual(block, slot.pieceType);
+  }
+
+  /* ============================================================================
+   * 6. ROMAN COMPLETION CELEBRATION (+120 OR & +15 ÉCLATS ON FIRST COMPLETION)
+   * ========================================================================== */
+  _triggerCompletionSequence() {
+    this.isComplete = true;
+    this.clearDropHighlights();
+    this.audio.playVictoryFanfare();
+
+    const dc = this.pyramidCenter;
+    const apexY = FOUNDATION_Y + 4 * BLOCK_H + 0.5;
+
+    this.victoryGroup = new THREE.Group();
+    this.victoryGroup.position.set(dc.x, apexY, dc.z);
+
+    // Sunlit golden Mediterranean celebration rays shining gracefully into the Domus atrium impluvium
+    const innerGeo = this._trackGeo(new THREE.CylinderGeometry(0.32, 1.15, 7.6, 18, 1, true));
+    innerGeo.translate(0, 3.2, 0);
+    const innerMat = this._trackMat(
+      new THREE.MeshBasicMaterial({
+        map: this.textures.maps.sunbeam,
+        color: 0xffe49c,
+        transparent: true,
+        opacity: 0.22,
+        side: THREE.DoubleSide,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+      })
+    );
+    this.victoryBeamInner = new THREE.Mesh(innerGeo, innerMat);
+    this.victoryGroup.add(this.victoryBeamInner);
+
+    const outerGeo = this._trackGeo(new THREE.CylinderGeometry(0.62, 1.75, 7.2, 18, 1, true));
+    outerGeo.translate(0, 3.0, 0);
+    const outerMat = this._trackMat(
+      new THREE.MeshBasicMaterial({
+        map: this.textures.maps.sunbeam,
+        color: 0xffd27a,
+        transparent: true,
+        opacity: 0.11,
+        side: THREE.DoubleSide,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+      })
+    );
+    this.victoryBeamOuter = new THREE.Mesh(outerGeo, outerMat);
+    this.victoryGroup.add(this.victoryBeamOuter);
+
+    const haloGeo = this._trackGeo(new THREE.RingGeometry(0.55, 1.18, 28));
+    haloGeo.rotateX(-Math.PI / 2);
+    const haloMat = this._trackMat(
+      new THREE.MeshBasicMaterial({
+        color: 0xffe488,
+        transparent: true,
+        opacity: 0.28,
+        side: THREE.DoubleSide,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+      })
+    );
+    this.victoryHalo = new THREE.Mesh(haloGeo, haloMat);
+    this.victoryHalo.position.y = -0.35;
+    this.victoryGroup.add(this.victoryHalo);
+
+    this.root.add(this.victoryGroup);
+
+    if (this.onComplete) {
+      const goldMult = this.upgrades.royal_gold_stone ? 1.25 : 1.0;
+      const rewardCoins = Math.round(Level2Rome.meta.rewardCoins * goldMult);
+      this.onComplete({
+        levelId: Level2Rome.meta.id,
+        focusPoint: new THREE.Vector3(dc.x, FOUNDATION_Y + 1.55, dc.z),
+        rewardCoins,
+        firstCompletionTokens: Level2Rome.meta.firstCompletionTokens,
+      });
+    }
+  }
+}

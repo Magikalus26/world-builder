@@ -375,6 +375,7 @@ export class Level1Pyramid {
     this.particles = [];
     this.particleCursor = 0;
 
+    this._beforeBuild();
     this._initSharedGeometries();
     this._buildDioramaBase();
     this._buildQuarryStation();
@@ -383,6 +384,18 @@ export class Level1Pyramid {
     this._buildPyramidSite();
     this._buildParticlePool();
     this._rebuildHitTargets();
+  }
+
+  _beforeBuild() {
+    // Subclass hook for initializing theme-specific PBR packs before geometry creation
+  }
+
+  _getRawBlockMaterial() {
+    return this.textures.materials.rawBlock;
+  }
+
+  _fitPlacedBlock(_block, _slot) {
+    // Subclass hook for fitting carved blocks into specialized slot geometries (columns, sloped roofs)
   }
 
   _mx(x) {
@@ -1655,7 +1668,7 @@ export class Level1Pyramid {
   }
 
   _spawnRawBlock(fromPos, targetSlot) {
-    const mesh = new THREE.Mesh(this.geos.rawBlock, this.textures.materials.rawBlock);
+    const mesh = new THREE.Mesh(this.geos.rawBlock, this._getRawBlockMaterial());
     mesh.castShadow = true;
     mesh.receiveShadow = true;
     mesh.position.copy(fromPos);
@@ -2003,6 +2016,9 @@ export class Level1Pyramid {
     if (isPyramidSnap && targetSlot.isCapstone && block.kind !== 'capstone') {
       this._convertBlockToCapstone(block);
     }
+    if (isPyramidSnap) {
+      this._fitPlacedBlock(block, targetSlot);
+    }
 
     if (isPyramidSnap) {
       block.locked = true;
@@ -2023,7 +2039,7 @@ export class Level1Pyramid {
       arcHeight: isPyramidSnap ? 0.28 : 0.22,
       onDone: () => {
         block.isTweening = false;
-        block.mesh.rotation.set(0, 0, 0);
+        block.mesh.rotation.set(0, targetSlot.rotY || 0, 0);
         this._triggerSquashBounce(block.mesh, 1.12, 0.88);
 
         if (isPyramidSnap) {

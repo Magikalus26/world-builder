@@ -1384,6 +1384,127 @@ export function createTextureLibrary(renderer) {
     }),
   };
 
+  let romePack = null;
+  const romeTextures = [];
+  const romeMaterials = [];
+
+  function ensureRomePack() {
+    if (romePack) return romePack;
+
+    const grass = buildRomanGrassPBR(anisotropy);
+    const viaRoad = buildRomanViaRoadPBR(anisotropy);
+    const travDust = buildTravertineDustPBR(anisotropy);
+    const travertine = buildRomanTravertinePBR(anisotropy);
+    const ashlar = buildRomanAshlarPBR(anisotropy);
+    const fluted = buildRomanFlutedColumnPBR(anisotropy);
+    const roofTiles = buildRomanTerracottaRoofPBR(anisotropy);
+    const mosaicMap = buildRomanMosaicFloor(anisotropy);
+
+    romeTextures.push(
+      grass.albedo,
+      grass.normalRough,
+      viaRoad.albedo,
+      viaRoad.normalRough,
+      travDust.albedo,
+      travDust.normalRough,
+      travertine.map,
+      travertine.normalMap,
+      travertine.roughnessMap,
+      ashlar.map,
+      ashlar.normalMap,
+      ashlar.roughnessMap,
+      fluted.map,
+      fluted.normalMap,
+      fluted.roughnessMap,
+      roofTiles.map,
+      roofTiles.normalMap,
+      roofTiles.roughnessMap,
+      mosaicMap
+    );
+
+    const romanTerrainSplat = createTerrainSplatMaterial({
+      sand: grass,
+      earthPath: viaRoad,
+      quarryDust: travDust,
+      oasisGrass: terrainBiomes.oasisGrass,
+    });
+    romanTerrainSplat.customProgramCacheKey = () => 'workd-builder-roman-terrain-splat-v1';
+
+    const rMats = {
+      terrainSplat: romanTerrainSplat,
+      travertineCliff: new THREE.MeshStandardMaterial({
+        map: travertine.map,
+        normalMap: travertine.normalMap,
+        normalScale: new THREE.Vector2(1.05, 1.05),
+        roughnessMap: travertine.roughnessMap,
+        roughness: 1.0,
+        metalness: 0.04,
+      }),
+      rawTravertine: new THREE.MeshStandardMaterial({
+        map: travertine.map,
+        normalMap: travertine.normalMap,
+        normalScale: new THREE.Vector2(1.15, 1.15),
+        roughnessMap: travertine.roughnessMap,
+        roughness: 1.0,
+        metalness: 0.05,
+        color: new THREE.Color('#fbf7ef'),
+      }),
+      romanAshlar: new THREE.MeshStandardMaterial({
+        map: ashlar.map,
+        normalMap: ashlar.normalMap,
+        normalScale: new THREE.Vector2(0.95, 0.95),
+        roughnessMap: ashlar.roughnessMap,
+        roughness: 1.0,
+        metalness: 0.06,
+      }),
+      flutedColumn: new THREE.MeshStandardMaterial({
+        map: fluted.map,
+        normalMap: fluted.normalMap,
+        normalScale: new THREE.Vector2(1.25, 1.25),
+        roughnessMap: fluted.roughnessMap,
+        roughness: 1.0,
+        metalness: 0.06,
+      }),
+      terracottaRoof: new THREE.MeshStandardMaterial({
+        map: roofTiles.map,
+        normalMap: roofTiles.normalMap,
+        normalScale: new THREE.Vector2(1.3, 1.3),
+        roughnessMap: roofTiles.roughnessMap,
+        roughness: 1.0,
+        metalness: 0.03,
+      }),
+      mosaicFloor: new THREE.MeshStandardMaterial({
+        map: mosaicMap,
+        roughness: 0.42,
+        metalness: 0.05,
+      }),
+      cypressLeaf: new THREE.MeshStandardMaterial({
+        color: new THREE.Color('#3b5f35'),
+        roughness: 0.78,
+        metalness: 0.02,
+      }),
+      cypressLeafLight: new THREE.MeshStandardMaterial({
+        color: new THREE.Color('#4f7a42'),
+        roughness: 0.74,
+        metalness: 0.02,
+      }),
+      amphoraClay: new THREE.MeshStandardMaterial({
+        color: new THREE.Color('#c8693e'),
+        roughness: 0.68,
+        metalness: 0.03,
+      }),
+      romanBronze: new THREE.MeshStandardMaterial({
+        color: new THREE.Color('#b6863c'),
+        roughness: 0.34,
+        metalness: 0.82,
+      }),
+    };
+
+    Object.values(rMats).forEach((m) => romeMaterials.push(m));
+    romePack = { materials: rMats };
+    return romePack;
+  }
+
   return {
     maps: {
       blueprint: blueprintMap,
@@ -1392,9 +1513,421 @@ export function createTextureLibrary(renderer) {
       waterNormal,
     },
     materials,
+    ensureRomePack,
     dispose() {
       textures.forEach((t) => t.dispose());
       Object.values(materials).forEach((m) => m.dispose());
+      romeTextures.forEach((t) => t.dispose());
+      romeMaterials.forEach((m) => m.dispose());
     },
   };
+}
+
+/* ============================================================================
+ * LEVEL 2 (ANCIENT ROME) — PROCEDURAL 512x512 MEDITERRANEAN PBR TEXTURES
+ * ========================================================================== */
+
+/** Roman Biome 0: Lush Mediterranean Olive-Green Grass & Wildflowers (512x512) */
+function buildRomanGrassPBR(anisotropy) {
+  const size = 512;
+  const albedoCanvas = makeCanvas(size);
+  const ctx = albedoCanvas.getContext('2d');
+  const img = ctx.createImageData(size, size);
+  const data = img.data;
+  const height = new Float32Array(size * size);
+  const rough = new Float32Array(size * size);
+
+  for (let y = 0; y < size; y++) {
+    const v = y / size;
+    for (let x = 0; x < size; x++) {
+      const u = x / size;
+      const i = y * size + x;
+
+      const macro = tileFBM(u, v, 4, 3, 401);
+      const blades = tileFBM(u * 2, v * 2, 16, 2, 419);
+      const micro = hash2i(x, y, 433);
+      const cell = tileWorley(u, v, 14, 449);
+
+      // Warm sunlit olive-sage Tuscan hill grass
+      let r = lerp(104, 152, macro) + (blades - 0.5) * 24 + (micro - 0.5) * 10;
+      let g = lerp(128, 174, macro) + (blades - 0.5) * 26 + (micro - 0.5) * 10;
+      let b = lerp(62, 92, macro) + (blades - 0.5) * 14 + (micro - 0.5) * 8;
+
+      // Subtle wildflower specks (sun-gold chamomile & crimson poppies)
+      if (cell.f1 < 0.085 && cell.id > 0.78) {
+        if (cell.id > 0.9) {
+          r = 224;
+          g = 88;
+          b = 64;
+        } else {
+          r = 244;
+          g = 222;
+          b = 124;
+        }
+      }
+
+      height[i] = clamp01(0.45 + blades * 0.35 + (macro - 0.5) * 0.14 + (micro - 0.5) * 0.06);
+      rough[i] = clamp01(0.84 - macro * 0.1 + (micro - 0.5) * 0.08);
+
+      const idx = i * 4;
+      data[idx] = Math.min(255, Math.max(0, Math.round(r)));
+      data[idx + 1] = Math.min(255, Math.max(0, Math.round(g)));
+      data[idx + 2] = Math.min(255, Math.max(0, Math.round(b)));
+      data[idx + 3] = 255;
+    }
+  }
+
+  ctx.putImageData(img, 0, 0);
+  const normalPacked = buildSobelNormalCanvas(height, size, 2.4, rough);
+  return {
+    albedo: wrapTexture(albedoCanvas, { isColor: true, anisotropy }),
+    normalRough: wrapTexture(normalPacked, { isColor: false, anisotropy }),
+  };
+}
+
+/** Roman Biome 1: Compacted Warm Terracotta Earth & Cobblestone Via Road (512x512) */
+function buildRomanViaRoadPBR(anisotropy) {
+  const size = 512;
+  const albedoCanvas = makeCanvas(size);
+  const ctx = albedoCanvas.getContext('2d');
+  const img = ctx.createImageData(size, size);
+  const data = img.data;
+  const height = new Float32Array(size * size);
+  const rough = new Float32Array(size * size);
+
+  for (let y = 0; y < size; y++) {
+    const v = y / size;
+    for (let x = 0; x < size; x++) {
+      const u = x / size;
+      const i = y * size + x;
+
+      const cobble = tileWorley(u, v, 8, 503);
+      const stoneVar = tileFBM(u, v, 6, 3, 521);
+      const grit = hash2i(x, y, 541);
+
+      // Polygonal Roman paving stones (basalt/travertine) bordered by warm terracotta earth mortar
+      const isStone = smoothstep(0.055, 0.125, cobble.edge);
+      const shade = 0.85 + cobble.id * 0.24 + (stoneVar - 0.5) * 0.14;
+
+      const earthR = 178 + (stoneVar - 0.5) * 20 + (grit - 0.5) * 14;
+      const earthG = 122 + (stoneVar - 0.5) * 16 + (grit - 0.5) * 12;
+      const earthB = 82 + (stoneVar - 0.5) * 12 + (grit - 0.5) * 10;
+
+      const stoneR = 186 * shade + (grit - 0.5) * 10;
+      const stoneG = 176 * shade + (grit - 0.5) * 10;
+      const stoneB = 158 * shade + (grit - 0.5) * 10;
+
+      const r = lerp(earthR, stoneR, isStone);
+      const g = lerp(earthG, stoneG, isStone);
+      const b = lerp(earthB, stoneB, isStone);
+
+      height[i] = clamp01(0.24 + isStone * 0.58 + (stoneVar - 0.5) * 0.12 + (grit - 0.5) * 0.04);
+      rough[i] = clamp01(lerp(0.9, 0.64, isStone) + (grit - 0.5) * 0.08);
+
+      const idx = i * 4;
+      data[idx] = Math.min(255, Math.max(0, Math.round(r)));
+      data[idx + 1] = Math.min(255, Math.max(0, Math.round(g)));
+      data[idx + 2] = Math.min(255, Math.max(0, Math.round(b)));
+      data[idx + 3] = 255;
+    }
+  }
+
+  ctx.putImageData(img, 0, 0);
+  const normalPacked = buildSobelNormalCanvas(height, size, 3.4, rough);
+  return {
+    albedo: wrapTexture(albedoCanvas, { isColor: true, anisotropy }),
+    normalRough: wrapTexture(normalPacked, { isColor: false, anisotropy }),
+  };
+}
+
+/** Roman Biome 2: Pale Crushed Travertine & Marble Quarry Dust (512x512) */
+function buildTravertineDustPBR(anisotropy) {
+  const size = 512;
+  const albedoCanvas = makeCanvas(size);
+  const ctx = albedoCanvas.getContext('2d');
+  const img = ctx.createImageData(size, size);
+  const data = img.data;
+  const height = new Float32Array(size * size);
+  const rough = new Float32Array(size * size);
+
+  for (let y = 0; y < size; y++) {
+    const v = y / size;
+    for (let x = 0; x < size; x++) {
+      const u = x / size;
+      const i = y * size + x;
+
+      const dust = tileFBM(u, v, 5, 3, 601);
+      const chips = tileWorley(u, v, 14, 617);
+      const grit = hash2i(x, y, 631);
+      const chipMask = smoothstep(0.18, 0.04, chips.f1);
+
+      const base = lerp(214, 240, dust) + chipMask * 14 + (grit - 0.5) * 12;
+      height[i] = clamp01(0.42 + dust * 0.28 + chipMask * 0.22 + (grit - 0.5) * 0.06);
+      rough[i] = clamp01(0.82 - chipMask * 0.22 + (grit - 0.5) * 0.08);
+
+      const idx = i * 4;
+      data[idx] = Math.min(255, Math.max(0, Math.round(base)));
+      data[idx + 1] = Math.min(255, Math.max(0, Math.round(base * 0.965)));
+      data[idx + 2] = Math.min(255, Math.max(0, Math.round(base * 0.895)));
+      data[idx + 3] = 255;
+    }
+  }
+
+  ctx.putImageData(img, 0, 0);
+  const normalPacked = buildSobelNormalCanvas(height, size, 2.5, rough);
+  return {
+    albedo: wrapTexture(albedoCanvas, { isColor: true, anisotropy }),
+    normalRough: wrapTexture(normalPacked, { isColor: false, anisotropy }),
+  };
+}
+
+/** White/Cream Travertine Marble PBR (512x512 Albedo + Normal + Roughness) */
+function buildRomanTravertinePBR(anisotropy) {
+  const size = 512;
+  const albedoCanvas = makeCanvas(size);
+  const ctx = albedoCanvas.getContext('2d');
+  const img = ctx.createImageData(size, size);
+  const data = img.data;
+  const height = new Float32Array(size * size);
+  const rough = new Float32Array(size * size);
+
+  for (let y = 0; y < size; y++) {
+    const v = y / size;
+    for (let x = 0; x < size; x++) {
+      const u = x / size;
+      const i = y * size + x;
+
+      const warp = tileFBM(u, v, 4, 3, 701) * 0.26;
+      const strata = Math.sin((v * 7 + warp * 2.8) * Math.PI * 2) * 0.5 + 0.5;
+      const pores = tileFBM(u * 2, v * 4, 12, 2, 719);
+      const grain = hash2i(x, y, 733);
+      const pit = pores < 0.28 ? (0.28 - pores) * 2.6 : 0;
+
+      const r = lerp(226, 248, strata) - pit * 36 + (grain - 0.5) * 8;
+      const g = lerp(218, 242, strata) - pit * 38 + (grain - 0.5) * 8;
+      const b = lerp(200, 228, strata) - pit * 40 + (grain - 0.5) * 8;
+
+      height[i] = clamp01(0.65 + (strata - 0.5) * 0.16 - pit * 0.45 + (grain - 0.5) * 0.04);
+      rough[i] = clamp01(0.48 + pit * 0.38 + (1 - strata) * 0.1);
+
+      const idx = i * 4;
+      data[idx] = Math.min(255, Math.max(0, Math.round(r)));
+      data[idx + 1] = Math.min(255, Math.max(0, Math.round(g)));
+      data[idx + 2] = Math.min(255, Math.max(0, Math.round(b)));
+      data[idx + 3] = 255;
+    }
+  }
+
+  ctx.putImageData(img, 0, 0);
+  const normalCanvas = buildSobelNormalCanvas(height, size, 2.6);
+  const roughCanvas = buildRoughnessCanvas(rough, size);
+  return {
+    map: wrapTexture(albedoCanvas, { isColor: true, anisotropy }),
+    normalMap: wrapTexture(normalCanvas, { isColor: false, anisotropy }),
+    roughnessMap: wrapTexture(roughCanvas, { isColor: false, anisotropy }),
+  };
+}
+
+/** Carved Roman Ashlar Stone Blocks PBR (512x512 Albedo + Normal + Roughness) */
+function buildRomanAshlarPBR(anisotropy) {
+  const size = 512;
+  const albedoCanvas = makeCanvas(size);
+  const ctx = albedoCanvas.getContext('2d');
+  const img = ctx.createImageData(size, size);
+  const data = img.data;
+  const height = new Float32Array(size * size);
+  const rough = new Float32Array(size * size);
+
+  for (let y = 0; y < size; y++) {
+    const v = y / size;
+    for (let x = 0; x < size; x++) {
+      const u = x / size;
+      const i = y * size + x;
+
+      // Crisp beveled perimeter & classic Roman ashlar masonry courses
+      const edgeX = Math.min(u, 1 - u);
+      const edgeY = Math.min(v, 1 - v);
+      const bevel = smoothstep(0.018, 0.072, Math.min(edgeX, edgeY));
+      const midSeam = smoothstep(0.008, 0.025, Math.abs(v - 0.5));
+      const courseMask = bevel * (0.45 + 0.55 * midSeam);
+
+      const stone = tileFBM(u, v, 5, 3, 751);
+      const grain = hash2i(x, y, 769);
+
+      const r = lerp(196, 245, courseMask) + (stone - 0.5) * 14 + (grain - 0.5) * 7;
+      const g = lerp(182, 235, courseMask) + (stone - 0.5) * 14 + (grain - 0.5) * 7;
+      const b = lerp(158, 214, courseMask) + (stone - 0.5) * 12 + (grain - 0.5) * 7;
+
+      height[i] = clamp01(0.25 + courseMask * 0.62 + (stone - 0.5) * 0.08);
+      rough[i] = clamp01(lerp(0.82, 0.46, courseMask) + (grain - 0.5) * 0.06);
+
+      const idx = i * 4;
+      data[idx] = Math.min(255, Math.max(0, Math.round(r)));
+      data[idx + 1] = Math.min(255, Math.max(0, Math.round(g)));
+      data[idx + 2] = Math.min(255, Math.max(0, Math.round(b)));
+      data[idx + 3] = 255;
+    }
+  }
+
+  ctx.putImageData(img, 0, 0);
+  const normalCanvas = buildSobelNormalCanvas(height, size, 3.0);
+  const roughCanvas = buildRoughnessCanvas(rough, size);
+  return {
+    map: wrapTexture(albedoCanvas, { isColor: true, anisotropy }),
+    normalMap: wrapTexture(normalCanvas, { isColor: false, anisotropy }),
+    roughnessMap: wrapTexture(roughCanvas, { isColor: false, anisotropy }),
+  };
+}
+
+/** Fluted Marble Columns PBR (512x512 Albedo + Normal + Roughness) */
+function buildRomanFlutedColumnPBR(anisotropy) {
+  const size = 512;
+  const albedoCanvas = makeCanvas(size);
+  const ctx = albedoCanvas.getContext('2d');
+  const img = ctx.createImageData(size, size);
+  const data = img.data;
+  const height = new Float32Array(size * size);
+  const rough = new Float32Array(size * size);
+
+  for (let y = 0; y < size; y++) {
+    const v = y / size;
+    for (let x = 0; x < size; x++) {
+      const u = x / size;
+      const i = y * size + x;
+
+      // 16 classical concave Doric/Ionic flutes around circumference
+      const flutePhase = (u * 16) % 1;
+      const ridge = Math.pow(Math.abs(flutePhase * 2 - 1), 1.7);
+      const collar = v < 0.08 || v > 0.92 ? 1.0 : 0.0;
+      const vein = tileFBM(u, v, 5, 2, 809);
+      const grain = hash2i(x, y, 821);
+
+      const lum = lerp(220, 250, Math.max(ridge, collar)) - (1 - vein) * 14 + (grain - 0.5) * 6;
+      height[i] = clamp01(0.3 + Math.max(ridge, collar) * 0.62 + (vein - 0.5) * 0.06);
+      rough[i] = clamp01(0.32 + (1 - ridge) * 0.14);
+
+      const idx = i * 4;
+      data[idx] = Math.min(255, Math.max(0, Math.round(lum)));
+      data[idx + 1] = Math.min(255, Math.max(0, Math.round(lum * 0.98)));
+      data[idx + 2] = Math.min(255, Math.max(0, Math.round(lum * 0.93)));
+      data[idx + 3] = 255;
+    }
+  }
+
+  ctx.putImageData(img, 0, 0);
+  const normalCanvas = buildSobelNormalCanvas(height, size, 3.6);
+  const roughCanvas = buildRoughnessCanvas(rough, size);
+  return {
+    map: wrapTexture(albedoCanvas, { isColor: true, anisotropy }),
+    normalMap: wrapTexture(normalCanvas, { isColor: false, anisotropy }),
+    roughnessMap: wrapTexture(roughCanvas, { isColor: false, anisotropy }),
+  };
+}
+
+/** Warm Terracotta Roman Roof Tiles — Tegulae & Imbrices (512x512 Albedo + Normal + Roughness) */
+function buildRomanTerracottaRoofPBR(anisotropy) {
+  const size = 512;
+  const albedoCanvas = makeCanvas(size);
+  const ctx = albedoCanvas.getContext('2d');
+  const img = ctx.createImageData(size, size);
+  const data = img.data;
+  const height = new Float32Array(size * size);
+  const rough = new Float32Array(size * size);
+
+  for (let y = 0; y < size; y++) {
+    const v = y / size;
+    for (let x = 0; x < size; x++) {
+      const u = x / size;
+      const i = y * size + x;
+
+      // 6 vertical barrel tile ribs (imbrices) & 5 horizontal overlapping courses (tegulae)
+      const col = (u * 6) % 1;
+      const row = (v * 5) % 1;
+      const tileIdx = Math.floor(u * 6) + Math.floor(v * 5) * 7;
+      const tileJitter = hash2i(tileIdx, 3, 857);
+
+      // Raised semi-cylindrical ridge between flat pan tiles
+      const rib = smoothstep(0.22, 0.0, Math.min(col, 1 - col));
+      const lip = smoothstep(0.0, 0.14, row);
+      const clay = tileFBM(u, v, 6, 2, 877);
+      const grit = hash2i(x, y, 887);
+
+      const h = clamp01(0.28 + rib * 0.48 + lip * 0.22 + (clay - 0.5) * 0.06);
+      height[i] = h;
+
+      // Sunbaked Roman terracotta palette (warm burnt orange-red & ochre highlights)
+      const shade = 0.84 + tileJitter * 0.22 + rib * 0.16 - (1 - lip) * 0.24;
+      const r = 204 * shade + (clay - 0.5) * 14 + (grit - 0.5) * 8;
+      const g = 98 * shade + (clay - 0.5) * 10 + (grit - 0.5) * 6;
+      const b = 56 * shade + (clay - 0.5) * 8 + (grit - 0.5) * 6;
+
+      rough[i] = clamp01(0.76 - rib * 0.14 + (grit - 0.5) * 0.08);
+
+      const idx = i * 4;
+      data[idx] = Math.min(255, Math.max(0, Math.round(r)));
+      data[idx + 1] = Math.min(255, Math.max(0, Math.round(g)));
+      data[idx + 2] = Math.min(255, Math.max(0, Math.round(b)));
+      data[idx + 3] = 255;
+    }
+  }
+
+  ctx.putImageData(img, 0, 0);
+  const normalCanvas = buildSobelNormalCanvas(height, size, 3.8);
+  const roughCanvas = buildRoughnessCanvas(rough, size);
+  return {
+    map: wrapTexture(albedoCanvas, { isColor: true, anisotropy }),
+    normalMap: wrapTexture(normalCanvas, { isColor: false, anisotropy }),
+    roughnessMap: wrapTexture(roughCanvas, { isColor: false, anisotropy }),
+  };
+}
+
+/** Decorative Roman Atrium Geometric Mosaic Tile Pattern (512x512) */
+function buildRomanMosaicFloor(anisotropy) {
+  const size = 512;
+  const canvas = makeCanvas(size);
+  const ctx = canvas.getContext('2d');
+
+  // Cream travertine mosaic base
+  ctx.fillStyle = '#efe3cb';
+  ctx.fillRect(0, 0, size, size);
+
+  // Subtle tesserae grid lines
+  ctx.strokeStyle = 'rgba(136, 114, 86, 0.22)';
+  ctx.lineWidth = 1;
+  for (let p = 0; p < size; p += 16) {
+    ctx.beginPath();
+    ctx.moveTo(p, 0);
+    ctx.lineTo(p, size);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(0, p);
+    ctx.lineTo(size, p);
+    ctx.stroke();
+  }
+
+  // Terracotta & charcoal Roman meander outer border
+  ctx.strokeStyle = '#9c4028';
+  ctx.lineWidth = 18;
+  ctx.strokeRect(24, 24, size - 48, size - 48);
+
+  ctx.strokeStyle = '#333b42';
+  ctx.lineWidth = 10;
+  ctx.strokeRect(48, 48, size - 96, size - 96);
+
+  // Inner golden-ochre decorative diamond mosaic tiles
+  ctx.fillStyle = '#c88e42';
+  const step = 64;
+  for (let y = 96; y <= size - 96; y += step) {
+    for (let x = 96; x <= size - 96; x += step) {
+      ctx.beginPath();
+      ctx.moveTo(x, y - 16);
+      ctx.lineTo(x + 16, y);
+      ctx.lineTo(x, y + 16);
+      ctx.lineTo(x - 16, y);
+      ctx.closePath();
+      ctx.fill();
+    }
+  }
+
+  return wrapTexture(canvas, { isColor: true, anisotropy });
 }
