@@ -36,6 +36,9 @@
       aria-label="Workd Builder — Diorama 3D interactif"
     ></canvas>
 
+    <!-- FRUSTUM-CULLED POOLED FLOATING LABELS FOR 100-LEVEL 3D WORLD MAP -->
+    <div id="worldmap-labels-layer" class="worldmap-labels-layer" hidden aria-hidden="true"></div>
+
     <!-- MAIN MENU OVERLAY (Default Launch — Faithful 3-Card Carved Wood & Gold Layout) -->
     <section id="main-menu-overlay" class="main-menu-overlay is-visible" aria-label="Menu principal Workd Builder">
       <!-- Sunlit multi-civilization hero banner with golden 3D WORKD BUILDER logo -->
@@ -292,6 +295,11 @@
       </div>
     </header>
 
+    <!-- 3D WORLD MAP ACTIVE REGION / BIOME SUBTITLE PILL -->
+    <div id="map-biome-banner" class="map-biome-banner" hidden aria-live="polite">
+      <span id="map-biome-text" class="map-biome-text">Chapitre 1 • Égypte — Sables de Gizeh</span>
+    </div>
+
     <!-- IN-GAME TOP HUD BAR (← Carte/Menu + Block Counter + 🪑 Décorer) -->
     <header id="hud-game-top" class="hud-top hud-game-top" hidden>
       <button id="game-back-menu-btn" class="hud-back-btn" type="button" aria-label="Retour">
@@ -341,10 +349,30 @@
       </div>
     </section>
 
-    <!-- WORLD MAP BRIEF LOCKED NOTICE PILL (Levels 2 & 3) -->
-    <div id="map-locked-pill" class="map-bottom-wrap" hidden role="status" aria-live="polite">
-      <div class="locked-pill">Prochaine civilisation en construction</div>
-    </div>
+    <!-- WORLD MAP COMING SOON / MILESTONE VILLAGE-CITY CARD (Levels 5–100) -->
+    <section id="map-locked-pill" class="map-bottom-wrap" hidden role="status" aria-live="polite">
+      <div id="map-coming-soon-card" class="map-card map-card--soon">
+        <span id="map-soon-badge" class="map-soon-badge">Bientôt</span>
+        <p id="map-soon-title" class="map-card-title">Niveau 5 — Bientôt disponible</p>
+        <p id="map-soon-sub" class="map-soon-sub">Chapitre 1 • Égypte — Sables de Gizeh</p>
+      </div>
+    </section>
+
+    <!-- 3D WORLD MAP HORIZONTAL SCROLLABLE CHAPTER JUMP BAR (1–10 .. 91–100) -->
+    <nav id="map-chapter-bar" class="map-chapter-bar" hidden aria-label="Saut rapide par chapitre">
+      <div id="map-chapter-scroller" class="map-chapter-scroller">
+        <button type="button" class="map-chapter-pill is-active" data-chapter="0">1–10</button>
+        <button type="button" class="map-chapter-pill" data-chapter="1">11–20</button>
+        <button type="button" class="map-chapter-pill" data-chapter="2">21–30</button>
+        <button type="button" class="map-chapter-pill" data-chapter="3">31–40</button>
+        <button type="button" class="map-chapter-pill" data-chapter="4">41–50</button>
+        <button type="button" class="map-chapter-pill" data-chapter="5">51–60</button>
+        <button type="button" class="map-chapter-pill" data-chapter="6">61–70</button>
+        <button type="button" class="map-chapter-pill" data-chapter="7">71–80</button>
+        <button type="button" class="map-chapter-pill" data-chapter="8">81–90</button>
+        <button type="button" class="map-chapter-pill" data-chapter="9">91–100</button>
+      </div>
+    </nav>
 
     <!-- LEVEL / ROGUELIKE COMPLETION BAR -->
     <div id="completion-bar" class="completion-bar" hidden>

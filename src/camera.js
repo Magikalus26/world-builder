@@ -96,9 +96,12 @@ export class DioramaCameraController {
     this.desiredTarget.add(this._delta);
     this._clampTarget(this.desiredTarget);
 
-    // Track damped inertia velocity
+    // Track damped inertia velocity (zero per-frame allocations)
     const invDt = dt > 0.004 ? 1 / dt : 60;
-    this.panVelocity.lerp(this._delta.clone().multiplyScalar(invDt * 0.35), 0.45);
+    const vx = this._delta.x * invDt * 0.44;
+    const vz = this._delta.z * invDt * 0.44;
+    this.panVelocity.x = THREE.MathUtils.lerp(this.panVelocity.x, vx, 0.46);
+    this.panVelocity.z = THREE.MathUtils.lerp(this.panVelocity.z, vz, 0.46);
   }
 
   /**
@@ -258,7 +261,7 @@ export class DioramaCameraController {
       if (this.panVelocity.lengthSq() > 0.0001) {
         this.desiredTarget.addScaledVector(this.panVelocity, dt);
         this._clampTarget(this.desiredTarget);
-        const panDamp = Math.exp(-7.5 * dt);
+        const panDamp = Math.exp(-5.4 * dt);
         this.panVelocity.multiplyScalar(panDamp);
       } else {
         this.panVelocity.set(0, 0, 0);

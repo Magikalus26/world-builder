@@ -33,10 +33,19 @@ class WorkdBuilderApp {
     // World Map HUD elements
     this.hudMapTop = document.getElementById('hud-map-top');
     this.mapBackMenuBtn = document.getElementById('map-back-menu-btn');
+    this.mapBiomeBanner = document.getElementById('map-biome-banner');
+    this.mapBiomeText = document.getElementById('map-biome-text');
     this.mapLevelCard = document.getElementById('map-level-card');
     this.mapCardTitle = document.getElementById('map-card-title');
     this.playLevelBtn = document.getElementById('play-level-btn');
     this.mapLockedPill = document.getElementById('map-locked-pill');
+    this.mapComingSoonCard = document.getElementById('map-coming-soon-card');
+    this.mapSoonBadge = document.getElementById('map-soon-badge');
+    this.mapSoonTitle = document.getElementById('map-soon-title');
+    this.mapSoonSub = document.getElementById('map-soon-sub');
+    this.mapChapterBar = document.getElementById('map-chapter-bar');
+    this.mapChapterPills = Array.from(document.querySelectorAll('.map-chapter-pill'));
+    this.activeMapChapter = 0;
 
     // In-Game HUD elements
     this.hudGameTop = document.getElementById('hud-game-top');
@@ -141,7 +150,7 @@ class WorkdBuilderApp {
     this.scene.environment = this._createDesertEnvironment();
     this.scene.environmentIntensity = 0.45;
 
-    this.camera = new THREE.PerspectiveCamera(37, width / Math.max(height, 1), 0.5, 130);
+    this.camera = new THREE.PerspectiveCamera(37, width / Math.max(height, 1), 0.5, 190);
 
     const hemiLight = new THREE.HemisphereLight('#fff8ea', '#c28344', 0.84);
     hemiLight.position.set(0, 20, 0);
@@ -152,8 +161,8 @@ class WorkdBuilderApp {
     sunLight.castShadow = true;
     sunLight.shadow.mapSize.set(1024, 1024);
     sunLight.shadow.camera.near = 6;
-    sunLight.shadow.camera.far = 52;
-    const d = 14.5;
+    sunLight.shadow.camera.far = 56;
+    const d = 16.5;
     sunLight.shadow.camera.left = -d;
     sunLight.shadow.camera.right = d;
     sunLight.shadow.camera.top = d;
@@ -161,6 +170,8 @@ class WorkdBuilderApp {
     sunLight.shadow.bias = -0.0005;
     sunLight.shadow.normalBias = 0.025;
     this.scene.add(sunLight);
+    this.scene.add(sunLight.target);
+    this.sunLight = sunLight;
 
     const rimFill = new THREE.DirectionalLight('#8fd4e6', 0.38);
     rimFill.position.set(14, 9, -13);
@@ -270,6 +281,19 @@ class WorkdBuilderApp {
       } else {
         this._transitionExitTo('worldmap');
       }
+    });
+
+    // Horizontal Chapter Jump Bar pills ("1–10" .. "91–100") on the 3D World Map
+    this.mapChapterPills.forEach((pill) => {
+      pill.addEventListener('click', () => {
+        if (this.mode !== 'worldmap' || !this.worldMap) return;
+        const idx = Number(pill.dataset.chapter || 0);
+        this.audio.unlock();
+        this.audio.playTabBounce();
+        this.audio.playCameraWhoosh();
+        this.worldMap.jumpToChapter(idx);
+        this._setActiveChapterUI(idx, true);
+      });
     });
   }
 
@@ -412,6 +436,30 @@ class WorkdBuilderApp {
     });
   }
 
+  _setActiveChapterUI(chapterIdx, scrollPill = false) {
+    this.activeMapChapter = chapterIdx;
+    this.mapChapterPills.forEach((pill, i) => {
+      const active = i === chapterIdx;
+      pill.classList.toggle('is-active', active);
+      if (active && scrollPill && typeof pill.scrollIntoView === 'function') {
+        pill.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+      }
+    });
+    if (this.worldMap && this.mapBiomeText) {
+      const ch = this.worldMap.getChapterMeta(chapterIdx);
+      if (ch) {
+        this.mapBiomeText.textContent = `Chapitre ${ch.index + 1} (${ch.rangeLabel}) • ${ch.biomeName}`;
+      }
+    }
+  }
+
+  _syncSunLightToTarget(x, z) {
+    if (!this.sunLight) return;
+    this.sunLight.position.set(x - 12, 19, z + 13);
+    this.sunLight.target.position.set(x, 0, z);
+    this.sunLight.target.updateMatrixWorld();
+  }
+
   /**
    * Opens the 3-card Main Menu over a live gently orbiting 3D multi-civilization diorama.
    */
@@ -423,31 +471,37 @@ class WorkdBuilderApp {
     this.mode = 'menu';
     this.scene.background.set('#e5c78f');
     this.scene.fog.color.set('#e5c78f');
+    this.scene.fog.near = 48;
+    this.scene.fog.far = 118;
 
     this.hudMapTop.hidden = true;
+    if (this.mapBiomeBanner) this.mapBiomeBanner.hidden = true;
+    if (this.mapChapterBar) this.mapChapterBar.hidden = true;
     this.hudGameTop.hidden = true;
     this.mainMenu.show();
 
     this._ensureWorldMapMounted();
+    this.worldMap.setLabelsVisible(false);
     this.interaction.setLevel(null);
     this.interaction.setDecorationSystem(null);
     this.interaction.setEnabled(false);
 
-    // Gentle elevated framing showcasing the live 3D archipelago behind the menu dock
+    // Gentle elevated framing showcasing the 4 playable starter islands behind the menu dock
     this.cameraController.configurePreset({
-      target: new THREE.Vector3(0.0, 0.3, 0.5),
+      target: new THREE.Vector3(-0.3, 0.35, 79.2),
       elevationDeg: 40,
-      azimuth: 0.25,
+      azimuth: 0.24,
       minDistance: 12.0,
-      maxDistance: 54.0,
-      panBounds: { minX: -6.8, maxX: 6.8, minZ: -7.2, maxZ: 7.2 },
-      distanceScale: 0.78,
+      maxDistance: 58.0,
+      panBounds: { minX: -10.5, maxX: 10.5, minZ: -87.0, maxZ: 87.0 },
+      distanceScale: 0.72,
     });
     this.cameraController.resetView(immediateCamera);
+    this._syncSunLightToTarget(-0.3, 79.2);
   }
 
   /**
-   * Opens the interactive 3D Tabletop World Map Level Selector.
+   * Opens the interactive 100-Level 3D Tabletop World Map Archipelago.
    */
   openWorldMap(immediateCamera = false) {
     this._disposeActiveLevel();
@@ -458,53 +512,73 @@ class WorkdBuilderApp {
     this.mode = 'worldmap';
     this.scene.background.set('#d5e8ea');
     this.scene.fog.color.set('#d5e8ea');
+    this.scene.fog.near = 60;
+    this.scene.fog.far = 148;
 
     this.hudMapTop.hidden = false;
+    if (this.mapBiomeBanner) this.mapBiomeBanner.hidden = false;
+    if (this.mapChapterBar) this.mapChapterBar.hidden = false;
     this.hudGameTop.hidden = true;
     this.mainMenu.refreshBalances();
 
     this._ensureWorldMapMounted();
     this.worldMap.selectedNode = null;
+    if (this.worldMap.selectionRing) this.worldMap.selectionRing.visible = false;
+    this.worldMap.setLabelsVisible(true);
 
     this.cameraController.configurePreset({
-      target: new THREE.Vector3(0.0, 0.25, 0.25),
+      target: new THREE.Vector3(-0.55, 0.25, 78.6),
       elevationDeg: 52,
-      azimuth: 0.06,
-      minDistance: 12.0,
-      maxDistance: 54.0,
-      panBounds: { minX: -6.8, maxX: 6.8, minZ: -7.2, maxZ: 7.2 },
-      distanceScale: 0.92,
+      azimuth: 0.04,
+      minDistance: 11.5,
+      maxDistance: 58.0,
+      panBounds: { minX: -10.5, maxX: 10.5, minZ: -87.0, maxZ: 87.0 },
+      distanceScale: 0.96,
     });
 
     this.interaction.setLevel(this.worldMap);
     this.interaction.setDecorationSystem(null);
     this.interaction.setEnabled(true);
     this.cameraController.resetView(immediateCamera);
+    this._syncSunLightToTarget(-0.55, 78.6);
+    this._setActiveChapterUI(0, false);
   }
 
   _handleMapNodeSelect(node) {
     this._hideMapBottomOverlays();
 
+    if (node.chapter) {
+      this._setActiveChapterUI(node.chapter.index, true);
+    }
+
     if (node.unlocked) {
       this.pendingLevelIndex = node.levelIndex;
       this.mapCardTitle.textContent = node.title;
       this.mapLevelCard.hidden = false;
-      requestAnimationFrame(() => {
-        this.mapLevelCard.classList.add('is-visible');
-      });
+      void this.mapLevelCard.offsetWidth;
+      this.mapLevelCard.classList.add('is-visible');
     } else {
+      if (this.mapComingSoonCard) {
+        this.mapComingSoonCard.classList.toggle('is-milestone', Boolean(node.isMilestone));
+      }
+      if (this.mapSoonBadge) {
+        this.mapSoonBadge.textContent = node.isMilestone
+          ? '🏛️ Grand Chantier • Bientôt'
+          : 'Bientôt';
+      }
+      if (this.mapSoonTitle) {
+        this.mapSoonTitle.textContent = node.isMilestone
+          ? `Niveau ${node.levelNum} • Grand Chantier Village/Ville — Bientôt`
+          : `Niveau ${node.levelNum} — Bientôt disponible`;
+      }
+      if (this.mapSoonSub) {
+        this.mapSoonSub.textContent =
+          node.subtitle ||
+          (node.chapter ? `Chapitre ${node.chapter.index + 1} • ${node.chapter.biomeName}` : '');
+      }
       this.mapLockedPill.hidden = false;
-      requestAnimationFrame(() => {
-        this.mapLockedPill.classList.add('is-visible');
-      });
-      this.lockedPillTimer = setTimeout(() => {
-        this.mapLockedPill.classList.remove('is-visible');
-        setTimeout(() => {
-          if (!this.mapLockedPill.classList.contains('is-visible')) {
-            this.mapLockedPill.hidden = true;
-          }
-        }, 280);
-      }, 3200);
+      void this.mapLockedPill.offsetWidth;
+      this.mapLockedPill.classList.add('is-visible');
     }
   }
 
@@ -522,7 +596,7 @@ class WorkdBuilderApp {
   }
 
   /**
-   * Launches a Campaign Level (e.g. Level 1 — La Petite Pyramide).
+   * Launches a Campaign Level (Levels 1–4).
    */
   loadLevel(index, immediateCamera = false) {
     const LevelClass = LEVEL_REGISTRY[index] || LEVEL_REGISTRY[0];
@@ -538,8 +612,13 @@ class WorkdBuilderApp {
     const skyHex = (LevelClass.meta && LevelClass.meta.skyColor) || '#efd3a2';
     this.scene.background.set(skyHex);
     this.scene.fog.color.set(skyHex);
+    this.scene.fog.near = 42;
+    this.scene.fog.far = 88;
+    this._syncSunLightToTarget(0, 0);
 
     this.hudMapTop.hidden = true;
+    if (this.mapBiomeBanner) this.mapBiomeBanner.hidden = true;
+    if (this.mapChapterBar) this.mapChapterBar.hidden = true;
     this.hudGameTop.hidden = false;
     this.gameBackMenuBtn.textContent = '← Carte';
     this.restartBtn.textContent = 'Recommencer';
@@ -592,8 +671,13 @@ class WorkdBuilderApp {
     this.activeRoguelikeConfig = cfg;
     this.scene.background.set(cfg.skyColor);
     this.scene.fog.color.set(cfg.skyColor);
+    this.scene.fog.near = 42;
+    this.scene.fog.far = 88;
+    this._syncSunLightToTarget(0, 0);
 
     this.hudMapTop.hidden = true;
+    if (this.mapBiomeBanner) this.mapBiomeBanner.hidden = true;
+    if (this.mapChapterBar) this.mapChapterBar.hidden = true;
     this.hudGameTop.hidden = false;
     this.gameBackMenuBtn.textContent = '← Menu';
     this.restartBtn.textContent = 'Nouveau Tirage';
@@ -715,11 +799,23 @@ class WorkdBuilderApp {
     this.interaction.update(dt, this.elapsed);
 
     if (this.mode === 'menu' && this.worldMap) {
-      this.worldMap.update(dt, this.elapsed);
       // Gentle living diorama rotation behind the carved wooden menu dock
       this.cameraController.desiredAzimuth += dt * 0.14;
+    }
+
+    this.cameraController.update(dt, this.interaction.isCameraGestureActive());
+    this.camera.updateMatrixWorld();
+
+    if (this.mode === 'menu' && this.worldMap) {
+      this._syncSunLightToTarget(this.cameraController.target.x, this.cameraController.target.z);
+      this.worldMap.update(dt, this.elapsed, null);
     } else if (this.mode === 'worldmap' && this.worldMap) {
-      this.worldMap.update(dt, this.elapsed);
+      this._syncSunLightToTarget(this.cameraController.target.x, this.cameraController.target.z);
+      this.worldMap.update(dt, this.elapsed, this.camera);
+      const chIdx = this.worldMap.getChapterIndexForZ(this.cameraController.target.z);
+      if (chIdx !== this.activeMapChapter) {
+        this._setActiveChapterUI(chIdx, true);
+      }
     } else if ((this.mode === 'level' || this.mode === 'roguelike') && this.currentLevel) {
       this.currentLevel.update(dt, this.elapsed);
       if (this.decorationSystem) {
@@ -727,7 +823,6 @@ class WorkdBuilderApp {
       }
     }
 
-    this.cameraController.update(dt, this.interaction.isCameraGestureActive());
     this.renderer.render(this.scene, this.camera);
   }
 }
