@@ -29,6 +29,11 @@ import {
   NEIGHBOR_PY,
   NEIGHBOR_NY,
 } from './connectedMasonry.js';
+import {
+  createCozyGroundFoliageSystem,
+  createContactShadowSystem,
+  buildStylizedFrontierPine,
+} from '../foliageAndGround.js';
 
 const BLOCK_W = 0.96;
 const BLOCK_H = 0.64;
@@ -569,55 +574,43 @@ export class Level5Penitentiary extends Level1Pyramid {
   }
 
   _buildDryPinesAndRocks(parent) {
-    // Dry western ponderosa pines planted on outer ridges
-    const trunkGeo = this._trackGeo(new THREE.CylinderGeometry(0.07, 0.13, 1.2, 6));
-    const tier1Geo = this._trackGeo(new THREE.ConeGeometry(0.58, 1.15, 7));
-    const tier2Geo = this._trackGeo(new THREE.ConeGeometry(0.42, 0.92, 7));
-
-    [
+    // Sculpted Western Ponderosa Pines with irregular jagged bough strata & exposed roots
+    const foliageMat = this._getSharedFoliageMaterial();
+    const pineSpecs = [
       [-8.2, -7.2, 1.1],
       [-0.8, -7.8, 0.95],
       [8.35, 3.6, 1.05],
       [8.4, 6.8, 0.92],
       [-8.3, 2.2, 0.88],
       [-7.6, 7.6, 1.0],
-    ].forEach(([px, pz, sc], idx) => {
+    ];
+    pineSpecs.forEach(([px, pz, sc], idx) => {
       const wx = this._mx(px);
-      const gy = this.getTerrainHeight(wx, pz);
-      const pine = new THREE.Group();
-      pine.position.set(wx, gy - 0.04, pz);
-      pine.scale.setScalar(sc);
-
-      const tr = new THREE.Mesh(trunkGeo, this.pen.materials.darkOak);
-      tr.position.y = 0.56;
-      tr.castShadow = true;
-      pine.add(tr);
-
-      const f1 = new THREE.Mesh(
-        tier1Geo,
-        idx % 2 === 0 ? this.pen.materials.dryPineFoliage : this.pen.materials.dryPineDark
-      );
-      f1.position.y = 1.42;
-      f1.castShadow = true;
-      pine.add(f1);
-
-      const f2 = new THREE.Mesh(tier2Geo, this.pen.materials.dryPineFoliage);
-      f2.position.y = 2.08;
-      f2.castShadow = true;
-      pine.add(f2);
-
-      parent.add(pine);
+      const groundY = this.getTerrainHeight(wx, pz);
+      const { tree, crown } = buildStylizedFrontierPine({
+        x: wx,
+        z: pz,
+        groundY,
+        scale: sc,
+        seed: idx + 1,
+        barkMat: this.pen.materials.darkOak,
+        foliageMat,
+        trackGeo: (g) => this._trackGeo(g),
+      });
+      this.palmFronds.push({ group: crown, phase: wx * 0.55 + pz * 0.45 });
+      parent.add(tree);
     });
 
     // Scattered rugged grey granite rocks along frontier edges
     const rockGeo = this._trackGeo(new THREE.DodecahedronGeometry(0.42, 0));
-    [
+    const rockSpecs = [
       [-7.8, -3.5, 1.15, 0.72, 0.95],
       [-1.5, -5.8, 0.92, 0.65, 0.82],
       [7.9, -4.1, 0.95, 0.58, 0.88],
       [8.2, 1.2, 0.85, 0.55, 0.78],
       [-7.6, 6.8, 0.82, 0.5, 0.75],
-    ].forEach(([rx, rz, sx, sy, sz], idx) => {
+    ];
+    rockSpecs.forEach(([rx, rz, sx, sy, sz], idx) => {
       const wx = this._mx(rx);
       const gy = this.getTerrainHeight(wx, rz);
       const rock = new THREE.Mesh(rockGeo, this.pen.materials.graniteCliff);
@@ -628,6 +621,53 @@ export class Level5Penitentiary extends Level1Pyramid {
       rock.receiveShadow = true;
       parent.add(rock);
     });
+
+    // Cozy 3D Instanced Frontier Sage/Golden Grass (860 tufts), Flat Granite Pebbles & Prairie Flowers
+    const focalPoints = [
+      ...pineSpecs.map(([px, pz]) => ({ x: this._mx(px), z: pz, innerRadius: 0.34, radius: 1.95 })),
+      ...rockSpecs.map(([rx, rz]) => ({ x: this._mx(rx), z: rz, innerRadius: 0.4, radius: 1.55 })),
+      { x: this._mx(7.1), z: -6.4, innerRadius: 0.95, radius: 2.3 },
+    ];
+    this.cozyGround = createCozyGroundFoliageSystem({
+      parent,
+      getTerrainHeight: (x, z) => this.getTerrainHeight(x, z),
+      isBlocked: (x, z) => this._isBlockedForFoliage(x, z),
+      getGrassWeight: (x, z) => {
+        const sx = x * this.mirrorX;
+        const { w0: wDirt, w1: wGravel, w2: wQuarry, w3: wScrub } = computePenitentiarySplatWeights(sx, z);
+        if (wGravel > 0.28 || wQuarry > 0.34) return 0;
+        const borderDist = Math.max(Math.abs(x), Math.abs(z));
+        return Math.max(wScrub * 1.35, borderDist > 6.2 ? 0.38 : wDirt * 0.24);
+      },
+      focalPoints,
+      waterLevel: -1.5,
+      halfW: TERRAIN_W * 0.5,
+      halfD: TERRAIN_D * 0.5,
+      grassCount: 860,
+      pebbleCount: 125,
+      flowerCount: 62,
+      grassPalette: ['#7e8d44', '#637538', '#999c4a', '#b3a352', '#566934'],
+      pebblePalette: ['#8e8e8b', '#a89f90', '#73767a', '#b8ab96'],
+      flowerPalette: ['#fff9e8', '#ffe46b', '#f7cf54'],
+      seed: 505,
+    });
+
+    // Soft Circular Contact Shadows (AO) under pines, granite boulders, watchtower, quarry, forge & Prison
+    const aoEntries = [
+      ...pineSpecs.map(([px, pz, sc]) => ({ x: this._mx(px), z: pz, radius: 1.05 * sc, strength: 0.96 })),
+      ...rockSpecs.map(([rx, rz, sx, , sz]) => ({
+        x: this._mx(rx),
+        z: rz,
+        radiusX: 0.6 * sx,
+        radiusZ: 0.6 * sz,
+        strength: 0.95,
+      })),
+      { x: this._mx(7.1), z: -6.4, radius: 1.45, strength: 0.92 },
+      { x: this._mx(-4.7), z: -5.2, radiusX: 3.3, radiusZ: 1.55, strength: 0.72 },
+      { x: this._mx(-4.6), z: 4.15, radiusX: 2.35, radiusZ: 2.15, strength: 0.7 },
+      { x: this.pyramidCenter.x, z: this.pyramidCenter.z, radiusX: 3.15, radiusZ: 3.15, strength: 0.8 },
+    ];
+    this.contactShadows = createContactShadowSystem(parent, aoEntries, (x, z) => this.getTerrainHeight(x, z));
   }
 
   /* ============================================================================

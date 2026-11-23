@@ -1082,8 +1082,8 @@ function buildSunbeamGradient() {
 function createTerrainSplatMaterial(biomes) {
   const mat = new THREE.MeshStandardMaterial({
     color: 0xffffff,
-    roughness: 1.0,
-    metalness: 0.04,
+    roughness: 0.9,
+    metalness: 0.0,
   });
 
   mat.onBeforeCompile = (shader) => {
@@ -1097,7 +1097,7 @@ function createTerrainSplatMaterial(biomes) {
     shader.uniforms.uNR2 = { value: biomes.quarryDust.normalRough };
     shader.uniforms.uNR3 = { value: biomes.oasisGrass.normalRough };
 
-    shader.uniforms.uNormalStrength = { value: 0.92 };
+    shader.uniforms.uNormalStrength = { value: 0.88 };
 
     shader.vertexShader = shader.vertexShader
       .replace(
@@ -1108,6 +1108,7 @@ function createTerrainSplatMaterial(biomes) {
         varying vec4 vSplat;
         varying float vWetness;
         varying vec2 vTerrainUv;
+        varying vec2 vWorldXZ;
         varying vec3 vTerrainT;
         varying vec3 vTerrainB;`
       )
@@ -1116,6 +1117,7 @@ function createTerrainSplatMaterial(biomes) {
         `#include <begin_vertex>
         vSplat = aSplat;
         vWetness = aWetness;
+        vWorldXZ = position.xz;
         vTerrainUv = position.xz * 0.24;
         vec3 objT = normalize(vec3(max(objectNormal.y, 0.05), -objectNormal.x, 0.0));
         vec3 objB = normalize(cross(objT, objectNormal));
@@ -1139,8 +1141,15 @@ function createTerrainSplatMaterial(biomes) {
         varying vec4 vSplat;
         varying float vWetness;
         varying vec2 vTerrainUv;
+        varying vec2 vWorldXZ;
         varying vec3 vTerrainT;
-        varying vec3 vTerrainB;`
+        varying vec3 vTerrainB;
+
+        float terrainOrganicWave(vec2 p) {
+          float w1 = sin(p.x * 0.85 + cos(p.y * 0.72) * 1.15) * cos(p.y * 0.91 - sin(p.x * 0.63));
+          float w2 = sin(p.x * 2.15 - p.y * 1.85) * 0.5 + cos(p.x * 1.45 + p.y * 2.35) * 0.5;
+          return w1 * 0.62 + w2 * 0.38;
+        }`
       )
       .replace(
         '#include <map_fragment>',
@@ -1154,22 +1163,36 @@ function createTerrainSplatMaterial(biomes) {
         vec4 nr2 = texture2D(uNR2, vTerrainUv * 1.25);
         vec4 nr3 = texture2D(uNR3, vTerrainUv * 1.4);
 
-        // Organic micro-height modulated splat weights for crisp natural biome borders
+        // Crisp, natural height-modulated transitions (eliminates muddy blurry fade bands)
+        float edgeN = terrainOrganicWave(vWorldXZ * 1.15);
         vec4 microH = vec4(nr0.b, nr1.b, nr2.b, nr3.b);
-        vec4 w = max(vSplat + (microH - 0.5) * 0.14 * step(0.02, vSplat), vec4(0.0));
-        w /= max(w.x + w.y + w.z + w.w, 0.0001);
+        vec4 activeMask = step(0.012, vSplat);
+        vec4 h = vSplat + (microH - 0.5) * 0.22 * activeMask + vec4(edgeN, -edgeN, edgeN * 0.6, -edgeN * 0.6) * 0.075 * activeMask;
+        float maxH = max(max(h.x, h.y), max(h.z, h.w));
+        vec4 w = max(h - (maxH - 0.165), vec4(0.0));
+        w = w * w;
+        w /= max(w.x + w.y + w.z + w.w, 0.00001);
 
         vec3 splatColor = c0.rgb * w.x + c1.rgb * w.y + c2.rgb * w.z + c3.rgb * w.w;
         vec4 splatNR = nr0 * w.x + nr1 * w.y + nr2 * w.z + nr3 * w.w;
 
-        // Nile shoreline dampness & wet silt darkening where terrain meets water
+        // Cozy painterly micro-hue variations on grassy zones (meadow green, moss green, sunlit gold touches)
+        float greenMask = smoothstep(0.03, 0.15, splatColor.g - max(splatColor.r * 0.94, splatColor.b * 1.12));
+        float patchMoss = smoothstep(-0.25, 0.65, terrainOrganicWave(vWorldXZ * 0.42 + vec2(3.1, -1.7)));
+        float patchGold = smoothstep(0.28, 0.85, terrainOrganicWave(vWorldXZ * 0.64 + vec2(-4.4, 2.9)));
+        vec3 grassTint = mix(vec3(0.86, 0.94, 0.82), vec3(1.04, 1.06, 0.92), patchMoss);
+        grassTint = mix(grassTint, vec3(1.14, 1.09, 0.78), patchGold * 0.52);
+        splatColor *= mix(vec3(1.0), grassTint, greenMask);
+
+        // Shoreline dampness & wet silt darkening where terrain meets water
         float wet = clamp(vWetness, 0.0, 1.0);
-        splatColor *= mix(1.0, 0.56, wet);
+        splatColor *= mix(1.0, 0.58, wet);
         diffuseColor.rgb *= splatColor;`
       )
       .replace(
         '#include <roughnessmap_fragment>',
-        `float roughnessFactor = roughness * mix(splatNR.a, 0.18, clamp(vWetness, 0.0, 1.0));`
+        `float dryRough = clamp(roughness * mix(0.92, 1.06, splatNR.a), 0.84, 0.96);
+        float roughnessFactor = mix(dryRough, 0.2, clamp(vWetness, 0.0, 1.0));`
       )
       .replace(
         '#include <normal_fragment_maps>',
@@ -1179,7 +1202,7 @@ function createTerrainSplatMaterial(biomes) {
       );
   };
 
-  mat.customProgramCacheKey = () => 'workd-builder-terrain-splat-v1';
+  mat.customProgramCacheKey = () => 'workd-builder-terrain-splat-cozy-v2';
   return mat;
 }
 
@@ -2010,30 +2033,32 @@ function buildRomanGrassPBR(anisotropy) {
       const i = y * size + x;
 
       const macro = tileFBM(u, v, 4, 3, 401);
+      const mossPatch = tileFBM(u, v, 7, 3, 409);
+      const goldTouch = smoothstep(0.56, 0.84, tileFBM(u, v, 6, 2, 413));
       const blades = tileFBM(u * 2, v * 2, 16, 2, 419);
       const micro = hash2i(x, y, 433);
       const cell = tileWorley(u, v, 14, 449);
 
-      // Warm sunlit olive-sage Tuscan hill grass
-      let r = lerp(104, 152, macro) + (blades - 0.5) * 24 + (micro - 0.5) * 10;
-      let g = lerp(128, 174, macro) + (blades - 0.5) * 26 + (micro - 0.5) * 10;
-      let b = lerp(62, 92, macro) + (blades - 0.5) * 14 + (micro - 0.5) * 8;
+      // Cozy Outlanders palette: meadow green + moss green + warm golden touches
+      let r = lerp(88, 134, macro) + (mossPatch - 0.5) * 18 + goldTouch * 38 + (blades - 0.5) * 20 + (micro - 0.5) * 9;
+      let g = lerp(126, 172, macro) + (mossPatch - 0.5) * 20 + goldTouch * 28 + (blades - 0.5) * 22 + (micro - 0.5) * 10;
+      let b = lerp(52, 78, macro) - (mossPatch - 0.5) * 10 - goldTouch * 10 + (blades - 0.5) * 12 + (micro - 0.5) * 7;
 
-      // Subtle wildflower specks (sun-gold chamomile & crimson poppies)
-      if (cell.f1 < 0.085 && cell.id > 0.78) {
-        if (cell.id > 0.9) {
-          r = 224;
-          g = 88;
-          b = 64;
+      // Subtle wildflower specks (sun-gold chamomile & warm white daisies)
+      if (cell.f1 < 0.08 && cell.id > 0.8) {
+        if (cell.id > 0.91) {
+          r = 248;
+          g = 244;
+          b = 224;
         } else {
           r = 244;
-          g = 222;
-          b = 124;
+          g = 216;
+          b = 104;
         }
       }
 
       height[i] = clamp01(0.45 + blades * 0.35 + (macro - 0.5) * 0.14 + (micro - 0.5) * 0.06);
-      rough[i] = clamp01(0.84 - macro * 0.1 + (micro - 0.5) * 0.08);
+      rough[i] = clamp01(0.9 - macro * 0.05 + (micro - 0.5) * 0.06);
 
       const idx = i * 4;
       data[idx] = Math.min(255, Math.max(0, Math.round(r)));
@@ -2418,16 +2443,18 @@ function buildJapanMossGrassPBR(anisotropy) {
       const u = x / size;
       const i = y * size + x;
       const macro = tileFBM(u, v, 5, 3, 2101);
+      const mossDeep = tileFBM(u, v, 8, 3, 2111);
+      const goldSun = smoothstep(0.58, 0.86, tileFBM(u, v, 6, 2, 2123));
       const tuft = tileFBM(u, v, 22, 2, 2117);
       const blade = hash2i(x, y, 2131);
 
       const h = clamp01(0.4 + (macro - 0.5) * 0.25 + (tuft - 0.5) * 0.34 + (blade - 0.5) * 0.14);
       height[i] = h;
 
-      // Rich emerald-moss velvet palette with sunlit chartreuse highlights
-      let r = 64 + macro * 34 + tuft * 18 + (blade - 0.5) * 10;
-      let g = 114 + macro * 42 + tuft * 24 + (blade - 0.5) * 12;
-      let b = 52 + macro * 18 + tuft * 10 + (blade - 0.5) * 8;
+      // Rich cozy moss-velvet + meadow green + warm sunlit golden-chartreuse highlights
+      let r = 60 + macro * 34 + (mossDeep - 0.5) * 16 + goldSun * 34 + tuft * 18 + (blade - 0.5) * 10;
+      let g = 110 + macro * 44 + (mossDeep - 0.5) * 20 + goldSun * 26 + tuft * 22 + (blade - 0.5) * 12;
+      let b = 46 + macro * 18 - (mossDeep - 0.5) * 10 - goldSun * 8 + tuft * 10 + (blade - 0.5) * 8;
 
       // Subtle scattered pale-pink fallen sakura petals on the moss
       const petal = hash2i(Math.floor(x / 5), Math.floor(y / 5), 2143);
@@ -2437,7 +2464,7 @@ function buildJapanMossGrassPBR(anisotropy) {
         b = 212;
       }
 
-      rough[i] = clamp01(0.84 + (0.5 - tuft) * 0.16);
+      rough[i] = clamp01(0.9 + (0.5 - tuft) * 0.08);
       const idx = i * 4;
       data[idx] = Math.min(255, Math.max(0, Math.round(r)));
       data[idx + 1] = Math.min(255, Math.max(0, Math.round(g)));
@@ -2897,17 +2924,18 @@ function buildMayaJungleMossPBR(anisotropy) {
       const u = x / size;
       const i = y * size + x;
       const canopy = tileFBM(u, v, 5, 3, 3109);
+      const goldDapple = smoothstep(0.58, 0.85, tileFBM(u, v, 6, 2, 3119));
       const fern = tileFBM(u, v, 20, 2, 3121);
       const grain = hash2i(x, y, 3137);
 
       height[i] = clamp01(0.4 + (canopy - 0.5) * 0.28 + (fern - 0.5) * 0.34 + (grain - 0.5) * 0.14);
-      // Deep tropical Yucatan emerald-moss & rich soil patches
-      const loam = smoothstep(0.62, 0.85, 1 - canopy);
-      const r = lerp(42 + canopy * 34 + fern * 22, 74, loam) + (grain - 0.5) * 10;
-      const g = lerp(96 + canopy * 48 + fern * 28, 66, loam) + (grain - 0.5) * 12;
-      const b = lerp(40 + canopy * 18 + fern * 12, 42, loam) + (grain - 0.5) * 8;
+      // Deep tropical Yucatan emerald-moss + meadow green + sunlit golden dapple
+      const loam = smoothstep(0.68, 0.88, 1 - canopy);
+      const r = lerp(44 + canopy * 34 + fern * 22 + goldDapple * 34, 76, loam) + (grain - 0.5) * 10;
+      const g = lerp(98 + canopy * 48 + fern * 26 + goldDapple * 26, 68, loam) + (grain - 0.5) * 12;
+      const b = lerp(38 + canopy * 16 + fern * 10 - goldDapple * 8, 42, loam) + (grain - 0.5) * 8;
 
-      rough[i] = clamp01(0.84 + (0.5 - fern) * 0.16);
+      rough[i] = clamp01(0.9 + (0.5 - fern) * 0.08);
       const idx = i * 4;
       data[idx] = Math.min(255, Math.max(0, Math.round(r)));
       data[idx + 1] = Math.min(255, Math.max(0, Math.round(g)));
@@ -2940,7 +2968,7 @@ function buildMayaSacbeCausewayPBR(anisotropy) {
       const u = x / size;
       const i = y * size + x;
       const cell = tileWorley(u, v, 7, 3203);
-      const stoneMask = smoothstep(0.06, 0.17, cell.f2 - cell.f1);
+      const stoneMask = smoothstep(0.06, 0.17, cell.edge);
       const texture = tileFBM(u, v, 14, 2, 3221);
       const grit = hash2i(x, y, 3251);
 

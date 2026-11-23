@@ -23,6 +23,11 @@ import {
   NEIGHBOR_PY,
   NEIGHBOR_NY,
 } from './connectedMasonry.js';
+import {
+  createCozyGroundFoliageSystem,
+  createContactShadowSystem,
+  buildStylizedCeibaTree,
+} from '../foliageAndGround.js';
 
 const BLOCK_W = 0.96;
 const BLOCK_H = 0.64;
@@ -406,37 +411,40 @@ export class Level4Maya extends Level1Pyramid {
     // Sunken crystal-turquoise Sacred Cenote pool ringed by mossy boulders in NE
     this._buildSacredCenote(env);
 
-    // Stylized 3D Tropical Ceiba & Jungle Palm Trees around perimeter
-    [
+    // Stylized 3D Tropical Ceiba Trees around perimeter (sculpted irregular foliage cushions + buttress roots)
+    const ceibaSpecs = [
       [4.45, -7.25, 1.15],
       [8.35, -2.55, 1.05],
       [-8.05, 6.15, 1.08],
       [7.85, 5.85, 1.12],
       [-0.25, -7.75, 1.02],
       [-8.3, -1.65, 1.0],
-    ].forEach(([tx, tz, sc], idx) => {
+    ];
+    ceibaSpecs.forEach(([tx, tz, sc], idx) => {
       this._createCeibaTree(env, this._mx(tx), tz, sc, idx);
     });
 
     // Giant Tropical Jungle Ferns along the cenote rim & mounds
-    [
+    const fernSpecs = [
       [5.1, -4.6, 1.05],
       [8.2, -4.3, 0.96],
       [6.4, -8.25, 1.1],
       [-7.6, 1.8, 1.0],
       [1.4, -7.2, 0.92],
       [7.7, 3.1, 1.05],
-    ].forEach(([fx, fz, sc], idx) => {
+    ];
+    fernSpecs.forEach(([fx, fz, sc], idx) => {
       this._createJungleFern(env, this._mx(fx), fz, sc, idx);
     });
 
     // Carved Mayan Stone Stelae with jade inlays flanking the ceremonial plaza & Sacbé causeway
-    [
+    const stelaSpecs = [
       [0.85, 2.55, 0.15],
       [6.35, 2.55, -0.15],
       [5.55, -3.75, 0.45],
       [-1.75, 2.75, -0.25],
-    ].forEach(([sx, sz, ry]) => {
+    ];
+    stelaSpecs.forEach(([sx, sz, ry]) => {
       this._createMayanStela(env, this._mx(sx), sz, ry);
     });
 
@@ -457,6 +465,47 @@ export class Level4Maya extends Level1Pyramid {
       flag.receiveShadow = true;
       env.add(flag);
     });
+
+    // Cozy 3D Instanced Jungle Grass (1120 tufts), Flat Limestone Pebbles & Discreet Tropical Flowers
+    const focalPoints = [
+      ...ceibaSpecs.map(([tx, tz]) => ({ x: this._mx(tx), z: tz, innerRadius: 0.42, radius: 2.05 })),
+      ...fernSpecs.map(([fx, fz]) => ({ x: this._mx(fx), z: fz, innerRadius: 0.3, radius: 1.55 })),
+      { x: this._mx(5.4), z: -4.9, innerRadius: 0.35, radius: 2.05 },
+      { x: this._mx(7.1), z: -3.7, innerRadius: 0.35, radius: 1.9 },
+    ];
+    this.cozyGround = createCozyGroundFoliageSystem({
+      parent: env,
+      getTerrainHeight: (x, z) => this.getTerrainHeight(x, z),
+      isBlocked: (x, z) => this._isBlockedForFoliage(x, z),
+      getGrassWeight: (x, z, y) => {
+        const sx = x * this.mirrorX;
+        const { w0: wJungle, w1: wSacbe, w2: wQuarry, w3: wCenoteMoss } = computeMayaSplatWeights(sx, z, y);
+        if (wSacbe > 0.28 || wQuarry > 0.34) return 0;
+        return Math.max(wJungle, wCenoteMoss);
+      },
+      focalPoints,
+      waterLevel: WATER_LEVEL,
+      halfW: TERRAIN_W * 0.5,
+      halfD: TERRAIN_D * 0.5,
+      grassCount: 1120,
+      pebbleCount: 115,
+      flowerCount: 88,
+      grassPalette: ['#3d8a3a', '#2c7032', '#5ea641', '#88b848', '#255f2a'],
+      pebblePalette: ['#b8b29f', '#9e9b8a', '#808276', '#c9c2ad'],
+      flowerPalette: ['#fffbf0', '#fff4d4', '#ffe14d', '#ffd23f'],
+      seed: 404,
+    });
+
+    // Soft Circular Contact Shadows (AO) under Ceiba trees, ferns, stelae, quarry, workshop & Temple
+    const aoEntries = [
+      ...ceibaSpecs.map(([tx, tz, sc]) => ({ x: this._mx(tx), z: tz, radius: 1.38 * sc, strength: 0.96 })),
+      ...fernSpecs.map(([fx, fz, sc]) => ({ x: this._mx(fx), z: fz, radius: 0.65 * sc, strength: 0.85 })),
+      ...stelaSpecs.map(([sx, sz]) => ({ x: this._mx(sx), z: sz, radius: 0.48, strength: 0.92 })),
+      { x: this._mx(-4.7), z: -5.2, radiusX: 3.3, radiusZ: 1.55, strength: 0.72 },
+      { x: this._mx(-4.6), z: 4.15, radiusX: 2.35, radiusZ: 2.15, strength: 0.7 },
+      { x: this.pyramidCenter.x, z: this.pyramidCenter.z, radiusX: 3.15, radiusZ: 3.15, strength: 0.78 },
+    ];
+    this.contactShadows = createContactShadowSystem(env, aoEntries, (x, z) => this.getTerrainHeight(x, z));
   }
 
   _buildSacredCenote(parent) {
@@ -508,44 +557,19 @@ export class Level4Maya extends Level1Pyramid {
   }
 
   _createCeibaTree(parent, x, z, scale = 1.0, idx = 0) {
-    const tree = new THREE.Group();
-    const y = this.getTerrainHeight(x, z);
-    tree.position.set(x, y - 0.05, z);
-    tree.scale.setScalar(scale);
-
-    // Buttressed tropical Ceiba trunk
-    const trunk = new THREE.Mesh(
-      this._trackGeo(new THREE.CylinderGeometry(0.14, 0.28, 1.72, 7)),
-      this.maya.materials.ceibaTrunk
-    );
-    trunk.position.y = 0.82;
-    trunk.rotation.z = (idx % 2 === 0 ? 1 : -1) * 0.06;
-    trunk.castShadow = true;
-    tree.add(trunk);
-
-    // Wide spreading Mesoamerican jungle umbrella canopy
-    const canopy = new THREE.Group();
-    canopy.position.set(0, 1.72, 0);
-    const puffGeo = this._trackGeo(new THREE.IcosahedronGeometry(0.62, 1));
-    [
-      [0, 0.32, 0, 1.35, 0.56, 1.35, false],
-      [-0.68, 0.08, 0.24, 0.96, 0.48, 0.92, true],
-      [0.68, 0.12, -0.22, 0.92, 0.48, 0.96, false],
-      [0.12, 0.1, 0.66, 0.88, 0.44, 0.88, true],
-      [-0.22, 0.14, -0.62, 0.9, 0.46, 0.88, false],
-    ].forEach(([px, py, pz, sx, sy, sz, isLight]) => {
-      const puff = new THREE.Mesh(
-        puffGeo,
-        isLight ? this.maya.materials.jungleCanopyLight : this.maya.materials.jungleCanopy
-      );
-      puff.position.set(px, py, pz);
-      puff.scale.set(sx, sy, sz);
-      puff.castShadow = true;
-      canopy.add(puff);
+    const groundY = this.getTerrainHeight(x, z);
+    const { tree, crown } = buildStylizedCeibaTree({
+      x,
+      z,
+      groundY,
+      scale,
+      seed: idx + 1,
+      barkMat: this.maya.materials.ceibaTrunk,
+      foliageMat: this._getSharedFoliageMaterial(),
+      trackGeo: (g) => this._trackGeo(g),
     });
-    tree.add(canopy);
     parent.add(tree);
-    this.jungleCanopies.push({ group: canopy, phase: idx * 1.3 });
+    this.jungleCanopies.push({ group: crown, phase: idx * 1.3 });
   }
 
   _createJungleFern(parent, x, z, scale = 1.0, idx = 0) {

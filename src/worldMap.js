@@ -10,6 +10,7 @@
  */
 
 import * as THREE from 'three';
+import { createIrregularConiferTierGeo, createMatteFoliageMaterial } from './foliageAndGround.js';
 
 export const WORLD_MAP_WIDTH = 24.0;
 export const WORLD_MAP_DEPTH = 186.0;
@@ -1011,8 +1012,23 @@ export class WorldMapScene {
     domusGroup.add(miniImpluvium);
     group.add(domusGroup);
 
-    // Slender Italian Cypress trees
-    const cypressGeo = this._trackGeo(new THREE.ConeGeometry(0.15, 0.88, 6));
+    // Sculpted irregular Italian Cypress trees with vertical color gradient
+    const miniFoliageMat = this._trackMat(createMatteFoliageMaterial());
+    const cypressGeo = this._trackGeo(
+      createIrregularConiferTierGeo({
+        radiusBottom: 0.17,
+        radiusTop: 0.025,
+        height: 0.9,
+        radialSegments: 8,
+        heightSegments: 3,
+        jaggedness: 0.22,
+        droop: 0.04,
+        seed: 21,
+        baseColor: '#1d4026',
+        midColor: '#3c6f35',
+        topColor: '#88b852',
+      })
+    );
     [
       [-1.22, 0.86, -0.4],
       [-1.05, 0.82, 0.6],
@@ -1020,9 +1036,10 @@ export class WorldMapScene {
       [0.62, 0.96, -0.95],
       [1.38, 0.82, -0.32],
     ].forEach(([cx, cy, cz], idx) => {
-      const tree = new THREE.Mesh(cypressGeo, this.mats.cypressGreen);
+      const tree = new THREE.Mesh(cypressGeo, miniFoliageMat);
       tree.position.set(cx, cy, cz);
-      tree.scale.setScalar(0.84 + (idx % 3) * 0.12);
+      tree.scale.setScalar(0.86 + (idx % 3) * 0.12);
+      tree.rotation.set(0.04 * (idx % 2 ? 1 : -1), idx * 1.1, 0.04 * (idx % 2 ? -1 : 1));
       tree.castShadow = true;
       group.add(tree);
     });
@@ -1397,15 +1414,31 @@ export class WorldMapScene {
 
     group.add(compound);
 
-    // Miniature timber corner watchtower & dry western pines
-    const pineGeo = this._trackGeo(new THREE.ConeGeometry(0.18, 0.72, 6));
+    // Miniature timber corner watchtower & sculpted frontier pines
+    const penFoliageMat = this._trackMat(createMatteFoliageMaterial());
+    const pineGeo = this._trackGeo(
+      createIrregularConiferTierGeo({
+        radiusBottom: 0.2,
+        radiusTop: 0.03,
+        height: 0.74,
+        radialSegments: 8,
+        heightSegments: 3,
+        jaggedness: 0.24,
+        droop: 0.04,
+        seed: 55,
+        baseColor: '#1f3624',
+        midColor: '#426037',
+        topColor: '#849a52',
+      })
+    );
     [
       [-1.18, 0.86, 0.56],
       [1.16, 0.84, 0.52],
       [-1.12, 0.88, -0.68],
-    ].forEach(([px, py, pz]) => {
-      const pine = new THREE.Mesh(pineGeo, this.mats.cypressGreen);
+    ].forEach(([px, py, pz], idx) => {
+      const pine = new THREE.Mesh(pineGeo, penFoliageMat);
       pine.position.set(px, py, pz);
+      pine.rotation.set(0.04 * (idx % 2 ? 1 : -1), idx * 1.4, 0.04);
       pine.castShadow = true;
       group.add(pine);
     });

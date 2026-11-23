@@ -23,6 +23,11 @@ import {
   NEIGHBOR_PY,
   NEIGHBOR_NY,
 } from './connectedMasonry.js';
+import {
+  createCozyGroundFoliageSystem,
+  createContactShadowSystem,
+  buildStylizedSakuraTree,
+} from '../foliageAndGround.js';
 
 const BLOCK_W = 0.96;
 const BLOCK_H = 0.64;
@@ -422,33 +427,36 @@ export class Level3Japan extends Level1Pyramid {
     this._buildKoiPondAndBridge(env);
 
     // Stylized 3D Cherry Blossom (Sakura) Trees around the Zen garden & mountain slopes
-    [
+    const sakuraSpecs = [
       [4.5, -7.2, 1.15],
       [8.2, -2.5, 1.02],
       [-7.9, 6.2, 1.05],
       [7.8, 5.9, 1.1],
       [-0.2, -7.6, 0.96],
-    ].forEach(([sx, sz, sc], idx) => {
+    ];
+    sakuraSpecs.forEach(([sx, sz, sc], idx) => {
       this._createSakuraTree(env, this._mx(sx), sz, sc, idx);
     });
 
     // Emerald Bamboo Groves framing the Western slope & koi pond edge
-    [
+    const bambooSpecs = [
       [-8.35, -1.6, 1.08],
       [-8.1, 2.2, 0.96],
       [8.45, -7.4, 1.0],
       [1.8, -7.9, 0.94],
-    ].forEach(([bx, bz, sc], idx) => {
+    ];
+    bambooSpecs.forEach(([bx, bz, sc], idx) => {
       this._createBambooGrove(env, this._mx(bx), bz, sc, idx);
     });
 
     // Carved Granite Japanese Toro Stone Lanterns along the Zen path & pond edge
-    [
+    const lanternSpecs = [
       [1.15, 2.45],
       [5.95, 2.55],
       [5.35, -4.45],
       [-1.85, 2.75],
-    ].forEach(([lx, lz]) => {
+    ];
+    lanternSpecs.forEach(([lx, lz]) => {
       this._createStoneLantern(env, this._mx(lx), lz);
     });
 
@@ -471,6 +479,47 @@ export class Level3Japan extends Level1Pyramid {
       stone.receiveShadow = true;
       env.add(stone);
     });
+
+    // Cozy 3D Instanced Mossy Mountain Grass (1080 tufts), River Pebbles & Discreet Flowers
+    const focalPoints = [
+      ...sakuraSpecs.map(([sx, sz]) => ({ x: this._mx(sx), z: sz, innerRadius: 0.34, radius: 1.95 })),
+      ...bambooSpecs.map(([bx, bz]) => ({ x: this._mx(bx), z: bz, innerRadius: 0.4, radius: 1.8 })),
+      { x: this._mx(5.4), z: -4.8, innerRadius: 0.35, radius: 2.0 },
+      { x: this._mx(7.1), z: -3.5, innerRadius: 0.35, radius: 1.95 },
+    ];
+    this.cozyGround = createCozyGroundFoliageSystem({
+      parent: env,
+      getTerrainHeight: (x, z) => this.getTerrainHeight(x, z),
+      isBlocked: (x, z) => this._isBlockedForFoliage(x, z),
+      getGrassWeight: (x, z, y) => {
+        const sx = x * this.mirrorX;
+        const { w0: wMoss, w1: wGravel, w2: wBasalt, w3: wEarth } = computeJapanSplatWeights(sx, z, y);
+        if (wGravel > 0.26 || wBasalt > 0.34) return 0;
+        return Math.max(wMoss, wEarth * 0.55);
+      },
+      focalPoints,
+      waterLevel: WATER_LEVEL,
+      halfW: TERRAIN_W * 0.5,
+      halfD: TERRAIN_D * 0.5,
+      grassCount: 1080,
+      pebbleCount: 118,
+      flowerCount: 90,
+      grassPalette: ['#4f913d', '#3e7834', '#68a645', '#8ab34a', '#356a2d'],
+      pebblePalette: ['#85898d', '#9fa19d', '#6b7075', '#b5b2a6'],
+      flowerPalette: ['#fffaf4', '#fff6dc', '#ffe266', '#ffd6e6'],
+      seed: 303,
+    });
+
+    // Soft Circular Contact Shadows (AO) under Sakura, Bamboo, Lanterns, Quarry, Workshop & Minka
+    const aoEntries = [
+      ...sakuraSpecs.map(([sx, sz, sc]) => ({ x: this._mx(sx), z: sz, radius: 1.2 * sc, strength: 0.96 })),
+      ...bambooSpecs.map(([bx, bz, sc]) => ({ x: this._mx(bx), z: bz, radius: 0.95 * sc, strength: 0.88 })),
+      ...lanternSpecs.map(([lx, lz]) => ({ x: this._mx(lx), z: lz, radius: 0.45, strength: 0.92 })),
+      { x: this._mx(-4.7), z: -5.2, radiusX: 3.3, radiusZ: 1.55, strength: 0.72 },
+      { x: this._mx(-4.6), z: 4.15, radiusX: 2.35, radiusZ: 2.15, strength: 0.7 },
+      { x: this.pyramidCenter.x, z: this.pyramidCenter.z, radiusX: 3.15, radiusZ: 3.15, strength: 0.78 },
+    ];
+    this.contactShadows = createContactShadowSystem(env, aoEntries, (x, z) => this.getTerrainHeight(x, z));
   }
 
   _buildKoiPondAndBridge(parent) {
@@ -595,43 +644,19 @@ export class Level3Japan extends Level1Pyramid {
   }
 
   _createSakuraTree(parent, x, z, scale = 1.0, idx = 0) {
-    const tree = new THREE.Group();
-    const y = this.getTerrainHeight(x, z);
-    tree.position.set(x, y - 0.05, z);
-    tree.scale.setScalar(scale);
-
-    // Gnarled dark sakura trunk & angled main limbs
-    const trunk = new THREE.Mesh(
-      this._trackGeo(new THREE.CylinderGeometry(0.11, 0.19, 1.45, 7)),
-      this.japan.materials.sakuraTrunk
-    );
-    trunk.position.y = 0.7;
-    trunk.rotation.z = (idx % 2 === 0 ? 1 : -1) * 0.08;
-    trunk.castShadow = true;
-    tree.add(trunk);
-
-    const canopy = new THREE.Group();
-    canopy.position.set(0, 1.48, 0);
-    const puffGeo = this._trackGeo(new THREE.IcosahedronGeometry(0.54, 1));
-    [
-      [0, 0.35, 0, 1.15, 0.72, 1.15, false],
-      [-0.56, 0.08, 0.28, 0.92, 0.62, 0.88, true],
-      [0.58, 0.14, -0.22, 0.88, 0.6, 0.92, false],
-      [0.14, 0.12, 0.58, 0.82, 0.56, 0.82, true],
-      [-0.24, 0.18, -0.54, 0.84, 0.58, 0.82, false],
-    ].forEach(([px, py, pz, sx, sy, sz, isLight]) => {
-      const puff = new THREE.Mesh(
-        puffGeo,
-        isLight ? this.japan.materials.sakuraBlossomLight : this.japan.materials.sakuraBlossom
-      );
-      puff.position.set(px, py, pz);
-      puff.scale.set(sx, sy, sz);
-      puff.castShadow = true;
-      canopy.add(puff);
+    const groundY = this.getTerrainHeight(x, z);
+    const { tree, crown } = buildStylizedSakuraTree({
+      x,
+      z,
+      groundY,
+      scale,
+      seed: idx + 1,
+      barkMat: this.japan.materials.sakuraTrunk,
+      foliageMat: this._getSharedFoliageMaterial(),
+      trackGeo: (g) => this._trackGeo(g),
     });
-    tree.add(canopy);
     parent.add(tree);
-    this.sakuraCanopies.push({ group: canopy, phase: idx * 1.4 });
+    this.sakuraCanopies.push({ group: crown, phase: idx * 1.4 });
   }
 
   _createBambooGrove(parent, x, z, scale = 1.0, idx = 0) {

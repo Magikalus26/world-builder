@@ -21,6 +21,12 @@ import {
   NEIGHBOR_PY,
   NEIGHBOR_NY,
 } from './connectedMasonry.js';
+import {
+  createCozyGroundFoliageSystem,
+  createContactShadowSystem,
+  buildStylizedRomanCypress,
+  buildStylizedRomanStonePine,
+} from '../foliageAndGround.js';
 
 const BLOCK_W = 0.96;
 const BLOCK_H = 0.64;
@@ -428,19 +434,19 @@ export class Level2Rome extends Level1Pyramid {
     // Decorative turquoise Roman water cistern / channel edge in North-East
     this._buildRomanCistern(env);
 
-    // Stylized Mediterranean Cypress trees across the Tuscan hillside & cistern edge
+    // Stylized Mediterranean Cypresses & Tuscan Umbrella Stone Pines (no smooth cones!)
     const cypressSpecs = [
-      [4.5, -6.95, 1.16],
-      [8.25, -7.25, 1.02],
-      [5.75, -8.35, 0.94],
-      [7.8, 5.7, 1.08],
-      [-7.9, 6.25, 0.96],
-      [-8.3, -1.8, 1.05],
-      [0.4, -7.9, 1.12],
-      [8.4, 2.2, 0.9],
+      [4.5, -6.95, 1.16, 'cypress'],
+      [8.25, -7.25, 1.02, 'cypress'],
+      [5.75, -8.35, 0.94, 'pine'],
+      [7.8, 5.7, 1.04, 'pine'],
+      [-7.9, 6.25, 0.96, 'cypress'],
+      [-8.3, -1.8, 1.05, 'cypress'],
+      [0.4, -7.9, 1.12, 'cypress'],
+      [8.4, 2.2, 0.92, 'cypress'],
     ];
-    cypressSpecs.forEach(([cx, cz, sc]) => {
-      this._createRomanCypress(env, this._mx(cx), cz, sc);
+    cypressSpecs.forEach(([cx, cz, sc, kind], idx) => {
+      this._createRomanCypress(env, this._mx(cx), cz, sc, kind, idx + 1);
     });
 
     // Cut white travertine Roman Via stepping flagstones
@@ -464,6 +470,53 @@ export class Level2Rome extends Level1Pyramid {
 
     // Stylized Terracotta Roman Amphorae props around the diorama edge & workshop
     this._buildTerracottaAmphorae(env);
+
+    // Cozy 3D Instanced Mediterranean Grass (1040 tufts), Flat Pebbles & White/Yellow Wildflowers
+    const focalPoints = [
+      ...cypressSpecs.map(([cx, cz]) => ({ x: this._mx(cx), z: cz, innerRadius: 0.3, radius: 1.9 })),
+      { x: this._mx(5.0), z: -4.8, innerRadius: 0.35, radius: 2.1 },
+      { x: this._mx(6.7), z: -3.6, innerRadius: 0.35, radius: 1.9 },
+      { x: this._mx(-7.0), z: 4.7, innerRadius: 0.35, radius: 1.5 },
+      { x: this._mx(6.7), z: 4.6, innerRadius: 0.35, radius: 1.5 },
+    ];
+    this.cozyGround = createCozyGroundFoliageSystem({
+      parent: env,
+      getTerrainHeight: (x, z) => this.getTerrainHeight(x, z),
+      isBlocked: (x, z) => this._isBlockedForFoliage(x, z),
+      getGrassWeight: (x, z, y) => {
+        const sx = x * this.mirrorX;
+        const { w0: wGrass, w1: wPath, w2: wQuarry, w3: wMoss } = computeRomanSplatWeights(sx, z, y);
+        if (wPath > 0.28 || wQuarry > 0.34) return 0;
+        return Math.max(wGrass, wMoss);
+      },
+      focalPoints,
+      waterLevel: WATER_LEVEL,
+      halfW: TERRAIN_W * 0.5,
+      halfD: TERRAIN_D * 0.5,
+      grassCount: 1040,
+      pebbleCount: 120,
+      flowerCount: 96,
+      grassPalette: ['#6da142', '#528032', '#82b348', '#a5ba4e', '#46702b'],
+      pebblePalette: ['#cfc7b8', '#b8af9e', '#9b9487', '#ddd5c4'],
+      flowerPalette: ['#fffcf2', '#fff7e0', '#ffe35c', '#ffd342'],
+      seed: 202,
+    });
+
+    // Soft Circular Contact Shadows (AO) under trees, amphora clusters, quarry, workshop & Domus
+    const aoEntries = [
+      ...cypressSpecs.map(([cx, cz, sc, kind]) => ({
+        x: this._mx(cx),
+        z: cz,
+        radius: (kind === 'pine' ? 1.25 : 0.88) * sc,
+        strength: 0.95,
+      })),
+      { x: this._mx(-7.0), z: 4.65, radius: 0.72, strength: 0.85 },
+      { x: this._mx(6.65), z: 4.55, radius: 0.72, strength: 0.85 },
+      { x: this._mx(-4.7), z: -5.2, radiusX: 3.3, radiusZ: 1.55, strength: 0.72 },
+      { x: this._mx(-4.6), z: 4.15, radiusX: 2.35, radiusZ: 2.15, strength: 0.7 },
+      { x: this.pyramidCenter.x, z: this.pyramidCenter.z, radiusX: 3.15, radiusZ: 3.15, strength: 0.78 },
+    ];
+    this.contactShadows = createContactShadowSystem(env, aoEntries, (x, z) => this.getTerrainHeight(x, z));
   }
 
   _buildRomanCistern(parent) {
@@ -496,37 +549,22 @@ export class Level2Rome extends Level1Pyramid {
     });
   }
 
-  _createRomanCypress(parent, x, z, scale = 1.0) {
-    const group = new THREE.Group();
+  _createRomanCypress(parent, x, z, scale = 1.0, kind = 'cypress', seed = 1) {
     const groundY = this.getTerrainHeight(x, z);
-    group.position.set(x, groundY - 0.04, z);
-    group.scale.setScalar(scale);
-
-    const trunk = new THREE.Mesh(
-      this._trackGeo(new THREE.CylinderGeometry(0.08, 0.13, 0.6, 6)),
-      this.textures.materials.palmTrunk
-    );
-    trunk.position.y = 0.28;
-    trunk.castShadow = true;
-    group.add(trunk);
-
-    const crown = new THREE.Group();
-    crown.position.y = 0.45;
-    const tiers = [
-      { r: 0.44, h: 1.4, y: 0.65, mat: this.rome.materials.cypressLeaf },
-      { r: 0.34, h: 1.25, y: 1.38, mat: this.rome.materials.cypressLeafLight },
-      { r: 0.22, h: 0.95, y: 2.02, mat: this.rome.materials.cypressLeaf },
-    ];
-    tiers.forEach((t) => {
-      const cone = new THREE.Mesh(this._trackGeo(new THREE.ConeGeometry(t.r, t.h, 8)), t.mat);
-      cone.position.y = t.y;
-      cone.castShadow = true;
-      crown.add(cone);
+    const foliageMat = this._getSharedFoliageMaterial();
+    const builder = kind === 'pine' ? buildStylizedRomanStonePine : buildStylizedRomanCypress;
+    const { tree, crown } = builder({
+      x,
+      z,
+      groundY,
+      scale,
+      seed,
+      barkMat: this.textures.materials.palmTrunk,
+      foliageMat,
+      trackGeo: (g) => this._trackGeo(g),
     });
-
-    group.add(crown);
     this.palmFronds.push({ group: crown, phase: x * 0.65 + z * 0.4 });
-    parent.add(group);
+    parent.add(tree);
   }
 
   _buildTerracottaAmphorae(parent) {

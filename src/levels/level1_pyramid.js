@@ -25,6 +25,14 @@ import {
   NEIGHBOR_PY,
   NEIGHBOR_NY,
 } from './connectedMasonry.js';
+import {
+  createCozyGroundFoliageSystem,
+  createContactShadowSystem,
+  createMatteFoliageMaterial,
+  applyVerticalFoliageGradient,
+  buildStylizedRomanCypress,
+  buildStylizedCeibaTree,
+} from '../foliageAndGround.js';
 
 const BLOCK_W = 0.96;
 const BLOCK_H = 0.68;
@@ -640,11 +648,16 @@ export class Level1Pyramid {
     this._buildNileWater(env);
 
     // 4. Stylized date palms & coastal reed tufts planted on exact sculpted terrain height
-    this._createPalmTree(env, this._mx(4.75), -6.9, 1.08, 0.16 * this.mirrorX);
-    this._createPalmTree(env, this._mx(8.2), -7.25, 0.92, -0.18 * this.mirrorX);
-    this._createPalmTree(env, this._mx(5.75), -8.35, 0.84, 0.1 * this.mirrorX);
-    this._createPalmTree(env, this._mx(7.6), 5.8, 0.96, -0.14 * this.mirrorX);
-    this._createPalmTree(env, this._mx(-7.8), 6.25, 0.85, 0.18 * this.mirrorX);
+    const palmSpecs = [
+      [4.75, -6.9, 1.08, 0.16 * this.mirrorX],
+      [8.2, -7.25, 0.92, -0.18 * this.mirrorX],
+      [5.75, -8.35, 0.84, 0.1 * this.mirrorX],
+      [7.6, 5.8, 0.96, -0.14 * this.mirrorX],
+      [-7.8, 6.25, 0.85, 0.18 * this.mirrorX],
+    ];
+    palmSpecs.forEach(([px, pz, sc, lean]) => {
+      this._createPalmTree(env, this._mx(px), pz, sc, lean);
+    });
     this._buildOasisReeds(env);
 
     // 5. Subtle sandstone stepping stones along central avenues at exact terrain height
@@ -686,6 +699,83 @@ export class Level1Pyramid {
       rock.receiveShadow = true;
       env.add(rock);
     });
+
+    // 7. Cozy 3D Instanced Grass, Border Pebbles & Discreet Wildflowers (1 draw call each)
+    const themeId = (this.runConfig && this.runConfig.themeId) || 'egypt';
+    const focalPoints = [
+      ...palmSpecs.map(([px, pz]) => ({ x: this._mx(px), z: pz, innerRadius: 0.28, radius: 1.85 })),
+      ...boulders.map(([bx, bz]) => ({ x: this._mx(bx), z: bz, innerRadius: 0.42, radius: 1.5 })),
+      { x: this._mx(6.1), z: -5.3, innerRadius: 0.4, radius: 2.2 },
+      { x: this._mx(7.4), z: -4.8, innerRadius: 0.35, radius: 2.0 },
+      { x: this._mx(5.2), z: -6.4, innerRadius: 0.35, radius: 2.1 },
+    ];
+    const isGreenTheme = themeId === 'rome' || themeId === 'china' || themeId === 'maya';
+    this.cozyGround = createCozyGroundFoliageSystem({
+      parent: env,
+      getTerrainHeight: (x, z) => this.getTerrainHeight(x, z),
+      isBlocked: (x, z) => this._isBlockedForFoliage(x, z),
+      getGrassWeight: (x, z, y) => {
+        const sx = x * this.mirrorX;
+        const [w0, wPath, wQuarry, wOasis] = sampleTerrainSplat(sx, z, y);
+        if (wPath > 0.36 || wQuarry > 0.42) return 0;
+        if (isGreenTheme) return Math.max(w0, wOasis);
+        // Egypt: lush around oasis/palms + sparse warm desert tufts on outer dune borders
+        const borderDist = Math.max(Math.abs(x), Math.abs(z));
+        return Math.max(wOasis * 1.4, borderDist > 6.5 ? 0.35 : 0.08);
+      },
+      focalPoints,
+      waterLevel: WATER_LEVEL,
+      halfW: TERRAIN_W * 0.5,
+      halfD: TERRAIN_D * 0.5,
+      grassCount: isGreenTheme ? 960 : 820,
+      pebbleCount: 105,
+      flowerCount: isGreenTheme ? 82 : 56,
+      grassPalette: isGreenTheme
+        ? ['#659b3c', '#4f8032', '#7cb347', '#9bb748', '#46722d']
+        : ['#7aa346', '#91ae4e', '#a9b355', '#5e8b38', '#bfa95e'],
+      pebblePalette: ['#c4ae86', '#b09a75', '#99886a', '#d2be96'],
+      flowerPalette: ['#fffaf0', '#fff4d4', '#ffe15e', '#ffd447'],
+      seed: 101 + (this.runConfig ? this.runConfig.seed || 7 : 0),
+    });
+
+    // 8. Soft Circular Ambient Occlusion Contact Shadows under trees, rocks & stations
+    const aoEntries = [
+      ...palmSpecs.map(([px, pz, sc]) => ({ x: this._mx(px), z: pz, radius: 0.92 * sc, strength: 0.9 })),
+      ...boulders.map(([bx, bz, sx, , sz]) => ({
+        x: this._mx(bx),
+        z: bz,
+        radiusX: 0.62 * sx,
+        radiusZ: 0.62 * sz,
+        strength: 0.95,
+      })),
+      { x: this._mx(-4.7), z: -5.2, radiusX: 3.3, radiusZ: 1.5, strength: 0.72 },
+      { x: this._mx(-4.6), z: 4.15, radiusX: 2.35, radiusZ: 2.15, strength: 0.7 },
+      { x: this.pyramidCenter.x, z: this.pyramidCenter.z, radiusX: 3.15, radiusZ: 3.15, strength: 0.76 },
+    ];
+    this.contactShadows = createContactShadowSystem(env, aoEntries, (x, z) => this.getTerrainHeight(x, z));
+  }
+
+  /**
+   * Shared exclusion check ensuring 3D grass & wildflowers never spawn on stone paths,
+   * compacted quarry/workshop/staging pads, sled tracks, or underneath buildings.
+   */
+  _isBlockedForFoliage(x, z) {
+    const sx = x * this.mirrorX;
+    // Quarry cliff & output pad (NW)
+    if (sx > -7.9 && sx < -1.1 && z > -7.4 && z < -2.35) return true;
+    // Track A corridor (Quarry -> Workshop)
+    if (sx > -6.3 && sx < -2.8 && z > -2.6 && z < 2.2) return true;
+    // Workshop anvil & output zone (SW)
+    if (sx > -7.3 && sx < -1.8 && z > 1.7 && z < 6.7) return true;
+    // Track B corridor (Workshop -> Staging)
+    if (sx > -2.6 && sx < 2.4 && z > 2.3 && z < 5.9) return true;
+    // Staging pad (SE)
+    if (sx > 1.8 && sx < 5.6 && z > 2.4 && z < 5.9) return true;
+    // Main monument / building site footprint (E)
+    if (sx > 0.35 && sx < 7.1 && z > -4.05 && z < 2.65) return true;
+    // Central stepping-stone walkway
+    if (sx > -1.75 && sx < 0.4 && z > -2.25 && z < 2.45) return true;
+    return false;
   }
 
   /**
@@ -817,59 +907,65 @@ export class Level1Pyramid {
     });
   }
 
+  _getSharedFoliageMaterial() {
+    if (!this._sharedFoliageMat) {
+      this._sharedFoliageMat = this._trackMat(createMatteFoliageMaterial());
+    }
+    return this._sharedFoliageMat;
+  }
+
   _createPalmTree(parent, x, z, scale = 1, lean = 0.12) {
     const themeId = this.runConfig && this.runConfig.themeId;
-    const group = new THREE.Group();
     const groundY = this.getTerrainHeight(x, z);
-    group.position.set(x, groundY - 0.04, z);
-    group.scale.setScalar(scale);
+    const foliageMat = this._getSharedFoliageMaterial();
 
     if (themeId === 'rome') {
-      // Sculpted Mediterranean Cypress tree for Rome — Colline Impériale
-      const trunkGeo = this._trackGeo(new THREE.CylinderGeometry(0.09, 0.13, 0.55, 6));
-      const trunk = new THREE.Mesh(trunkGeo, this.textures.materials.palmTrunk);
-      trunk.position.y = 0.26;
-      trunk.castShadow = true;
-      group.add(trunk);
-
-      const foliage = new THREE.Group();
-      foliage.position.y = 0.45;
-      const c1 = new THREE.Mesh(
-        this._trackGeo(new THREE.ConeGeometry(0.42, 1.35, 7)),
-        this.textures.materials.palmLeaf
-      );
-      c1.position.y = 0.65;
-      c1.castShadow = true;
-      foliage.add(c1);
-
-      const c2 = new THREE.Mesh(
-        this._trackGeo(new THREE.ConeGeometry(0.32, 1.15, 7)),
-        this.textures.materials.palmLeaf
-      );
-      c2.position.y = 1.32;
-      c2.castShadow = true;
-      foliage.add(c2);
-
-      const c3 = new THREE.Mesh(
-        this._trackGeo(new THREE.ConeGeometry(0.2, 0.85, 7)),
-        this.textures.materials.palmLeaf
-      );
-      c3.position.y = 1.88;
-      c3.castShadow = true;
-      foliage.add(c3);
-
-      group.add(foliage);
-      this.palmFronds.push({ group: foliage, phase: x * 0.7 + z * 0.3 });
-      parent.add(group);
+      const { tree, crown } = buildStylizedRomanCypress({
+        x,
+        z,
+        groundY,
+        scale,
+        seed: Math.abs(Math.round(x * 13 + z * 7)) + 3,
+        barkMat: this.textures.materials.palmTrunk,
+        foliageMat,
+        trackGeo: (g) => this._trackGeo(g),
+      });
+      this.palmFronds.push({ group: crown, phase: x * 0.7 + z * 0.3 });
+      parent.add(tree);
       return;
     }
+
+    if (themeId === 'maya') {
+      const { tree, crown } = buildStylizedCeibaTree({
+        x,
+        z,
+        groundY,
+        scale: scale * 0.94,
+        seed: Math.abs(Math.round(x * 11 + z * 17)) + 5,
+        barkMat: this.textures.materials.palmTrunk,
+        foliageMat,
+        trackGeo: (g) => this._trackGeo(g),
+      });
+      this.palmFronds.push({ group: crown, phase: x * 0.7 + z * 0.3 });
+      parent.add(tree);
+      return;
+    }
+
+    const group = new THREE.Group();
+    group.position.set(x, groundY - 0.04, z);
+    group.scale.setScalar(scale);
 
     if (themeId === 'china') {
       // Cluster of 3 tall Jade Bamboo stalks for Chine — Montagne Céleste
       const stalkGeo = this._trackGeo(new THREE.CylinderGeometry(0.055, 0.075, 2.35, 6));
-      const leafGeo = this._trackGeo(new THREE.ConeGeometry(0.18, 0.72, 4));
-      leafGeo.scale(1, 1, 0.2);
-      leafGeo.translate(0, 0.34, 0);
+      const leafGeo = this._trackGeo(
+        applyVerticalFoliageGradient(
+          new THREE.ConeGeometry(0.18, 0.72, 4).scale(1, 1, 0.2).translate(0, 0.34, 0),
+          '#265c30',
+          '#4d913e',
+          '#94c958'
+        )
+      );
 
       const grove = new THREE.Group();
       [
@@ -885,7 +981,7 @@ export class Level1Pyramid {
         grove.add(s);
 
         for (let k = 0; k < 3; k++) {
-          const lf = new THREE.Mesh(leafGeo, this.textures.materials.palmLeaf);
+          const lf = new THREE.Mesh(leafGeo, foliageMat);
           lf.position.set(ox, (1.45 + k * 0.32) * sc, oz);
           lf.rotation.y = idx * 2.1 + k * 2.05;
           lf.rotation.z = 1.08;
@@ -900,9 +996,30 @@ export class Level1Pyramid {
       return;
     }
 
-    // Default / Égypte: Sunlit Desert Date Palm
+    // Default / Égypte: Sunlit Desert Date Palm with thickened flared root collar & gradient fronds
+    const rootCollar = new THREE.Mesh(
+      this._trackGeo(new THREE.CylinderGeometry(0.16, 0.25, 0.26, 7)),
+      this.textures.materials.palmTrunk
+    );
+    rootCollar.position.y = 0.11;
+    rootCollar.castShadow = true;
+    rootCollar.receiveShadow = true;
+    group.add(rootCollar);
+
+    const rootGeo = this._trackGeo(new THREE.CylinderGeometry(0.03, 0.085, 0.36, 5));
+    for (let r = 0; r < 4; r++) {
+      const ang = (r / 4) * Math.PI * 2 + 0.4;
+      const root = new THREE.Mesh(rootGeo, this.textures.materials.palmTrunk);
+      root.position.set(Math.cos(ang) * 0.2, 0.08, Math.sin(ang) * 0.2);
+      root.rotation.order = 'YXZ';
+      root.rotation.y = -ang + Math.PI * 0.5;
+      root.rotation.x = 1.12;
+      root.castShadow = true;
+      group.add(root);
+    }
+
     const segGeo = this._trackGeo(new THREE.CylinderGeometry(0.11, 0.16, 0.52, 6));
-    let curY = 0.22;
+    let curY = 0.24;
     let curX = 0;
     for (let i = 0; i < 5; i++) {
       const seg = new THREE.Mesh(segGeo, this.textures.materials.palmTrunk);
@@ -918,14 +1035,16 @@ export class Level1Pyramid {
 
     const crown = new THREE.Group();
     crown.position.set(curX, curY - 0.1, 0);
-    const frondGeo = this._trackGeo(new THREE.ConeGeometry(0.24, 1.35, 4));
-    frondGeo.scale(1, 1, 0.22);
-    frondGeo.translate(0, 0.65, 0);
+    const rawFrond = new THREE.ConeGeometry(0.26, 1.38, 4);
+    rawFrond.scale(1, 1, 0.24);
+    rawFrond.translate(0, 0.66, 0);
+    applyVerticalFoliageGradient(rawFrond, '#27582c', '#4e8a38', '#98c44e');
+    const frondGeo = this._trackGeo(rawFrond);
 
-    for (let f = 0; f < 6; f++) {
-      const frond = new THREE.Mesh(frondGeo, this.textures.materials.palmLeaf);
-      frond.rotation.y = (f / 6) * Math.PI * 2;
-      frond.rotation.z = 1.05 + (f % 2) * 0.18;
+    for (let f = 0; f < 7; f++) {
+      const frond = new THREE.Mesh(frondGeo, foliageMat);
+      frond.rotation.y = (f / 7) * Math.PI * 2;
+      frond.rotation.z = 1.02 + (f % 2) * 0.2;
       frond.castShadow = true;
       crown.add(frond);
     }
@@ -2502,11 +2621,14 @@ export class Level1Pyramid {
       }
     }
 
-    // 6. Subtle breeze on palm fronds, workshop sunshade, carving pips, & animated Nile water
+    // 6. Subtle breeze on tree canopies, instanced grass/flowers, workshop sunshade, & animated water
+    if (this.cozyGround) {
+      this.cozyGround.update(elapsed);
+    }
     for (let i = 0; i < this.palmFronds.length; i++) {
       const p = this.palmFronds[i];
-      p.group.rotation.z = Math.sin(elapsed * 1.45 + p.phase) * 0.045;
-      p.group.rotation.x = Math.cos(elapsed * 1.1 + p.phase) * 0.03;
+      p.group.rotation.z = Math.sin(elapsed * 1.35 + p.phase) * 0.036 + Math.sin(elapsed * 2.1 + p.phase * 1.4) * 0.01;
+      p.group.rotation.x = Math.cos(elapsed * 1.05 + p.phase) * 0.024;
     }
     if (this.canopyMesh) {
       this.canopyMesh.rotation.z = Math.sin(elapsed * 1.8) * 0.015;
@@ -2603,6 +2725,15 @@ export class Level1Pyramid {
     if (this.masonryCache) {
       this.masonryCache.dispose();
     }
+    if (this.cozyGround) {
+      this.cozyGround.dispose();
+      this.cozyGround = null;
+    }
+    if (this.contactShadows) {
+      this.contactShadows.dispose();
+      this.contactShadows = null;
+    }
+    this._sharedFoliageMat = null;
 
     // Restore shared terrain splat color to neutral white
     this.textures.materials.terrainSplat.color.setHex(0xffffff);
