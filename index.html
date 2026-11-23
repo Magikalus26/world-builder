@@ -54,11 +54,21 @@
       <div class="menu-top-bar">
         <div class="currency-group" aria-live="polite">
           <div class="token-pill" title="Éclats d'Architecte (Roguelike)">
-            <span class="coin-icon" aria-hidden="true">💠</span>
+            <svg class="hud-currency-svg" viewBox="0 0 24 24" aria-hidden="true">
+              <polygon points="12,1.5 22,12 12,22.5 2,12" fill="#18a8c7" stroke="#b6ffff" stroke-width="1.3"/>
+              <polygon points="12,1.5 18,12 12,12" fill="#b8ffff"/>
+              <polygon points="12,1.5 6,12 12,12" fill="#5cefff"/>
+              <polygon points="12,22.5 18,12 12,12" fill="#0d7a9c"/>
+              <polygon points="12,22.5 6,12 12,12" fill="#29d2e8"/>
+            </svg>
             <span id="menu-tokens-val">45 Éclats</span>
           </div>
           <div class="coin-pill" title="Pièces d'Or">
-            <span class="coin-icon" aria-hidden="true">🪙</span>
+            <svg class="hud-currency-svg" viewBox="0 0 24 24" aria-hidden="true">
+              <circle cx="12" cy="12" r="10.2" fill="#d99422" stroke="#ffea9c" stroke-width="1.5"/>
+              <circle cx="12" cy="12" r="7.4" fill="#f7c84c" stroke="#9e6212" stroke-width="1.1"/>
+              <path d="M12 7.2L15.6 12L12 16.8L8.4 12Z" fill="#ffe999" stroke="#a66812" stroke-width="0.9"/>
+            </svg>
             <span id="menu-coins-val">100 Or</span>
           </div>
         </div>
@@ -278,18 +288,31 @@
     <!-- 3D WORLD MAP TOP HUD (← Menu + Title + Dual Currencies) -->
     <header id="hud-map-top" class="hud-top hud-map-top" hidden>
       <button id="map-back-menu-btn" class="hud-back-btn" type="button" aria-label="Retour au menu">
-        ← Menu
+        <svg class="hud-icon-svg" viewBox="0 0 20 20" aria-hidden="true">
+          <path d="M12.8 4.4L7.2 10l5.6 5.6" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <span>Menu</span>
       </button>
       <div id="hud-map-badge" class="hud-pill hud-map-badge">
         <span class="hud-brand">Workd Builder</span>
       </div>
       <div class="currency-group currency-group--compact" aria-live="polite">
         <div class="token-pill coin-pill--hud" title="Éclats d'Architecte">
-          <span class="coin-icon" aria-hidden="true">💠</span>
+          <svg class="hud-currency-svg hud-currency-svg--sm" viewBox="0 0 24 24" aria-hidden="true">
+            <polygon points="12,1.5 22,12 12,22.5 2,12" fill="#18a8c7" stroke="#b6ffff" stroke-width="1.4"/>
+            <polygon points="12,1.5 18,12 12,12" fill="#b8ffff"/>
+            <polygon points="12,1.5 6,12 12,12" fill="#5cefff"/>
+            <polygon points="12,22.5 18,12 12,12" fill="#0d7a9c"/>
+            <polygon points="12,22.5 6,12 12,12" fill="#29d2e8"/>
+          </svg>
           <span id="map-tokens-val">45</span>
         </div>
         <div class="coin-pill coin-pill--hud" title="Pièces d'Or">
-          <span class="coin-icon" aria-hidden="true">🪙</span>
+          <svg class="hud-currency-svg hud-currency-svg--sm" viewBox="0 0 24 24" aria-hidden="true">
+            <circle cx="12" cy="12" r="10.2" fill="#d99422" stroke="#ffea9c" stroke-width="1.5"/>
+            <circle cx="12" cy="12" r="7.4" fill="#f7c84c" stroke="#9e6212" stroke-width="1.1"/>
+            <path d="M12 7.2L15.6 12L12 16.8L8.4 12Z" fill="#ffe999" stroke="#a66812" stroke-width="0.9"/>
+          </svg>
           <span id="map-coins-val">100</span>
         </div>
       </div>
@@ -300,13 +323,16 @@
       <span id="map-biome-text" class="map-biome-text">Chapitre 1 • Égypte — Sables de Gizeh</span>
     </div>
 
-    <!-- IN-GAME TOP HUD BAR (← Carte/Menu + Block Counter + 🪑 Décorer) -->
+    <!-- IN-GAME TOP HUD BAR (← Carte/Menu + Block Counter + Décorer) -->
     <header id="hud-game-top" class="hud-top hud-game-top" hidden>
       <button id="game-back-menu-btn" class="hud-back-btn" type="button" aria-label="Retour">
-        ← Carte
+        <svg class="hud-icon-svg" viewBox="0 0 20 20" aria-hidden="true">
+          <path d="M12.8 4.4L7.2 10l5.6 5.6" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <span id="game-back-label">Carte</span>
       </button>
-      <div id="hud-pill" class="hud-pill" role="status" aria-live="polite">
-        <span id="hud-counter" class="hud-counter">Pyramide : 0 / 55 blocs</span>
+      <div id="hud-pill" class="hud-pill hud-pill--counter" role="status" aria-live="polite">
+        <span id="hud-counter" class="hud-counter">Pyramide : 0 / 55</span>
       </div>
       <button
         id="decorate-toggle-btn"
@@ -315,7 +341,10 @@
         aria-pressed="false"
         aria-label="Décorer le niveau"
       >
-        🪑 Décorer
+        <svg class="hud-icon-svg" viewBox="0 0 20 20" aria-hidden="true">
+          <path d="M4.8 3.2h2.2v6.1h6.2V11.5H4.8V3.2zm0 8.5h2v5.1h-2v-5.1zm8.4 0h2v5.1h-2v-5.1z" fill="currentColor"/>
+        </svg>
+        <span>Décorer</span>
       </button>
     </header>
 

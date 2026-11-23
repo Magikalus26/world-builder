@@ -8,6 +8,13 @@
  */
 
 import * as THREE from 'three';
+import {
+  createUnifiedRenderer,
+  createRoomEnvironmentIBL,
+  createThreePointLightingRig,
+  calibrateShadowCamera,
+} from './graphicsCore.js';
+import { buildDioramaEnvironment } from './dioramaEnvironment.js';
 import { SoundEngine } from './audio.js';
 import { createTextureLibrary } from './textures.js';
 import { DioramaCameraController } from './camera.js';
@@ -51,6 +58,7 @@ class WorkdBuilderApp {
     // In-Game HUD elements
     this.hudGameTop = document.getElementById('hud-game-top');
     this.gameBackMenuBtn = document.getElementById('game-back-menu-btn');
+    this.gameBackLabel = document.getElementById('game-back-label');
     this.hudPill = document.getElementById('hud-pill');
     this.hudCounter = document.getElementById('hud-counter');
     this.rogueModWrap = document.getElementById('roguelike-modifier-wrap');
@@ -130,98 +138,35 @@ class WorkdBuilderApp {
     const width = window.innerWidth || 390;
     const height = window.innerHeight || 844;
 
-    this.renderer = new THREE.WebGLRenderer({
-      canvas: this.canvas,
-      antialias: true,
+    this.renderer = createUnifiedRenderer(this.canvas, {
       alpha: false,
-      powerPreference: 'high-performance',
+      shadowMap: true,
+      width,
+      height,
     });
-    // Cap pixel ratio at 2x for locked 60 FPS and low thermals on iPhone 16e Safari
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-    this.renderer.setSize(width, height, false);
-    this.renderer.outputColorSpace = THREE.SRGBColorSpace;
-    this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.08;
-    this.renderer.shadowMap.enabled = true;
-    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color('#e6c893');
-    this.scene.fog = new THREE.Fog('#e6c893', 42, 88);
-    this.scene.environment = this._createDesertEnvironment();
-    this.scene.environmentIntensity = 0.45;
+    this.scene.fog = new THREE.Fog('#e6c893', 44, 94);
 
-    this.camera = new THREE.PerspectiveCamera(37, width / Math.max(height, 1), 0.5, 190);
+    // Procedural RoomEnvironment studio IBL for realistic PBR reflections on every scene
+    this.envRenderTarget = createRoomEnvironmentIBL(this.renderer);
+    this.scene.environment = this.envRenderTarget.texture;
+    this.scene.environmentIntensity = 0.62;
 
-    const hemiLight = new THREE.HemisphereLight('#fff8ea', '#c28344', 0.84);
-    hemiLight.position.set(0, 20, 0);
-    this.scene.add(hemiLight);
+    this.camera = new THREE.PerspectiveCamera(37, width / Math.max(height, 1), 0.5, 260);
 
-    const sunLight = new THREE.DirectionalLight('#fff0cf', 2.05);
-    sunLight.position.set(-12, 19, 13);
-    sunLight.castShadow = true;
-    sunLight.shadow.mapSize.set(1024, 1024);
-    sunLight.shadow.camera.near = 6;
-    sunLight.shadow.camera.far = 56;
-    const d = 16.5;
-    sunLight.shadow.camera.left = -d;
-    sunLight.shadow.camera.right = d;
-    sunLight.shadow.camera.top = d;
-    sunLight.shadow.camera.bottom = -d;
-    sunLight.shadow.bias = -0.0005;
-    sunLight.shadow.normalBias = 0.025;
-    this.scene.add(sunLight);
-    this.scene.add(sunLight.target);
-    this.sunLight = sunLight;
-
-    const rimFill = new THREE.DirectionalLight('#8fd4e6', 0.38);
-    rimFill.position.set(14, 9, -13);
-    this.scene.add(rimFill);
-  }
-
-  _createDesertEnvironment() {
-    const pmrem = new THREE.PMREMGenerator(this.renderer);
-    pmrem.compileEquirectangularShader();
-
-    const envScene = new THREE.Scene();
-    const skyGeo = new THREE.SphereGeometry(20, 16, 12);
-    const skyCanvas = document.createElement('canvas');
-    skyCanvas.width = 128;
-    skyCanvas.height = 64;
-    const ctx = skyCanvas.getContext('2d');
-    const grad = ctx.createLinearGradient(0, 0, 0, 64);
-    grad.addColorStop(0.0, '#7eb7d9');
-    grad.addColorStop(0.35, '#f6dfb4');
-    grad.addColorStop(0.52, '#fff4d6');
-    grad.addColorStop(0.68, '#d9a45b');
-    grad.addColorStop(1.0, '#8c5a2b');
-    ctx.fillStyle = grad;
-    ctx.fillRect(0, 0, 128, 64);
-
-    ctx.fillStyle = '#fffdf0';
-    ctx.beginPath();
-    ctx.arc(32, 20, 9, 0, Math.PI * 2);
-    ctx.fill();
-
-    const skyTex = new THREE.CanvasTexture(skyCanvas);
-    skyTex.colorSpace = THREE.SRGBColorSpace;
-    const skyMat = new THREE.MeshBasicMaterial({ map: skyTex, side: THREE.BackSide });
-    envScene.add(new THREE.Mesh(skyGeo, skyMat));
-
-    const envRT = pmrem.fromScene(envScene, 0.04);
-    skyGeo.dispose();
-    skyMat.dispose();
-    skyTex.dispose();
-    pmrem.dispose();
-    this.envRenderTarget = envRT;
-    return envRT.texture;
+    // Cinematic 3-point lighting rig (2048x2048 PCFSoftShadowMap, bias = -0.0004)
+    this.lights = createThreePointLightingRig(this.scene, { shadowBounds: 16.5 });
+    this.sunLight = this.lights.sunLight;
+    this.dioramaEnv = null;
   }
 
   _bindUI() {
     this._onResize = () => {
       const w = window.innerWidth || 390;
       const h = window.innerHeight || 844;
-      this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+      this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 3));
       this.renderer.setSize(w, h, false);
       this.cameraController.handleResize(w, h);
     };
@@ -454,11 +399,21 @@ class WorkdBuilderApp {
     }
   }
 
+  _applyDioramaEnvironment(biomeKey) {
+    if (this.dioramaEnv) {
+      this.dioramaEnv.dispose();
+      this.dioramaEnv = null;
+    }
+    this.dioramaEnv = buildDioramaEnvironment(biomeKey, {
+      scene: this.scene,
+      lights: this.lights,
+      materialFactory: this.textures ? this.textures.materialFactory : null,
+    });
+  }
+
   _syncSunLightToTarget(x, z) {
-    if (!this.sunLight) return;
-    this.sunLight.position.set(x - 12, 19, z + 13);
-    this.sunLight.target.position.set(x, 0, z);
-    this.sunLight.target.updateMatrixWorld();
+    if (!this.lights) return;
+    calibrateShadowCamera(this.lights, x, z);
   }
 
   /**
@@ -470,10 +425,7 @@ class WorkdBuilderApp {
     this._hideCompletionAndModifiers();
 
     this.mode = 'menu';
-    this.scene.background.set('#e5c78f');
-    this.scene.fog.color.set('#e5c78f');
-    this.scene.fog.near = 48;
-    this.scene.fog.far = 118;
+    this._applyDioramaEnvironment('menu');
 
     this.hudMapTop.hidden = true;
     if (this.mapBiomeBanner) this.mapBiomeBanner.hidden = true;
@@ -487,7 +439,7 @@ class WorkdBuilderApp {
     this.interaction.setDecorationSystem(null);
     this.interaction.setEnabled(false);
 
-    // Gentle elevated framing showcasing the 4 playable starter islands behind the menu dock
+    // Gentle elevated framing showcasing the starter islands behind the menu dock
     this.cameraController.configurePreset({
       target: new THREE.Vector3(-0.3, 0.35, 79.2),
       elevationDeg: 40,
@@ -511,10 +463,7 @@ class WorkdBuilderApp {
     this.mainMenu.hide();
 
     this.mode = 'worldmap';
-    this.scene.background.set('#d5e8ea');
-    this.scene.fog.color.set('#d5e8ea');
-    this.scene.fog.near = 60;
-    this.scene.fog.far = 148;
+    this._applyDioramaEnvironment('worldmap');
 
     this.hudMapTop.hidden = false;
     if (this.mapBiomeBanner) this.mapBiomeBanner.hidden = false;
@@ -597,7 +546,7 @@ class WorkdBuilderApp {
   }
 
   /**
-   * Launches a Campaign Level (Levels 1–4).
+   * Launches a Campaign Level (Levels 1–5 and all future levels up to Level 100).
    */
   loadLevel(index, immediateCamera = false) {
     const LevelClass = LEVEL_REGISTRY[index] || LEVEL_REGISTRY[0];
@@ -610,18 +559,16 @@ class WorkdBuilderApp {
     this.mainMenu.hide();
 
     this.mode = 'level';
-    const skyHex = (LevelClass.meta && LevelClass.meta.skyColor) || '#efd3a2';
-    this.scene.background.set(skyHex);
-    this.scene.fog.color.set(skyHex);
-    this.scene.fog.near = 42;
-    this.scene.fog.far = 88;
+    const biomeKey = (LevelClass.meta && LevelClass.meta.id) || 'level1_pyramid';
+    this._applyDioramaEnvironment(biomeKey);
     this._syncSunLightToTarget(0, 0);
 
     this.hudMapTop.hidden = true;
     if (this.mapBiomeBanner) this.mapBiomeBanner.hidden = true;
     if (this.mapChapterBar) this.mapChapterBar.hidden = true;
     this.hudGameTop.hidden = false;
-    this.gameBackMenuBtn.textContent = '← Carte';
+    if (this.gameBackLabel) this.gameBackLabel.textContent = 'Carte';
+    else this.gameBackMenuBtn.textContent = '← Carte';
     this.restartBtn.textContent = 'Recommencer';
     this.completionMapBtn.textContent = 'Retour à la Carte';
     this._updateHUD(0, LevelClass.meta.totalGoal, LevelClass.meta.hudLabel, false);
@@ -649,6 +596,14 @@ class WorkdBuilderApp {
       },
     });
 
+    if (
+      this.dioramaEnv &&
+      this.dioramaEnv.plinthMaterial &&
+      typeof this.currentLevel.applyGeologicalPlinthMaterial === 'function'
+    ) {
+      this.currentLevel.applyGeologicalPlinthMaterial(this.dioramaEnv.plinthMaterial);
+    }
+
     this._mountDecorations(LevelClass.meta.id || 'level1_pyramid');
     this.interaction.setLevel(this.currentLevel);
     this.interaction.setEnabled(true);
@@ -670,17 +625,15 @@ class WorkdBuilderApp {
 
     this.mode = 'roguelike';
     this.activeRoguelikeConfig = cfg;
-    this.scene.background.set(cfg.skyColor);
-    this.scene.fog.color.set(cfg.skyColor);
-    this.scene.fog.near = 42;
-    this.scene.fog.far = 88;
+    this._applyDioramaEnvironment(cfg.themeId || cfg.themeShortName || 'egypt');
     this._syncSunLightToTarget(0, 0);
 
     this.hudMapTop.hidden = true;
     if (this.mapBiomeBanner) this.mapBiomeBanner.hidden = true;
     if (this.mapChapterBar) this.mapChapterBar.hidden = true;
     this.hudGameTop.hidden = false;
-    this.gameBackMenuBtn.textContent = '← Menu';
+    if (this.gameBackLabel) this.gameBackLabel.textContent = 'Menu';
+    else this.gameBackMenuBtn.textContent = '← Menu';
     this.restartBtn.textContent = 'Nouveau Tirage';
     this.completionMapBtn.textContent = 'Retour au Menu';
     this._updateHUD(0, cfg.totalGoal, cfg.themeShortName || 'Roguelike', false);
@@ -711,6 +664,14 @@ class WorkdBuilderApp {
         this._handleLevelComplete(payload);
       },
     });
+
+    if (
+      this.dioramaEnv &&
+      this.dioramaEnv.plinthMaterial &&
+      typeof this.currentLevel.applyGeologicalPlinthMaterial === 'function'
+    ) {
+      this.currentLevel.applyGeologicalPlinthMaterial(this.dioramaEnv.plinthMaterial);
+    }
 
     this._mountDecorations('roguelike');
     this.interaction.setLevel(this.currentLevel);
@@ -816,6 +777,15 @@ class WorkdBuilderApp {
 
     this.cameraController.update(dt, this.interaction.isCameraGestureActive());
     this.camera.updateMatrixWorld();
+
+    if (this.dioramaEnv) {
+      this.dioramaEnv.update(
+        dt,
+        this.elapsed,
+        this.cameraController.target.x,
+        this.cameraController.target.z
+      );
+    }
 
     if (this.mode === 'menu' && this.worldMap) {
       this._syncSunLightToTarget(this.cameraController.target.x, this.cameraController.target.z);

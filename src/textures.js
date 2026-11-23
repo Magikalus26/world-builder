@@ -7,6 +7,8 @@
  */
 
 import * as THREE from 'three';
+import { applyCrispTextureSettings, getGlobalMaxAnisotropy } from './graphicsCore.js';
+import { MaterialFactory } from './materialFactory.js';
 
 function makeCanvas(w = 512, h = w) {
   const canvas = document.createElement('canvas');
@@ -106,17 +108,14 @@ function tileWorley(u, v, cells, seed) {
   return { f1: d1, edge: d2 - d1, id: cellId };
 }
 
-function wrapTexture(canvas, { repeat = [1, 1], isColor = true, anisotropy = 4 } = {}) {
+function wrapTexture(canvas, { repeat = [1, 1], isColor = true, anisotropy = null } = {}) {
   const tex = new THREE.CanvasTexture(canvas);
-  tex.wrapS = THREE.RepeatWrapping;
-  tex.wrapT = THREE.RepeatWrapping;
-  tex.repeat.set(repeat[0], repeat[1]);
-  tex.anisotropy = anisotropy;
-  if (isColor) {
-    tex.colorSpace = THREE.SRGBColorSpace;
-  }
-  tex.needsUpdate = true;
-  return tex;
+  return applyCrispTextureSettings(tex, {
+    isColor,
+    repeat,
+    wrap: true,
+    anisotropy: anisotropy || getGlobalMaxAnisotropy(),
+  });
 }
 
 /**
@@ -1188,7 +1187,11 @@ function createTerrainSplatMaterial(biomes) {
  * Generates and caches all procedural 512x512 PBR textures and shared materials.
  */
 export function createTextureLibrary(renderer) {
-  const anisotropy = Math.min(renderer.capabilities.getMaxAnisotropy(), 4);
+  const anisotropy =
+    renderer && renderer.capabilities && typeof renderer.capabilities.getMaxAnisotropy === 'function'
+      ? renderer.capabilities.getMaxAnisotropy()
+      : getGlobalMaxAnisotropy();
+  const materialFactory = new MaterialFactory(renderer);
 
   // 4-Biome Terrain PBR sets
   const terrainBiomes = {
@@ -1965,6 +1968,7 @@ export function createTextureLibrary(renderer) {
       waterNormal,
     },
     materials,
+    materialFactory,
     ensureRomePack,
     ensureJapanPack,
     ensureMayaPack,
@@ -1980,6 +1984,7 @@ export function createTextureLibrary(renderer) {
       mayaMaterials.forEach((m) => m.dispose());
       penitentiaryTextures.forEach((t) => t.dispose());
       penitentiaryMaterials.forEach((m) => m.dispose());
+      materialFactory.dispose();
     },
   };
 }
@@ -3887,8 +3892,5 @@ function build1800sUSFlagTexture(anisotropy) {
   }
 
   const tex = new THREE.CanvasTexture(canvas);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  tex.anisotropy = anisotropy;
-  tex.needsUpdate = true;
-  return tex;
+  return applyCrispTextureSettings(tex, { isColor: true, anisotropy });
 }

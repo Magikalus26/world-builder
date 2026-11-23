@@ -496,39 +496,52 @@ export class Level1Pyramid {
       particleCube: this._trackGeo(new THREE.DodecahedronGeometry(0.11, 0)),
     };
 
-    // Shared ghost slot materials (normal vs snap-highlighted)
+    // Standardized ultra-crisp frosted ice-blue glass ghost placement materials (via MaterialFactory)
+    const frosted =
+      this.textures && this.textures.materialFactory
+        ? this.textures.materialFactory.createFrostedGhostMaterials()
+        : null;
+
     this.mats = {
       ghostNormal: this._trackMat(
-        new THREE.MeshBasicMaterial({
-          map: this.textures.maps.blueprint,
-          color: 0x72e0ff,
-          transparent: true,
-          opacity: 0.48,
-          depthWrite: false,
-        })
+        frosted
+          ? frosted.ghostNormal
+          : new THREE.MeshBasicMaterial({
+              map: this.textures.maps.blueprint,
+              color: 0x72e0ff,
+              transparent: true,
+              opacity: 0.48,
+              depthWrite: false,
+            })
       ),
       ghostHighlight: this._trackMat(
-        new THREE.MeshBasicMaterial({
-          map: this.textures.maps.blueprint,
-          color: 0xffe27a,
-          transparent: true,
-          opacity: 0.84,
-          depthWrite: false,
-        })
+        frosted
+          ? frosted.ghostHighlight
+          : new THREE.MeshBasicMaterial({
+              map: this.textures.maps.blueprint,
+              color: 0xffe27a,
+              transparent: true,
+              opacity: 0.84,
+              depthWrite: false,
+            })
       ),
       ghostLineNormal: this._trackMat(
-        new THREE.LineBasicMaterial({
-          color: 0xdffaff,
-          transparent: true,
-          opacity: 0.85,
-        })
+        frosted
+          ? frosted.ghostLineNormal
+          : new THREE.LineBasicMaterial({
+              color: 0xdffaff,
+              transparent: true,
+              opacity: 0.9,
+            })
       ),
       ghostLineHighlight: this._trackMat(
-        new THREE.LineBasicMaterial({
-          color: 0xffdc66,
-          transparent: true,
-          opacity: 1.0,
-        })
+        frosted
+          ? frosted.ghostLineHighlight
+          : new THREE.LineBasicMaterial({
+              color: 0xffdc66,
+              transparent: true,
+              opacity: 1.0,
+            })
       ),
       slotIdle: this._trackMat(
         new THREE.MeshBasicMaterial({
@@ -1828,6 +1841,22 @@ export class Level1Pyramid {
 
   _triggerSquashBounce(mesh, sxz = 1.15, sy = 0.84) {
     mesh.scale.set(sxz, sy, sxz);
+    mesh.userData._springTime = 0.0001;
+    mesh.userData._springAmp = Math.max(0.08, Math.abs(1 - sy));
+  }
+
+  /**
+   * Applies the biome's 1024x1024 HD geological cross-section strata material from MaterialFactory
+   * to this level's contoured island plinth skirt automatically.
+   */
+  applyGeologicalPlinthMaterial(plinthMat) {
+    if (!plinthMat || !this.root) return;
+    const basePlinthMat = this.textures && this.textures.materials ? this.textures.materials.plinth : null;
+    this.root.traverse((obj) => {
+      if (obj.isMesh && obj.material === basePlinthMat) {
+        obj.material = plinthMat;
+      }
+    });
   }
 
   /* ============================================================================
@@ -2368,11 +2397,25 @@ export class Level1Pyramid {
       }
     }
 
-    // 2. Spring-recover squash-and-stretch on blocks
+    // 2. Damped harmonic elastic spring bounce on placed & carved blocks (all levels)
     const scaleRecover = 1 - Math.exp(-14 * dt);
     for (let i = 0; i < this.blocks.length; i++) {
       const m = this.blocks[i].mesh;
-      if (Math.abs(m.scale.x - 1) > 0.002 || Math.abs(m.scale.y - 1) > 0.002) {
+      const st = m.userData._springTime;
+      if (st > 0) {
+        const nextT = st + dt;
+        if (nextT >= 0.46) {
+          m.userData._springTime = 0;
+          m.scale.set(1, 1, 1);
+        } else {
+          m.userData._springTime = nextT;
+          const amp = m.userData._springAmp || 0.14;
+          const osc = -Math.exp(-8.8 * nextT) * Math.cos(nextT * 24.0) * amp;
+          const sy = Math.max(0.76, 1 + osc);
+          const sxz = 1 / Math.sqrt(sy);
+          m.scale.set(sxz, sy, sxz);
+        }
+      } else if (Math.abs(m.scale.x - 1) > 0.002 || Math.abs(m.scale.y - 1) > 0.002) {
         m.scale.x = THREE.MathUtils.lerp(m.scale.x, 1, scaleRecover);
         m.scale.y = THREE.MathUtils.lerp(m.scale.y, 1, scaleRecover);
         m.scale.z = THREE.MathUtils.lerp(m.scale.z, 1, scaleRecover);
@@ -2440,9 +2483,12 @@ export class Level1Pyramid {
       }
     }
 
-    // 5. Breathing pulse on active blueprint ghost slots & optional Pyramidion Aura ring
-    const pulse = 0.38 + Math.sin(elapsed * 3.4) * 0.1;
-    this.mats.ghostNormal.opacity = pulse;
+    // 5. Standardized frosted-glass luminous pulse on active ghost slots & optional Pyramidion Aura ring
+    if (this.textures && this.textures.materialFactory) {
+      this.textures.materialFactory.updateFrostedGhostPulse(this.mats, elapsed);
+    } else {
+      this.mats.ghostNormal.opacity = 0.38 + Math.sin(elapsed * 3.4) * 0.1;
+    }
     if (this.auraRingMesh) {
       const auraS = 1 + Math.sin(elapsed * 2.5) * 0.025;
       this.auraRingMesh.scale.setScalar(auraS);

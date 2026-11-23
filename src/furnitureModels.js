@@ -19,6 +19,7 @@
  */
 
 import * as THREE from 'three';
+import { applyCrispTextureSettings } from './graphicsCore.js';
 
 const SHARED_CACHE = new WeakMap();
 
@@ -220,6 +221,7 @@ function getSharedAssets(textures) {
   const ownGeometries = [];
 
   const trackTex = (t) => {
+    applyCrispTextureSettings(t, { isColor: true });
     ownTextures.push(t);
     return t;
   };

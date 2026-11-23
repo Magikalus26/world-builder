@@ -6,6 +6,7 @@
  */
 
 import * as THREE from 'three';
+import { createUnifiedRenderer, createRoomEnvironmentIBL } from './graphicsCore.js';
 import {
   ROGUELIKE_THEMES,
   rollRandomTheme,
@@ -410,21 +411,17 @@ export class RoguelikeLobbyController {
     if (this._renderer || !this.canvas) return;
     const w = 316;
     const h = 176;
-    this._renderer = new THREE.WebGLRenderer({
-      canvas: this.canvas,
-      antialias: true,
+    this._renderer = createUnifiedRenderer(this.canvas, {
       alpha: true,
-      powerPreference: 'high-performance',
+      shadowMap: true,
+      width: w,
+      height: h,
     });
-    this._renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-    this._renderer.setSize(w, h, false);
-    this._renderer.outputColorSpace = THREE.SRGBColorSpace;
-    this._renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this._renderer.toneMappingExposure = 1.1;
-    this._renderer.shadowMap.enabled = true;
-    this._renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
     this._scene = new THREE.Scene();
+    this._envRT = createRoomEnvironmentIBL(this._renderer);
+    this._scene.environment = this._envRT.texture;
+    this._scene.environmentIntensity = 0.65;
     this._camera = new THREE.PerspectiveCamera(34, w / h, 0.2, 30);
     this._camera.position.set(0, 2.35, 3.85);
     this._camera.lookAt(0, 0.28, 0);

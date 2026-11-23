@@ -7,6 +7,7 @@
  */
 
 import * as THREE from 'three';
+import { createUnifiedRenderer, createRoomEnvironmentIBL } from './graphicsCore.js';
 import {
   FURNITURE_CATALOG,
   LOOT_BOXES,
@@ -767,21 +768,17 @@ export class ShopController {
 
     const w = 310;
     const h = 230;
-    this._previewRenderer = new THREE.WebGLRenderer({
-      canvas: this.previewCanvas,
-      antialias: true,
+    this._previewRenderer = createUnifiedRenderer(this.previewCanvas, {
       alpha: true,
-      powerPreference: 'high-performance',
+      shadowMap: true,
+      width: w,
+      height: h,
     });
-    this._previewRenderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-    this._previewRenderer.setSize(w, h, false);
-    this._previewRenderer.outputColorSpace = THREE.SRGBColorSpace;
-    this._previewRenderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this._previewRenderer.toneMappingExposure = 1.12;
-    this._previewRenderer.shadowMap.enabled = true;
-    this._previewRenderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
     this._previewScene = new THREE.Scene();
+    this._previewEnvRT = createRoomEnvironmentIBL(this._previewRenderer);
+    this._previewScene.environment = this._previewEnvRT.texture;
+    this._previewScene.environmentIntensity = 0.65;
 
     this._previewCamera = new THREE.PerspectiveCamera(34, w / h, 0.2, 30);
     this._previewCamera.position.set(0, 1.85, 3.25);
