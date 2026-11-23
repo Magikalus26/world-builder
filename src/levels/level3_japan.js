@@ -853,57 +853,96 @@ export class Level3Japan extends Level1Pyramid {
     floor.receiveShadow = true;
     ws.add(floor);
 
-    // 4 Dark cedar posts on grey granite plinth stones
+    // Decorative open-courtyard frame: 2 tall rear cedar posts + 2 lower front corner posts
+    // Keeps full Japanese carpenter workshop silhouette while leaving the workbench 100% unobstructed from above!
+    const frameGroup = new THREE.Group();
+    ws.add(frameGroup);
+
     const plinthGeo = this._trackGeo(new THREE.BoxGeometry(0.32, 0.22, 0.32));
-    const postGeo = this._trackGeo(new THREE.CylinderGeometry(0.085, 0.1, 2.18, 8));
+    const rearPostGeo = this._trackGeo(new THREE.CylinderGeometry(0.085, 0.1, 2.22, 8));
+    const frontPostGeo = this._trackGeo(new THREE.CylinderGeometry(0.08, 0.095, 1.32, 8));
+    const postCapGeo = this._trackGeo(new THREE.BoxGeometry(0.24, 0.08, 0.24));
+
     [
-      [cx - 1.85, cz - 1.28],
-      [cx + 1.85, cz - 1.28],
-      [cx - 1.85, cz + 1.28],
-      [cx + 1.85, cz + 1.28],
-    ].forEach(([px, pz]) => {
+      [cx - 1.85, cz - 1.28, true],
+      [cx + 1.85, cz - 1.28, true],
+      [cx - 1.85, cz + 1.28, false],
+      [cx + 1.85, cz + 1.28, false],
+    ].forEach(([px, pz, isRear]) => {
       const plinth = new THREE.Mesh(plinthGeo, this.japan.materials.basaltCliff);
       plinth.position.set(px, 0.22, pz);
       plinth.castShadow = true;
-      ws.add(plinth);
+      frameGroup.add(plinth);
 
-      const post = new THREE.Mesh(postGeo, this.japan.materials.cedarBeam);
-      post.position.set(px, 1.4, pz);
+      const post = new THREE.Mesh(isRear ? rearPostGeo : frontPostGeo, this.japan.materials.cedarBeam);
+      post.position.set(px, isRear ? 1.42 : 0.96, pz);
       post.castShadow = true;
-      ws.add(post);
+      frameGroup.add(post);
+
+      if (!isRear) {
+        const cap = new THREE.Mesh(postCapGeo, this.japan.materials.kawaraRoof);
+        cap.position.set(px, 1.66, pz);
+        frameGroup.add(cap);
+      }
     });
 
-    // Shaded pitched slate-blue kawara-tile Japanese carpenter workshop roof
+    // Cutaway / Open-Front Slate-Blue Kawara Eaves Awning (covers ONLY back ~35% behind workbench)
     const canopyGroup = new THREE.Group();
-    canopyGroup.position.set(cx, 2.52, cz);
+    canopyGroup.position.set(cx, 2.48, cz);
 
-    const roofBeam = new THREE.Mesh(
-      this._trackGeo(new THREE.BoxGeometry(4.2, 0.16, 0.18)),
+    // Rear cedar header girder & decorative open side eaves beams framing the open workbench bay
+    const rearGirder = new THREE.Mesh(
+      this._trackGeo(new THREE.BoxGeometry(4.2, 0.15, 0.16)),
       this.japan.materials.cedarBeam
     );
-    roofBeam.position.y = 0.46;
-    canopyGroup.add(roofBeam);
+    rearGirder.position.set(0, 0.04, -1.28);
+    rearGirder.castShadow = true;
+    canopyGroup.add(rearGirder);
 
-    const slopeGeo = this._trackGeo(new THREE.BoxGeometry(4.5, 0.12, 1.85));
-    const slopeN = new THREE.Mesh(slopeGeo, this.japan.materials.kawaraRoof);
-    slopeN.position.set(0, 0.22, -0.78);
-    slopeN.rotation.x = -0.34;
-    slopeN.castShadow = true;
-    canopyGroup.add(slopeN);
+    const sideRailGeo = this._trackGeo(new THREE.BoxGeometry(0.11, 0.12, 1.05));
+    [-1.85, 1.85].forEach((ox) => {
+      const rail = new THREE.Mesh(sideRailGeo, this.japan.materials.cedarBeam);
+      rail.position.set(ox, 0.04, -1.22);
+      rail.castShadow = true;
+      canopyGroup.add(rail);
+    });
 
-    const slopeS = new THREE.Mesh(slopeGeo, this.japan.materials.kawaraRoof);
-    slopeS.position.set(0, 0.22, 0.78);
-    slopeS.rotation.x = 0.34;
-    slopeS.castShadow = true;
-    canopyGroup.add(slopeS);
+    // Overhanging dark slate-blue Kawara tiled rear awning slope (z in [-1.72, -0.76] — completely clear of workbench!)
+    const awningRoof = new THREE.Mesh(
+      this._trackGeo(new THREE.BoxGeometry(4.52, 0.13, 0.98)),
+      this.japan.materials.kawaraRoof
+    );
+    awningRoof.position.set(0, 0.24, -1.24);
+    awningRoof.rotation.x = -0.28;
+    awningRoof.castShadow = true;
+    canopyGroup.add(awningRoof);
 
-    // Red-lacquered noren banner trim beneath front eave
+    // Carved ridge trim & twin subtle Onigawara corner accents along top edge of rear awning
+    const ridgeCap = new THREE.Mesh(
+      this._trackGeo(new THREE.BoxGeometry(4.42, 0.14, 0.16)),
+      this.japan.materials.kawaraRoof
+    );
+    ridgeCap.position.set(0, 0.42, -0.82);
+    ridgeCap.castShadow = true;
+    canopyGroup.add(ridgeCap);
+
+    // Red-lacquered Japanese Noren valance tucked cleanly under the back eaves behind the workbench
     const noren = new THREE.Mesh(
-      this._trackGeo(new THREE.BoxGeometry(3.6, 0.24, 0.05)),
+      this._trackGeo(new THREE.BoxGeometry(3.48, 0.24, 0.05)),
       this.japan.materials.lacquerRed
     );
-    noren.position.set(0, -0.1, 1.26);
+    noren.position.set(0, -0.06, -0.84);
     canopyGroup.add(noren);
+
+    // Disable raycast hit-testing on ALL decorative workshop roof eaves & framing meshes
+    // so touching/dragging stone blocks on the workbench NEVER collides with the canopy
+    const noopRaycast = () => {};
+    frameGroup.traverse((child) => {
+      if (child.isMesh) child.raycast = noopRaycast;
+    });
+    canopyGroup.traverse((child) => {
+      if (child.isMesh) child.raycast = noopRaycast;
+    });
 
     this.canopyMesh = canopyGroup;
     ws.add(canopyGroup);

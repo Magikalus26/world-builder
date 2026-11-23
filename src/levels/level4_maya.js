@@ -754,58 +754,97 @@ export class Level4Maya extends Level1Pyramid {
     floor.receiveShadow = true;
     ws.add(floor);
 
-    // 4 Tropical hardwood canopy posts on carved limestone plinths
+    // Decorative open-courtyard Mayan sculptor frame: 2 tall rear hardwood posts + 2 lower carved front bollards
+    // Keeps authentic palm-thatch palapa look while leaving the stone anvil 100% open to top-down view & touch!
+    const frameGroup = new THREE.Group();
+    ws.add(frameGroup);
+
     const plinthGeo = this._trackGeo(new THREE.BoxGeometry(0.32, 0.22, 0.32));
-    const postGeo = this._trackGeo(new THREE.CylinderGeometry(0.09, 0.11, 2.15, 8));
+    const rearPostGeo = this._trackGeo(new THREE.CylinderGeometry(0.09, 0.11, 2.2, 8));
+    const frontPostGeo = this._trackGeo(new THREE.CylinderGeometry(0.085, 0.1, 1.28, 8));
+    const jadeOrbGeo = this._trackGeo(new THREE.OctahedronGeometry(0.11, 0));
+
     [
-      [cx - 1.85, cz - 1.28],
-      [cx + 1.85, cz - 1.28],
-      [cx - 1.85, cz + 1.28],
-      [cx + 1.85, cz + 1.28],
-    ].forEach(([px, pz]) => {
+      [cx - 1.85, cz - 1.28, true],
+      [cx + 1.85, cz - 1.28, true],
+      [cx - 1.85, cz + 1.28, false],
+      [cx + 1.85, cz + 1.28, false],
+    ].forEach(([px, pz, isRear]) => {
       const plinth = new THREE.Mesh(plinthGeo, this.maya.materials.mayaCliff);
       plinth.position.set(px, 0.22, pz);
       plinth.castShadow = true;
-      ws.add(plinth);
+      frameGroup.add(plinth);
 
-      const post = new THREE.Mesh(postGeo, this.maya.materials.hardwoodLog);
-      post.position.set(px, 1.38, pz);
+      const post = new THREE.Mesh(isRear ? rearPostGeo : frontPostGeo, this.maya.materials.hardwoodLog);
+      post.position.set(px, isRear ? 1.4 : 0.94, pz);
       post.castShadow = true;
-      ws.add(post);
+      frameGroup.add(post);
+
+      if (!isRear) {
+        const orb = new THREE.Mesh(jadeOrbGeo, this.maya.materials.jadeInlay);
+        orb.position.set(px, 1.66, pz);
+        frameGroup.add(orb);
+      }
     });
 
-    // Warm pitched palm-thatched Mesoamerican palapa canopy roof
+    // Cutaway / Open-Front Palm-Thatched Palapa Awning (covers ONLY back ~35% behind stone anvil)
     const canopyGroup = new THREE.Group();
-    canopyGroup.position.set(cx, 2.52, cz);
+    canopyGroup.position.set(cx, 2.48, cz);
 
+    // Hardwood rear girder & open side beam brackets
+    const rearPole = new THREE.Mesh(
+      this._trackGeo(new THREE.CylinderGeometry(0.08, 0.08, 4.3, 6)),
+      this.maya.materials.hardwoodLog
+    );
+    rearPole.rotation.z = Math.PI / 2;
+    rearPole.position.set(0, 0.06, -1.28);
+    rearPole.castShadow = true;
+    canopyGroup.add(rearPole);
+
+    const sideBeamGeo = this._trackGeo(new THREE.BoxGeometry(0.11, 0.12, 1.05));
+    [-1.85, 1.85].forEach((ox) => {
+      const sb = new THREE.Mesh(sideBeamGeo, this.maya.materials.hardwoodLog);
+      sb.position.set(ox, 0.06, -1.22);
+      sb.castShadow = true;
+      canopyGroup.add(sb);
+    });
+
+    // Golden palm-thatch overhanging rear awning (z in [-1.74, -0.74] — completely clear of anvil & block!)
+    const thatchAwning = new THREE.Mesh(
+      this._trackGeo(new THREE.BoxGeometry(4.56, 0.18, 1.02)),
+      this.maya.materials.thatchRoof
+    );
+    thatchAwning.position.set(0, 0.26, -1.24);
+    thatchAwning.rotation.x = -0.32;
+    thatchAwning.castShadow = true;
+    canopyGroup.add(thatchAwning);
+
+    // Hardwood front ridge pole along the raised lip of the rear thatch awning
     const ridgePole = new THREE.Mesh(
-      this._trackGeo(new THREE.CylinderGeometry(0.08, 0.08, 4.35, 6)),
+      this._trackGeo(new THREE.CylinderGeometry(0.075, 0.075, 4.46, 6)),
       this.maya.materials.hardwoodLog
     );
     ridgePole.rotation.z = Math.PI / 2;
-    ridgePole.position.y = 0.56;
+    ridgePole.position.set(0, 0.44, -0.82);
     canopyGroup.add(ridgePole);
 
-    const thatchSlopeGeo = this._trackGeo(new THREE.BoxGeometry(4.55, 0.18, 1.95));
-    const slopeN = new THREE.Mesh(thatchSlopeGeo, this.maya.materials.thatchRoof);
-    slopeN.position.set(0, 0.26, -0.78);
-    slopeN.rotation.x = -0.38;
-    slopeN.castShadow = true;
-    canopyGroup.add(slopeN);
-
-    const slopeS = new THREE.Mesh(thatchSlopeGeo, this.maya.materials.thatchRoof);
-    slopeS.position.set(0, 0.26, 0.78);
-    slopeS.rotation.x = 0.38;
-    slopeS.castShadow = true;
-    canopyGroup.add(slopeS);
-
-    // Ceremonial red-ochre & jade banner fascia along front eave
+    // Ceremonial red-ochre & jade banner fascia tucked neatly beneath the rear awning eaves
     const banner = new THREE.Mesh(
-      this._trackGeo(new THREE.BoxGeometry(3.7, 0.16, 0.06)),
+      this._trackGeo(new THREE.BoxGeometry(3.52, 0.18, 0.06)),
       this.maya.materials.redOchre
     );
-    banner.position.set(0, -0.1, 1.28);
+    banner.position.set(0, -0.04, -0.84);
     canopyGroup.add(banner);
+
+    // Disable raycast hit-testing on ALL decorative workshop roof eaves & framing meshes
+    // so tapping/dragging limestone blocks on the anvil NEVER hits the roof overhang
+    const noopRaycast = () => {};
+    frameGroup.traverse((child) => {
+      if (child.isMesh) child.raycast = noopRaycast;
+    });
+    canopyGroup.traverse((child) => {
+      if (child.isMesh) child.raycast = noopRaycast;
+    });
 
     this.canopyMesh = canopyGroup;
     ws.add(canopyGroup);
