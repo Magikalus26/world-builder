@@ -6,12 +6,18 @@
  * and choreographed Loot Box Opening Animations (Classique, Royal, Légendaire).
  */
 
+import * as THREE from 'three';
 import {
   FURNITURE_CATALOG,
   LOOT_BOXES,
   RARITY_META,
   SHOP_CATALOG,
 } from './saveManager.js';
+import {
+  createFurniture3D,
+  updateFurniture3D,
+  disposeFurniture3DInstance,
+} from './furnitureModels.js';
 
 function triggerTactileBounce(el) {
   if (!el) return;
@@ -113,6 +119,30 @@ export class ShopController {
     this.lootCoinsBadge = document.getElementById('lootbox-coins-badge');
     this.lootClaimBtn = document.getElementById('lootbox-claim-btn');
 
+    // Interactive 3D Turntable Preview Modal DOM & dedicated lazy mini-WebGL state
+    this.previewModal = document.getElementById('furniture-preview-modal');
+    this.previewBackdrop = document.getElementById('preview-backdrop');
+    this.previewCloseBtn = document.getElementById('preview-close-btn');
+    this.previewCanvas = document.getElementById('preview-3d-canvas');
+    this.previewItemName = document.getElementById('preview-item-name');
+    this.previewItemRarity = document.getElementById('preview-item-rarity');
+    this.previewItemImg = document.getElementById('preview-item-img');
+    this.previewBuyBtn = document.getElementById('preview-buy-btn');
+
+    this._previewAssetKey = {}; // Dedicated WebGL context asset cache key
+    this._previewRenderer = null;
+    this._previewScene = null;
+    this._previewCamera = null;
+    this._previewTurntable = null;
+    this._previewModel = null;
+    this._previewRafId = null;
+    this._previewLastTime = 0;
+    this._previewElapsed = 0;
+    this._previewDragging = false;
+    this._previewDragX = 0;
+    this._previewCurrentItem = null;
+    this._previewUsePromo = false;
+
     this._bindEvents();
     this.refreshBalances();
     this.render();
@@ -149,6 +179,59 @@ export class ShopController {
       this.audio.playCoinClink();
       this.closeLootStage();
     });
+
+    if (this.previewCloseBtn) {
+      this.previewCloseBtn.addEventListener('click', () => {
+        this.audio.unlock();
+        this.audio.playTabBounce();
+        this.closePreview();
+      });
+    }
+    if (this.previewBackdrop) {
+      this.previewBackdrop.addEventListener('click', () => {
+        this.audio.unlock();
+        this.audio.playTabBounce();
+        this.closePreview();
+      });
+    }
+    if (this.previewBuyBtn) {
+      this.previewBuyBtn.addEventListener('click', () => {
+        if (!this._previewCurrentItem) return;
+        this.audio.unlock();
+        const res = this.save.purchaseFurniture(this._previewCurrentItem.id, this._previewUsePromo);
+        if (res.ok) {
+          this.audio.playCoinClink();
+          triggerTactileBounce(this.previewBuyBtn);
+          this.refreshBalances();
+          this.render();
+          this._syncPreviewBuyButton();
+        } else {
+          this.audio.playMapTap(true);
+        }
+      });
+    }
+    if (this.previewCanvas) {
+      this.previewCanvas.addEventListener('pointerdown', (e) => {
+        this._previewDragging = true;
+        this._previewDragX = e.clientX;
+        try {
+          this.previewCanvas.setPointerCapture(e.pointerId);
+        } catch (_) {
+          // Ignore unsupported capture
+        }
+      });
+      this.previewCanvas.addEventListener('pointermove', (e) => {
+        if (!this._previewDragging || !this._previewTurntable) return;
+        const dx = e.clientX - this._previewDragX;
+        this._previewDragX = e.clientX;
+        this._previewTurntable.rotation.y += dx * 0.015;
+      });
+      const stopDrag = () => {
+        this._previewDragging = false;
+      };
+      this.previewCanvas.addEventListener('pointerup', stopDrag);
+      this.previewCanvas.addEventListener('pointercancel', stopDrag);
+    }
   }
 
   _syncTabActiveStates() {
@@ -177,6 +260,7 @@ export class ShopController {
   }
 
   close() {
+    this.closePreview();
     this.closeLootStage();
     this.modal.classList.remove('is-visible');
     this.modal.hidden = true;
@@ -224,9 +308,13 @@ export class ShopController {
       const card = document.createElement('div');
       card.className = `furniture-card furniture-card--deal${owned ? ' is-owned' : ''}`;
       card.dataset.rarity = item.rarity;
+      card.dataset.previewItemId = item.id;
+      card.setAttribute('role', 'button');
+      card.setAttribute('tabindex', '0');
 
       card.innerHTML = `
         <span class="promo-ribbon">PROMO</span>
+        <span class="preview-3d-chip" aria-hidden="true">3D</span>
         <div class="furniture-thumb">
           <img src="${item.img}" alt="${item.name}" loading="lazy" />
         </div>
@@ -235,6 +323,12 @@ export class ShopController {
           ${rarity.label}
         </span>
       `;
+
+      card.addEventListener('click', () => {
+        this.audio.unlock();
+        this.audio.playTabBounce();
+        this.openPreview(item, true);
+      });
 
       const buyBtn = document.createElement('button');
       buyBtn.type = 'button';
@@ -245,20 +339,20 @@ export class ShopController {
         ? 'Possédé ✓'
         : `<span class="price-old">${item.price}</span> 💠 ${promoPrice}`;
 
-      if (!owned) {
-        buyBtn.addEventListener('click', () => {
-          this.audio.unlock();
-          const res = this.save.purchaseFurniture(item.id, true);
-          if (res.ok) {
-            this.audio.playCoinClink();
-            triggerTactileBounce(card);
-            this.refreshBalances();
-            this.render();
-          } else {
-            this.audio.playMapTap(true);
-          }
-        });
-      }
+      buyBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (owned) return;
+        this.audio.unlock();
+        const res = this.save.purchaseFurniture(item.id, true);
+        if (res.ok) {
+          this.audio.playCoinClink();
+          triggerTactileBounce(card);
+          this.refreshBalances();
+          this.render();
+        } else {
+          this.audio.playMapTap(true);
+        }
+      });
 
       card.appendChild(buyBtn);
       dealsRow.appendChild(card);
@@ -314,7 +408,7 @@ export class ShopController {
     boxesSection.appendChild(boxesGrid);
     this.contentEl.appendChild(boxesSection);
 
-    // 3. Catalogue Classique (All 12 transparent PNG furniture items)
+    // 3. Catalogue Classique (All 12 transparent PNG furniture items — tap any card for live 3D preview)
     const ownedCount = this.save.getUnlockedFurniture().length;
     const catSection = document.createElement('section');
     catSection.className = 'shop-section';
@@ -335,7 +429,11 @@ export class ShopController {
       const card = document.createElement('div');
       card.className = `furniture-card${owned ? ' is-owned' : ''}`;
       card.dataset.rarity = item.rarity;
+      card.dataset.previewCatalogId = item.id;
+      card.setAttribute('role', 'button');
+      card.setAttribute('tabindex', '0');
       card.innerHTML = `
+        <span class="preview-3d-chip" aria-hidden="true">3D</span>
         <div class="furniture-thumb">
           <img src="${item.img}" alt="${item.name}" loading="lazy" />
         </div>
@@ -345,6 +443,12 @@ export class ShopController {
         </span>
       `;
 
+      card.addEventListener('click', () => {
+        this.audio.unlock();
+        this.audio.playTabBounce();
+        this.openPreview(item, false);
+      });
+
       const buyBtn = document.createElement('button');
       buyBtn.type = 'button';
       buyBtn.className = `furniture-buy-btn${owned ? ' is-owned' : ''}`;
@@ -352,20 +456,20 @@ export class ShopController {
       buyBtn.disabled = owned || !canAfford;
       buyBtn.textContent = owned ? 'Possédé ✓' : `💠 ${item.price} Éclats`;
 
-      if (!owned) {
-        buyBtn.addEventListener('click', () => {
-          this.audio.unlock();
-          const res = this.save.purchaseFurniture(item.id, false);
-          if (res.ok) {
-            this.audio.playCoinClink();
-            triggerTactileBounce(card);
-            this.refreshBalances();
-            this.render();
-          } else {
-            this.audio.playMapTap(true);
-          }
-        });
-      }
+      buyBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (owned) return;
+        this.audio.unlock();
+        const res = this.save.purchaseFurniture(item.id, false);
+        if (res.ok) {
+          this.audio.playCoinClink();
+          triggerTactileBounce(card);
+          this.refreshBalances();
+          this.render();
+        } else {
+          this.audio.playMapTap(true);
+        }
+      });
 
       card.appendChild(buyBtn);
       catGrid.appendChild(card);
@@ -596,5 +700,176 @@ export class ShopController {
       this.lootCoinsBadge.hidden = false;
       this.lootClaimBtn.hidden = false;
     });
+  }
+
+  /* ============================================================================
+   * INTERACTIVE 3D FURNITURE TURNTABLE PREVIEW (Lazy Mini-WebGL Pedestal)
+   * ========================================================================== */
+  _ensurePreviewRenderer() {
+    if (this._previewRenderer || !this.previewCanvas) return;
+
+    const w = 310;
+    const h = 230;
+    this._previewRenderer = new THREE.WebGLRenderer({
+      canvas: this.previewCanvas,
+      antialias: true,
+      alpha: true,
+      powerPreference: 'high-performance',
+    });
+    this._previewRenderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+    this._previewRenderer.setSize(w, h, false);
+    this._previewRenderer.outputColorSpace = THREE.SRGBColorSpace;
+    this._previewRenderer.toneMapping = THREE.ACESFilmicToneMapping;
+    this._previewRenderer.toneMappingExposure = 1.12;
+    this._previewRenderer.shadowMap.enabled = true;
+    this._previewRenderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+    this._previewScene = new THREE.Scene();
+
+    this._previewCamera = new THREE.PerspectiveCamera(34, w / h, 0.2, 30);
+    this._previewCamera.position.set(0, 1.85, 3.25);
+    this._previewCamera.lookAt(0, 0.56, 0);
+
+    // Warm studio diorama lighting
+    const hemi = new THREE.HemisphereLight('#fff8eb', '#a67442', 1.15);
+    this._previewScene.add(hemi);
+
+    const key = new THREE.DirectionalLight('#fff2d4', 2.2);
+    key.position.set(-2.6, 4.5, 3.4);
+    key.castShadow = true;
+    key.shadow.mapSize.set(512, 512);
+    key.shadow.camera.near = 1;
+    key.shadow.camera.far = 12;
+    key.shadow.camera.left = -2;
+    key.shadow.camera.right = 2;
+    key.shadow.camera.top = 2;
+    key.shadow.camera.bottom = -2;
+    key.shadow.bias = -0.001;
+    this._previewScene.add(key);
+
+    const rim = new THREE.DirectionalLight('#7ad8ec', 0.65);
+    rim.position.set(3.2, 2.0, -2.6);
+    this._previewScene.add(rim);
+
+    // Carved circular golden-sandstone turntable pedestal
+    this._previewTurntable = new THREE.Group();
+    const baseGeo = new THREE.CylinderGeometry(0.96, 1.08, 0.16, 32);
+    const baseMat = new THREE.MeshStandardMaterial({
+      color: '#d8b478',
+      roughness: 0.72,
+      metalness: 0.08,
+    });
+    const baseMesh = new THREE.Mesh(baseGeo, baseMat);
+    baseMesh.position.y = -0.08;
+    baseMesh.receiveShadow = true;
+    this._previewTurntable.add(baseMesh);
+
+    const trimGeo = new THREE.TorusGeometry(0.98, 0.032, 10, 36);
+    trimGeo.rotateX(Math.PI / 2);
+    const trimMat = new THREE.MeshStandardMaterial({
+      color: '#f7ca59',
+      roughness: 0.28,
+      metalness: 0.85,
+    });
+    const trimMesh = new THREE.Mesh(trimGeo, trimMat);
+    trimMesh.position.y = -0.005;
+    this._previewTurntable.add(trimMesh);
+
+    this._previewScene.add(this._previewTurntable);
+    this._tickPreview = this._tickPreview.bind(this);
+  }
+
+  openPreview(item, usePromo = false) {
+    if (!this.previewModal || !item) return;
+    this._previewCurrentItem = item;
+    this._previewUsePromo = Boolean(usePromo && typeof item.promoPrice === 'number');
+
+    const rarity = RARITY_META[item.rarity] || RARITY_META.commun;
+    if (this.previewItemName) this.previewItemName.textContent = item.name;
+    if (this.previewItemRarity) {
+      this.previewItemRarity.textContent = rarity.label;
+      this.previewItemRarity.style.setProperty('--rarity-color', rarity.color);
+    }
+    if (this.previewItemImg) {
+      this.previewItemImg.src = item.img;
+      this.previewItemImg.alt = item.name;
+    }
+    this._syncPreviewBuyButton();
+
+    this._ensurePreviewRenderer();
+
+    // Swap active 3D model on the turntable cleanly
+    if (this._previewModel && this._previewTurntable) {
+      this._previewTurntable.remove(this._previewModel);
+      disposeFurniture3DInstance(this._previewModel);
+      this._previewModel = null;
+    }
+    if (this._previewTurntable) {
+      this._previewModel = createFurniture3D(item.id, this._previewAssetKey);
+      this._previewTurntable.rotation.y = 0.45;
+      this._previewTurntable.add(this._previewModel);
+    }
+
+    this.previewModal.hidden = false;
+    requestAnimationFrame(() => {
+      this.previewModal.classList.add('is-visible');
+    });
+
+    if (!this._previewRafId && this._previewRenderer) {
+      this._previewLastTime = performance.now();
+      this._previewRafId = requestAnimationFrame(this._tickPreview);
+    }
+  }
+
+  closePreview() {
+    if (this._previewRafId) {
+      cancelAnimationFrame(this._previewRafId);
+      this._previewRafId = null;
+    }
+    if (this._previewModel && this._previewTurntable) {
+      this._previewTurntable.remove(this._previewModel);
+      disposeFurniture3DInstance(this._previewModel);
+      this._previewModel = null;
+    }
+    this._previewCurrentItem = null;
+    if (this.previewModal) {
+      this.previewModal.classList.remove('is-visible');
+      this.previewModal.hidden = true;
+    }
+  }
+
+  _syncPreviewBuyButton() {
+    if (!this.previewBuyBtn || !this._previewCurrentItem) return;
+    const item = this._previewCurrentItem;
+    const owned = this.save.hasFurniture(item.id);
+    const cost = this._previewUsePromo && typeof item.promoPrice === 'number' ? item.promoPrice : item.price;
+    const canAfford = this.save.getTokens() >= cost;
+
+    this.previewBuyBtn.classList.toggle('is-owned', owned);
+    this.previewBuyBtn.disabled = owned || !canAfford;
+    if (owned) {
+      this.previewBuyBtn.textContent = 'Possédé ✓';
+    } else if (this._previewUsePromo) {
+      this.previewBuyBtn.textContent = `PROMO • 💠 ${cost} Éclats`;
+    } else {
+      this.previewBuyBtn.textContent = `Acheter • 💠 ${cost} Éclats`;
+    }
+  }
+
+  _tickPreview(now) {
+    this._previewRafId = requestAnimationFrame(this._tickPreview);
+    const dt = Math.min(Math.max((now - this._previewLastTime) / 1000, 0.001), 0.05);
+    this._previewLastTime = now;
+    this._previewElapsed += dt;
+
+    if (this._previewTurntable && !this._previewDragging) {
+      this._previewTurntable.rotation.y += dt * 0.68;
+    }
+    if (this._previewModel) {
+      updateFurniture3D(this._previewModel, dt, this._previewElapsed);
+    }
+    if (this._previewRenderer && this._previewScene && this._previewCamera) {
+      this._previewRenderer.render(this._previewScene, this._previewCamera);
+    }
   }
 }

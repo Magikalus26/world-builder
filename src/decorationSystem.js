@@ -1,29 +1,20 @@
 /**
  * Workd Builder — In-Level 3D Furniture Decoration System
- * Lets players toggle "🪑 Décorer" mode inside playable levels (Level 1 & Roguelike),
- * place unlocked transparent furniture props onto valid sculpted terrain coordinates
- * (sampling level.getTerrainHeight(x, z)), drag to reposition, rotate 90°, or remove them,
- * while strictly protecting Quarry, Rail Tracks, Stonecutter, Staging Pallet, and Pyramid zones.
+ * Spawns genuine multi-part procedural 3D furniture models (from src/furnitureModels.js)
+ * onto valid sculpted terrain coordinates (y = level.getTerrainHeight(x, z)), complete with
+ * contact drop shadows, placement dust puffs, true 90° Y-axis rotation, drag-to-reposition,
+ * blocked work-station protection, and automatic localStorage persistence.
  */
 
 import * as THREE from 'three';
 import { getFurnitureById } from './saveManager.js';
+import {
+  createFurniture3D,
+  updateFurniture3D,
+  disposeFurniture3DInstance,
+} from './furnitureModels.js';
 
 const WATER_LEVEL = -0.14;
-const FURNITURE_TEXTURE_CACHE = new Map();
-const textureLoader = new THREE.TextureLoader();
-
-function getFurnitureTexture(imgPath) {
-  if (FURNITURE_TEXTURE_CACHE.has(imgPath)) {
-    return FURNITURE_TEXTURE_CACHE.get(imgPath);
-  }
-  const tex = textureLoader.load(imgPath);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  tex.anisotropy = 4;
-  tex.needsUpdate = true;
-  FURNITURE_TEXTURE_CACHE.set(imgPath, tex);
-  return tex;
-}
 
 export class DecorationSystem {
   constructor({ scene, level, levelKey, textures, audio, save, onOpenShop }) {
@@ -38,24 +29,27 @@ export class DecorationSystem {
     this.active = false;
     this.selectedCatalogId = null;
     this.selectedPlacedUid = null;
-    this.placedItems = []; // { uid, itemId, x, z, rotY, group, popAnim, materials, geometries }
+    this.placedItems = []; // { uid, itemId, x, z, rotY, group, model, popAnim }
+    this.dustPuffs = []; // Active transient sand dust puff bursts
 
     this.root = new THREE.Group();
     this.root.name = 'decorations_root';
     this.scene.add(this.root);
 
     // Shared per-level geometries & materials (disposed cleanly on level unload)
-    this.plinthGeo = new THREE.CylinderGeometry(0.46, 0.56, 0.09, 20);
-    this.plinthMat = new THREE.MeshStandardMaterial({
-      color: 0xe3cb9d,
-      roughness: 0.86,
-      metalness: 0.04,
-    });
-    this.shadowGeo = new THREE.PlaneGeometry(1.45, 1.45);
+    this.shadowGeo = new THREE.PlaneGeometry(1.58, 1.58);
     this.shadowGeo.rotateX(-Math.PI / 2);
 
-    // Selection highlight ring around active prop
-    this.selRingGeo = new THREE.RingGeometry(0.58, 0.72, 32);
+    this.dustGeo = new THREE.SphereGeometry(0.11, 7, 6);
+    this.dustMat = new THREE.MeshBasicMaterial({
+      color: 0xeed5a3,
+      transparent: true,
+      opacity: 0.72,
+      depthWrite: false,
+    });
+
+    // Selection highlight ring around active 3D furniture piece
+    this.selRingGeo = new THREE.RingGeometry(0.68, 0.82, 32);
     this.selRingGeo.rotateX(-Math.PI / 2);
     this.selRingMat = new THREE.MeshBasicMaterial({
       color: 0xffd25a,
@@ -68,7 +62,7 @@ export class DecorationSystem {
     this.root.add(this.selectionRing);
 
     // Live placement validity reticle (green = valid, red = blocked)
-    this.reticleGeo = new THREE.RingGeometry(0.48, 0.66, 32);
+    this.reticleGeo = new THREE.RingGeometry(0.56, 0.74, 32);
     this.reticleGeo.rotateX(-Math.PI / 2);
     this.reticleMat = new THREE.MeshBasicMaterial({
       color: 0x67e88d,
@@ -115,25 +109,10 @@ export class DecorationSystem {
     const entry = this.placedItems.find((p) => p.uid === this.selectedPlacedUid);
     if (!entry) return;
     entry.rotY = (entry.rotY + Math.PI * 0.5) % (Math.PI * 2);
-    this._applyPropOrientation(entry);
+    entry.group.rotation.y = entry.rotY;
     entry.popAnim = 0.22;
     this.audio.playDecorPlace(true);
     this._persist();
-  }
-
-  _applyPropOrientation(entry) {
-    const step = Math.round(entry.rotY / (Math.PI * 0.5)) % 4;
-    // Keep plinth marker rotated by full 90° steps while angling/mirroring the cutout art
-    // so every 90° rotation looks distinctly oriented without ever appearing paper-thin edge-on.
-    if (entry.plinthGroup) {
-      entry.plinthGroup.rotation.y = entry.rotY;
-    }
-    if (entry.cardMesh) {
-      const angles = [0.0, 0.42, 0.0, -0.42];
-      const flipX = step === 1 || step === 2 ? -1 : 1;
-      entry.cardMesh.rotation.y = angles[step] || 0;
-      entry.cardMesh.scale.x = flipX;
-    }
   }
 
   _handleRemoveClick() {
@@ -141,6 +120,8 @@ export class DecorationSystem {
     const idx = this.placedItems.findIndex((p) => p.uid === this.selectedPlacedUid);
     if (idx === -1) return;
     const [removed] = this.placedItems.splice(idx, 1);
+    const y = this.level.getTerrainHeight(removed.x, removed.z);
+    this._spawnDustPuff(removed.x, y, removed.z);
     this._disposePropEntry(removed);
     this.selectedPlacedUid = null;
     this.selectionRing.visible = false;
@@ -170,7 +151,6 @@ export class DecorationSystem {
       this.reticleMesh.visible = false;
       this._syncPropActionsUI();
     } else {
-      // Auto-select first unlocked item if none selected yet
       const unlocked = this.save.getUnlockedFurniture();
       if (!this.selectedCatalogId && unlocked.length > 0) {
         this.selectedCatalogId = unlocked[0];
@@ -228,11 +208,11 @@ export class DecorationSystem {
       }
     }
 
-    // Avoid overlapping another placed furniture piece
+    // Avoid overlapping another placed 3D furniture piece
     for (let i = 0; i < this.placedItems.length; i++) {
       const other = this.placedItems[i];
       if (other.uid === ignoreUid) continue;
-      if (Math.hypot(other.x - x, other.z - z) < 1.15) {
+      if (Math.hypot(other.x - x, other.z - z) < 1.25) {
         return false;
       }
     }
@@ -268,6 +248,8 @@ export class DecorationSystem {
     });
     if (!entry) return false;
 
+    const groundY = this.level.getTerrainHeight(x, z);
+    this._spawnDustPuff(x, groundY, z);
     this.selectedPlacedUid = entry.uid;
     this._updateSelectionRing();
     this._syncPropActionsUI();
@@ -278,7 +260,7 @@ export class DecorationSystem {
   }
 
   /**
-   * Selects a placed furniture prop (called on tap in Decoration Mode).
+   * Selects a placed 3D furniture prop (called on tap in Decoration Mode).
    */
   selectPlacedProp(entry) {
     if (!entry) return;
@@ -289,7 +271,7 @@ export class DecorationSystem {
   }
 
   /**
-   * Live preview while dragging an existing placed prop across terrain.
+   * Live preview while dragging an existing placed 3D prop across terrain.
    */
   updatePropDrag(entry, worldX, worldZ) {
     if (!entry) return;
@@ -311,7 +293,7 @@ export class DecorationSystem {
   }
 
   /**
-   * Finalizes dragging a placed prop: commits if valid, snaps back if blocked.
+   * Finalizes dragging a placed 3D prop: commits with dust puff if valid, snaps back if blocked.
    */
   endPropDrag(entry, worldX, worldZ) {
     this.reticleMesh.visible = false;
@@ -325,10 +307,10 @@ export class DecorationSystem {
       const groundY = this.level.getTerrainHeight(cx, cz);
       entry.group.position.set(cx, groundY, cz);
       entry.popAnim = 0.24;
+      this._spawnDustPuff(cx, groundY, cz);
       this.audio.playDecorPlace(false);
       this._persist();
     } else {
-      // Snap back to previous valid coordinates
       const oldY = this.level.getTerrainHeight(entry.x, entry.z);
       entry.group.position.set(entry.x, oldY, entry.z);
       this._flashHint('Zone réservée au chantier ou à l’eau');
@@ -338,6 +320,31 @@ export class DecorationSystem {
     this.selectedPlacedUid = entry.uid;
     this._updateSelectionRing();
     this._syncPropActionsUI();
+  }
+
+  /**
+   * Spawns a lightweight tactile ring of warm sand dust puffs around a placed 3D prop.
+   */
+  _spawnDustPuff(x, y, z) {
+    const group = new THREE.Group();
+    group.position.set(x, y + 0.08, z);
+    const mat = this.dustMat.clone();
+    const particles = [];
+    for (let i = 0; i < 8; i++) {
+      const ang = (i / 8) * Math.PI * 2 + (i % 2) * 0.2;
+      const m = new THREE.Mesh(this.dustGeo, mat);
+      const speed = 1.15 + (i % 3) * 0.28;
+      m.position.set(Math.cos(ang) * 0.28, 0, Math.sin(ang) * 0.28);
+      group.add(m);
+      particles.push({
+        mesh: m,
+        vx: Math.cos(ang) * speed,
+        vy: 0.45 + (i % 2) * 0.25,
+        vz: Math.sin(ang) * speed,
+      });
+    }
+    this.root.add(group);
+    this.dustPuffs.push({ group, mat, particles, age: 0, duration: 0.44 });
   }
 
   _showTransientReticle(x, z, valid) {
@@ -458,39 +465,16 @@ export class DecorationSystem {
         ? this.level.getTerrainHeight(x, z)
         : 0;
     group.position.set(x, groundY, z);
+    group.rotation.y = rotY;
 
     // Ground contact shadow blob
     const shadowMesh = new THREE.Mesh(this.shadowGeo, this.textures.materials.shadowBlob);
     shadowMesh.position.y = 0.025;
     group.add(shadowMesh);
 
-    // Carved sandstone pedestal plinth
-    const plinthGroup = new THREE.Group();
-    const plinth = new THREE.Mesh(this.plinthGeo, this.plinthMat);
-    plinth.position.y = 0.045;
-    plinth.castShadow = true;
-    plinth.receiveShadow = true;
-    plinthGroup.add(plinth);
-    group.add(plinthGroup);
-
-    // High-clarity transparent PNG diorama cutout plane (alpha-tested for clean lighting & depth)
-    const size = meta.scale || 1.65;
-    const cardGeo = new THREE.PlaneGeometry(size, size);
-    const cardTex = getFurnitureTexture(meta.img);
-    const cardMat = new THREE.MeshStandardMaterial({
-      map: cardTex,
-      alphaTest: 0.32,
-      roughness: 0.72,
-      metalness: 0.06,
-      side: THREE.DoubleSide,
-    });
-    const cardMesh = new THREE.Mesh(cardGeo, cardMat);
-    cardMesh.position.y = 0.08 + size * 0.48;
-    // Slight 8° backward tilt for optimal isometric camera readability
-    cardMesh.rotation.x = -0.14;
-    cardMesh.castShadow = true;
-    cardMesh.receiveShadow = false;
-    group.add(cardMesh);
+    // Genuine multi-part procedural 3D PBR model grounded cleanly at y = 0
+    const model = createFurniture3D(itemId, this.textures);
+    group.add(model);
 
     const entry = {
       uid,
@@ -499,14 +483,10 @@ export class DecorationSystem {
       z,
       rotY,
       group,
-      plinthGroup,
-      cardMesh,
+      model,
       popAnim: animate ? 0.34 : 0,
-      geometries: [cardGeo],
-      materials: [cardMat],
     };
 
-    this._applyPropOrientation(entry);
     group.userData.interact = { type: 'decor-prop', entry };
     this.root.add(group);
     this.placedItems.push(entry);
@@ -534,7 +514,7 @@ export class DecorationSystem {
   }
 
   update(dt, elapsed) {
-    // Animate bouncy pop-in on newly placed or rotated props
+    // Animate bouncy pop-in + per-item ambient 3D effects (embers, water, lantern, lock)
     for (let i = 0; i < this.placedItems.length; i++) {
       const p = this.placedItems[i];
       if (p.popAnim > 0) {
@@ -544,6 +524,29 @@ export class DecorationSystem {
         p.group.scale.setScalar(overshoot);
       } else if (p.group.scale.x !== 1) {
         p.group.scale.setScalar(1);
+      }
+      updateFurniture3D(p.model, dt, elapsed);
+    }
+
+    // Update transient placement dust puffs
+    for (let i = this.dustPuffs.length - 1; i >= 0; i--) {
+      const puff = this.dustPuffs[i];
+      puff.age += dt;
+      const t = puff.age / puff.duration;
+      if (t >= 1) {
+        this.root.remove(puff.group);
+        puff.mat.dispose();
+        this.dustPuffs.splice(i, 1);
+        continue;
+      }
+      puff.mat.opacity = 0.72 * (1 - t);
+      const scale = 0.8 + t * 1.1;
+      for (let j = 0; j < puff.particles.length; j++) {
+        const pt = puff.particles[j];
+        pt.mesh.position.x += pt.vx * dt * (1 - t * 0.6);
+        pt.mesh.position.y += pt.vy * dt * (1 - t * 0.5);
+        pt.mesh.position.z += pt.vz * dt * (1 - t * 0.6);
+        pt.mesh.scale.setScalar(scale);
       }
     }
 
@@ -555,8 +558,7 @@ export class DecorationSystem {
 
   _disposePropEntry(entry) {
     this.root.remove(entry.group);
-    entry.geometries.forEach((g) => g.dispose());
-    entry.materials.forEach((m) => m.dispose());
+    disposeFurniture3DInstance(entry.model);
   }
 
   dispose() {
@@ -573,10 +575,16 @@ export class DecorationSystem {
     this.placedItems.forEach((entry) => this._disposePropEntry(entry));
     this.placedItems.length = 0;
 
+    this.dustPuffs.forEach((puff) => {
+      this.root.remove(puff.group);
+      puff.mat.dispose();
+    });
+    this.dustPuffs.length = 0;
+
     this.scene.remove(this.root);
-    this.plinthGeo.dispose();
-    this.plinthMat.dispose();
     this.shadowGeo.dispose();
+    this.dustGeo.dispose();
+    this.dustMat.dispose();
     this.selRingGeo.dispose();
     this.selRingMat.dispose();
     this.reticleGeo.dispose();

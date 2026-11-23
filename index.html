@@ -151,6 +151,30 @@
       </div>
     </div>
 
+    <!-- 3D FURNITURE TURNTABLE PREVIEW MODAL (Opened on tapping any furniture card in Boutique) -->
+    <div id="furniture-preview-modal" class="preview-modal" hidden role="dialog" aria-modal="true" aria-labelledby="preview-item-name">
+      <div id="preview-backdrop" class="shop-backdrop"></div>
+      <div class="preview-panel">
+        <div class="preview-header">
+          <div class="preview-title-wrap">
+            <h2 id="preview-item-name" class="preview-item-name">Meuble 3D</h2>
+            <span id="preview-item-rarity" class="rarity-badge">Commun</span>
+          </div>
+          <button id="preview-close-btn" class="shop-close-btn" type="button" aria-label="Fermer l'aperçu 3D">✕</button>
+        </div>
+        <div class="preview-stage-wrap">
+          <canvas id="preview-3d-canvas" class="preview-3d-canvas" aria-label="Aperçu 3D rotatif du meuble"></canvas>
+          <div class="preview-illustration-chip">
+            <img id="preview-item-img" src="" alt="" />
+          </div>
+          <span class="preview-drag-hint">↻ Glisser pour tourner</span>
+        </div>
+        <div class="preview-footer">
+          <button id="preview-buy-btn" class="play-btn preview-buy-btn" type="button">💠 30 Éclats</button>
+        </div>
+      </div>
+    </div>
+
     <!-- FULL-SCREEN ANIMATED LOOT BOX OPENING STAGE -->
     <div id="lootbox-stage" class="lootbox-stage" hidden role="dialog" aria-modal="true" aria-label="Ouverture de coffre">
       <div class="lootbox-stage-bg"></div>
