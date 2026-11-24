@@ -1028,6 +1028,107 @@ export const ROGUELIKE_THEMES = [
       },
     ],
   },
+  {
+    id: 'english',
+    levelNum: 12,
+    shortName: 'Village Anglais 1900',
+    title: 'Niveau 12 : Village Anglais 1900 — Angleterre Édouardienne',
+    biomeLabel: 'Briques Rouges, Pierre des Cotswolds, Colombages & Ardoise',
+    skyColor: '#dceaf2',
+    terrainTint: '#a6cc8c',
+    stoneTint: '#e2cca0',
+    accentColor: '#1f6c44',
+    rewardRangeLabel: '+35 à +55 Éclats',
+    structures: [
+      {
+        id: 'english_edwardian_clocktower',
+        name: "La Tour de l'Horloge Édouardienne",
+        subtitle: 'Beffroi en brique rouge & pierre dorée, 4 cadrans & flèche en ardoise',
+        // 9 + 4 + 4 + 4 + 4 + 2 + 1 = 28 blocks
+        layers: [
+          { cells: makeRectCells(3, 3) },
+          { cells: makeRectCells(2, 2) },
+          { cells: makeRectCells(2, 2) },
+          { cells: makeRectCells(2, 2) },
+          { cells: makeRectCells(2, 2) },
+          { cells: [[-0.5, 0], [0.5, 0]] },
+          { cells: [[0, 0]], isCapstone: true },
+        ],
+      },
+      {
+        id: 'english_royal_oak_pub',
+        name: 'Le Pub Anglais "The Royal Oak"',
+        subtitle: 'Taverne en briques & colombages, baies vitrées & doubles cheminées',
+        // 12 + 10 + 8 + 2 = 32 blocks
+        layers: [
+          { cells: makeRectCells(4, 3) },
+          {
+            cells: [
+              [-1.5, -1], [-0.5, -1], [0.5, -1], [1.5, -1],
+              [-1.5, 0], [1.5, 0],
+              [-1.5, 1], [-0.5, 1], [0.5, 1], [1.5, 1],
+            ],
+          },
+          { cells: makeRectCells(4, 2) },
+          { cells: [[-1, 0], [1, 0]] },
+        ],
+      },
+      {
+        id: 'english_rural_station_1900',
+        name: 'La Gare Rurale Britannique 1900',
+        subtitle: 'Bâtiment voyageurs en brique rouge, auvent de quai & cheminée',
+        // 15 + 9 + 8 + 2 = 34 blocks
+        layers: [
+          { cells: makeRectCells(5, 3) },
+          {
+            cells: [
+              [-2, -1], [-1, -1], [0, -1], [1, -1], [2, -1],
+              [-2, 1], [0, 1], [2, 1], [0, 0],
+            ],
+          },
+          { cells: makeRectCells(4, 2) },
+          { cells: [[-0.5, 0], [0.5, 0]] },
+        ],
+      },
+      {
+        id: 'english_cotswolds_manor',
+        name: 'Le Manoir de Campagne des Cotswolds',
+        subtitle: 'Manoir en pierre couleur miel, ailes symétriques & toits en ardoise',
+        // 16 + 10 + 6 + 4 = 36 blocks
+        layers: [
+          { cells: makeRectCells(4, 4) },
+          {
+            cells: [
+              [-1.5, -1.5], [-0.5, -1.5], [0.5, -1.5], [1.5, -1.5],
+              [-1.5, 0], [1.5, 0],
+              [-1.5, 1.5], [-0.5, 1.5], [0.5, 1.5], [1.5, 1.5],
+            ],
+          },
+          { cells: makeRectCells(3, 2) },
+          { cells: makeRectCells(2, 2) },
+        ],
+      },
+      {
+        id: 'english_victorian_bandstand_bridge',
+        name: 'Le Kiosque Victorien & Pont du Ruisseau',
+        subtitle: 'Kiosque à musique blanc & vert relié à un pont de pierre en arc',
+        // 12 + 8 + 5 + 1 = 26 blocks
+        layers: [
+          { cells: makeRectCells(4, 3) },
+          {
+            cells: [
+              [-1.5, -1], [-0.5, -1], [0.5, -1], [1.5, -1],
+              [-1.5, 1], [-0.5, 1], [0.5, 1], [1.5, 1],
+            ],
+          },
+          {
+            cells: [[0, 0], [-1, 0], [1, 0], [0, -1], [0, 1]],
+          },
+          { cells: [[0, 0]], isCapstone: true },
+        ],
+      },
+    ],
+  },
 ];
 
 /** 4 randomized gameplay run modifiers */

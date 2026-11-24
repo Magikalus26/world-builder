@@ -2931,6 +2931,191 @@ export function createTextureLibrary(renderer) {
     return vikingPack;
   }
 
+  let englishPack = null;
+  const englishTextures = [];
+  const englishMaterials = [];
+
+  function ensureEnglishVillagePack() {
+    if (englishPack) return englishPack;
+
+    const meadowGrass = buildEnglishMeadowGrassPBR(anisotropy);
+    const cobbleLane = buildEnglishCobbleLanePBR(anisotropy);
+    const quarryDust = buildEnglishQuarryDustPBR(anisotropy);
+    const brookBank = buildEnglishBrookBankPBR(anisotropy);
+
+    const edwardianBrick = buildEdwardianBrickPBR(anisotropy);
+    const cotswoldStone = buildCotswoldLimestonePBR(anisotropy);
+    const halfTimber = buildEnglishHalfTimberPBR(anisotropy);
+    const welshSlate = buildWelshSlateRoofPBR(anisotropy);
+    const clockFace = buildEdwardianClockFacePBR(anisotropy);
+    const cobbleBlock = buildEnglishCobbleBlockPBR(anisotropy);
+    const rawQuarry = buildEnglishRawQuarryPBR(anisotropy);
+
+    [meadowGrass, cobbleLane, quarryDust, brookBank].forEach((b) => {
+      englishTextures.push(b.albedo, b.normalRough);
+    });
+    [edwardianBrick, cotswoldStone, halfTimber, welshSlate, clockFace, cobbleBlock, rawQuarry].forEach((pack) => {
+      if (pack.map) englishTextures.push(pack.map);
+      if (pack.normalMap) englishTextures.push(pack.normalMap);
+      if (pack.roughnessMap) englishTextures.push(pack.roughnessMap);
+    });
+
+    const englishTerrainSplat = createTerrainSplatMaterial({
+      sand: meadowGrass,       // Biome 0: Lush English meadow grass, clover & boxwood meadow
+      earthPath: cobbleLane,   // Biome 1: Compacted cobblestone High Street & gravel country lanes
+      quarryDust: quarryDust,  // Biome 2: Crushed honey-limestone & red brick-clay quarry dust
+      oasisGrass: brookBank,   // Biome 3: Mossy turquoise brook bank & garden border soil
+    });
+    englishTerrainSplat.customProgramCacheKey = () => 'workd-builder-english-terrain-splat-v1';
+
+    const brookWaterNormal = waterNormal.clone();
+    brookWaterNormal.wrapS = THREE.RepeatWrapping;
+    brookWaterNormal.wrapT = THREE.RepeatWrapping;
+    brookWaterNormal.repeat.set(3.8, 3.8);
+    brookWaterNormal.needsUpdate = true;
+    englishTextures.push(brookWaterNormal);
+
+    const eMats = {
+      terrainSplat: englishTerrainSplat,
+      edwardianBrick: new THREE.MeshStandardMaterial({
+        map: edwardianBrick.map,
+        normalMap: edwardianBrick.normalMap,
+        normalScale: new THREE.Vector2(1.42, 1.42),
+        roughnessMap: edwardianBrick.roughnessMap,
+        roughness: 0.84,
+        metalness: 0.04,
+      }),
+      edwardianBrickWarm: new THREE.MeshStandardMaterial({
+        map: edwardianBrick.map,
+        normalMap: edwardianBrick.normalMap,
+        normalScale: new THREE.Vector2(1.38, 1.38),
+        roughnessMap: edwardianBrick.roughnessMap,
+        color: new THREE.Color('#e6c2a8'),
+        roughness: 0.84,
+        metalness: 0.04,
+      }),
+      cotswoldStone: new THREE.MeshStandardMaterial({
+        map: cotswoldStone.map,
+        normalMap: cotswoldStone.normalMap,
+        normalScale: new THREE.Vector2(1.44, 1.44),
+        roughnessMap: cotswoldStone.roughnessMap,
+        roughness: 0.82,
+        metalness: 0.04,
+      }),
+      halfTimber: new THREE.MeshStandardMaterial({
+        map: halfTimber.map,
+        normalMap: halfTimber.normalMap,
+        normalScale: new THREE.Vector2(1.46, 1.46),
+        roughnessMap: halfTimber.roughnessMap,
+        roughness: 0.84,
+        metalness: 0.03,
+      }),
+      welshSlate: new THREE.MeshStandardMaterial({
+        map: welshSlate.map,
+        normalMap: welshSlate.normalMap,
+        normalScale: new THREE.Vector2(1.42, 1.42),
+        roughnessMap: welshSlate.roughnessMap,
+        roughness: 0.54,
+        metalness: 0.16,
+      }),
+      clockFace: new THREE.MeshStandardMaterial({
+        map: clockFace.map,
+        normalMap: clockFace.normalMap,
+        normalScale: new THREE.Vector2(1.25, 1.25),
+        roughnessMap: clockFace.roughnessMap,
+        emissive: new THREE.Color('#fff1c6'),
+        emissiveMap: clockFace.map,
+        emissiveIntensity: 0.28,
+        roughness: 0.36,
+        metalness: 0.14,
+      }),
+      cobbleRoadBlock: new THREE.MeshStandardMaterial({
+        map: cobbleBlock.map,
+        normalMap: cobbleBlock.normalMap,
+        normalScale: new THREE.Vector2(1.38, 1.38),
+        roughnessMap: cobbleBlock.roughnessMap,
+        roughness: 0.86,
+        metalness: 0.04,
+      }),
+      rawEnglishQuarry: new THREE.MeshStandardMaterial({
+        map: rawQuarry.map,
+        normalMap: rawQuarry.normalMap,
+        normalScale: new THREE.Vector2(1.58, 1.58),
+        roughnessMap: rawQuarry.roughnessMap,
+        roughness: 0.92,
+        metalness: 0.04,
+      }),
+      brookWater: new THREE.MeshStandardMaterial({
+        color: new THREE.Color('#2ba4b8'),
+        normalMap: brookWaterNormal,
+        normalScale: new THREE.Vector2(0.4, 0.4),
+        roughness: 0.12,
+        metalness: 0.15,
+        envMapIntensity: 1.42,
+        transparent: true,
+        opacity: 0.9,
+      }),
+      britishGreen: new THREE.MeshStandardMaterial({
+        color: new THREE.Color('#1d5438'),
+        roughness: 0.56,
+        metalness: 0.12,
+      }),
+      victorianWhite: new THREE.MeshStandardMaterial({
+        color: new THREE.Color('#f4f1e8'),
+        roughness: 0.62,
+        metalness: 0.04,
+      }),
+      darkOak: new THREE.MeshStandardMaterial({
+        color: new THREE.Color('#4a3322'),
+        roughness: 0.84,
+        metalness: 0.04,
+      }),
+      brassTrim: new THREE.MeshStandardMaterial({
+        color: new THREE.Color('#e2b846'),
+        roughness: 0.28,
+        metalness: 0.88,
+        envMapIntensity: 1.35,
+      }),
+      wroughtIron: new THREE.MeshStandardMaterial({
+        color: new THREE.Color('#252a30'),
+        roughness: 0.36,
+        metalness: 0.86,
+      }),
+      warmWindowGlow: new THREE.MeshStandardMaterial({
+        color: new THREE.Color('#fff0bd'),
+        emissive: new THREE.Color('#ffb94a'),
+        emissiveIntensity: 0.72,
+        roughness: 0.24,
+        metalness: 0.1,
+      }),
+      boxwoodHedge: new THREE.MeshStandardMaterial({
+        color: new THREE.Color('#2f6430'),
+        roughness: 0.9,
+        metalness: 0.0,
+      }),
+      flowerRose: new THREE.MeshStandardMaterial({
+        color: new THREE.Color('#d84a64'),
+        roughness: 0.78,
+      }),
+      flowerLavender: new THREE.MeshStandardMaterial({
+        color: new THREE.Color('#8e68c4'),
+        roughness: 0.78,
+      }),
+      flowerMarigold: new THREE.MeshStandardMaterial({
+        color: new THREE.Color('#f0b63a'),
+        roughness: 0.78,
+      }),
+      clayPot: new THREE.MeshStandardMaterial({
+        color: new THREE.Color('#b85c3a'),
+        roughness: 0.82,
+      }),
+    };
+
+    Object.values(eMats).forEach((m) => englishMaterials.push(m));
+    englishPack = { materials: eMats };
+    return englishPack;
+  }
+
   return {
     maps: {
       blueprint: blueprintMap,
@@ -2949,6 +3134,7 @@ export function createTextureLibrary(renderer) {
     ensureMedievalPack,
     ensureMuseumPack,
     ensureVikingPack,
+    ensureEnglishVillagePack,
     dispose() {
       textures.forEach((t) => t.dispose());
       Object.values(materials).forEach((m) => m.dispose());
@@ -2970,6 +3156,8 @@ export function createTextureLibrary(renderer) {
       museumMaterials.forEach((m) => m.dispose());
       vikingTextures.forEach((t) => t.dispose());
       vikingMaterials.forEach((m) => m.dispose());
+      englishTextures.forEach((t) => t.dispose());
+      englishMaterials.forEach((m) => m.dispose());
       materialFactory.dispose();
     },
   };
@@ -7886,6 +8074,760 @@ function buildVikingRawGranitePBR(anisotropy) {
   ctx.putImageData(img, 0, 0);
   rCtx.putImageData(rImg, 0, 0);
   const normalCanvas = buildSobelNormalCanvas(height, size, 4.0);
+  return {
+    map: wrapTexture(albedoCanvas, { isColor: true, anisotropy: aniso }),
+    normalMap: wrapTexture(normalCanvas, { isColor: false, anisotropy: aniso }),
+    roughnessMap: wrapTexture(roughCanvas, { isColor: false, anisotropy: aniso }),
+  };
+}
+
+/* ============================================================================
+ * LEVEL 12 (EDWARDIAN ENGLAND 1900s — LE VILLAGE ANGLAIS 1900) — 512x512 PBR
+ * ========================================================================== */
+
+/** English Biome 0: Lush Cotswold Meadow Grass, Clover & Daisies (512x512) */
+function buildEnglishMeadowGrassPBR(anisotropy) {
+  const size = 512;
+  const albedoCanvas = makeCanvas(size);
+  const ctx = albedoCanvas.getContext('2d');
+  const img = ctx.createImageData(size, size);
+  const data = img.data;
+  const height = new Float32Array(size * size);
+  const rough = new Float32Array(size * size);
+  const aniso = Math.min(4, anisotropy || 4);
+
+  for (let y = 0; y < size; y++) {
+    const v = y / size;
+    for (let x = 0; x < size; x++) {
+      const u = x / size;
+      const i = y * size + x;
+      const macro = tileFBM(u, v, 5, 3, 11101);
+      const clover = tileFBM(u, v, 11, 3, 11117);
+      const blades = tileFBM(u * 2.4, v * 2.4, 24, 2, 11131);
+      const micro = hash2i(x, y, 11149);
+
+      // Rich manicured English countryside emerald & sunlit clover meadow green
+      let r = lerp(68, 114, macro) + (clover - 0.5) * 16 + (blades - 0.5) * 16;
+      let g = lerp(124, 174, macro) + (clover - 0.5) * 18 + (blades - 0.5) * 20;
+      let b = lerp(46, 76, macro) + (blades - 0.5) * 10;
+
+      // Tiny white English meadow daisies & golden buttercups
+      const fl = tileWorley(u, v, 24, 11161);
+      if (fl.f1 < 0.08 && fl.id > 0.85) {
+        const bloom = 1.0 - smoothstep(0.025, 0.08, fl.f1);
+        const isButtercup = fl.id > 0.93;
+        r = lerp(r, isButtercup ? 244 : 250, bloom * 0.78);
+        g = lerp(g, isButtercup ? 214 : 248, bloom * 0.78);
+        b = lerp(b, isButtercup ? 68 : 234, bloom * 0.78);
+      }
+
+      height[i] = clamp01(0.46 + (blades - 0.5) * 0.32 + (macro - 0.5) * 0.14);
+      rough[i] = clamp01(0.88 + (0.5 - blades) * 0.08 + (micro - 0.5) * 0.04);
+
+      const idx = i * 4;
+      data[idx] = Math.min(255, Math.max(0, Math.round(r + (micro - 0.5) * 8)));
+      data[idx + 1] = Math.min(255, Math.max(0, Math.round(g + (micro - 0.5) * 8)));
+      data[idx + 2] = Math.min(255, Math.max(0, Math.round(b + (micro - 0.5) * 6)));
+      data[idx + 3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  const normalRoughCanvas = buildSobelNormalCanvas(height, size, 2.2, rough);
+  return {
+    albedo: wrapTexture(albedoCanvas, { isColor: true, anisotropy: aniso }),
+    normalRough: wrapTexture(normalRoughCanvas, { isColor: false, anisotropy: aniso }),
+  };
+}
+
+/** English Biome 1: Compacted Cobblestone High Street & Warm Gravel Country Lanes (512x512) */
+function buildEnglishCobbleLanePBR(anisotropy) {
+  const size = 512;
+  const albedoCanvas = makeCanvas(size);
+  const ctx = albedoCanvas.getContext('2d');
+  const img = ctx.createImageData(size, size);
+  const data = img.data;
+  const height = new Float32Array(size * size);
+  const rough = new Float32Array(size * size);
+  const aniso = Math.min(4, anisotropy || 4);
+
+  for (let y = 0; y < size; y++) {
+    const v = y / size;
+    for (let x = 0; x < size; x++) {
+      const u = x / size;
+      const i = y * size + x;
+      const cobble = tileWorley(u, v, 14, 11177);
+      const gravel = tileFBM(u, v, 8, 3, 11197);
+      const grit = hash2i(x, y, 11213);
+
+      const seam = 1.0 - smoothstep(0.03, 0.11, cobble.edge);
+      const isCobble = smoothstep(0.28, 0.56, cobble.id) * (1.0 - seam);
+
+      // Warm buff Cotswold gravel lane with fitted granite setts
+      let r = lerp(164, 198, gravel) + (grit - 0.5) * 14;
+      let g = lerp(148, 178, gravel) + (grit - 0.5) * 14;
+      let b = lerp(118, 146, gravel) + (grit - 0.5) * 12;
+
+      const sr = lerp(136, 172, cobble.id) + (grit - 0.5) * 12;
+      const sg = lerp(134, 168, cobble.id) + (grit - 0.5) * 12;
+      const sb = lerp(130, 162, cobble.id) + (grit - 0.5) * 12;
+
+      r = lerp(r, sr, isCobble * 0.72);
+      g = lerp(g, sg, isCobble * 0.72);
+      b = lerp(b, sb, isCobble * 0.72);
+
+      r = lerp(r, 108, seam * 0.45);
+      g = lerp(g, 98, seam * 0.45);
+      b = lerp(b, 82, seam * 0.45);
+
+      height[i] = clamp01(0.4 + isCobble * 0.34 - seam * 0.16 + (grit - 0.5) * 0.08);
+      rough[i] = clamp01(0.84 - isCobble * 0.12 + seam * 0.08);
+
+      const idx = i * 4;
+      data[idx] = Math.min(255, Math.max(0, Math.round(r)));
+      data[idx + 1] = Math.min(255, Math.max(0, Math.round(g)));
+      data[idx + 2] = Math.min(255, Math.max(0, Math.round(b)));
+      data[idx + 3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  const normalRoughCanvas = buildSobelNormalCanvas(height, size, 2.7, rough);
+  return {
+    albedo: wrapTexture(albedoCanvas, { isColor: true, anisotropy: aniso }),
+    normalRough: wrapTexture(normalRoughCanvas, { isColor: false, anisotropy: aniso }),
+  };
+}
+
+/** English Biome 2: Crushed Honey-Limestone & Red Brick-Clay Quarry Dust (512x512) */
+function buildEnglishQuarryDustPBR(anisotropy) {
+  const size = 512;
+  const albedoCanvas = makeCanvas(size);
+  const ctx = albedoCanvas.getContext('2d');
+  const img = ctx.createImageData(size, size);
+  const data = img.data;
+  const height = new Float32Array(size * size);
+  const rough = new Float32Array(size * size);
+  const aniso = Math.min(4, anisotropy || 4);
+
+  for (let y = 0; y < size; y++) {
+    const v = y / size;
+    for (let x = 0; x < size; x++) {
+      const u = x / size;
+      const i = y * size + x;
+      const dust = tileFBM(u, v, 7, 3, 11239);
+      const clayVeins = smoothstep(0.56, 0.82, tileFBM(u, v, 5, 3, 11251));
+      const chips = tileWorley(u, v, 20, 11261);
+      const grit = hash2i(x, y, 11273);
+
+      const chipMask = 1.0 - smoothstep(0.06, 0.24, chips.f1);
+      let r = lerp(182, 218, dust) + chipMask * 14 + (grit - 0.5) * 14;
+      let g = lerp(156, 192, dust) + chipMask * 10 + (grit - 0.5) * 12;
+      let b = lerp(116, 148, dust) + chipMask * 8 + (grit - 0.5) * 10;
+
+      // Red brick-clay streaks blended into the honey-limestone quarry yard
+      r = lerp(r, 168, clayVeins * 0.55);
+      g = lerp(g, 92, clayVeins * 0.55);
+      b = lerp(b, 68, clayVeins * 0.55);
+
+      height[i] = clamp01(0.42 + chipMask * 0.3 + (dust - 0.5) * 0.18);
+      rough[i] = clamp01(0.9 - chipMask * 0.06);
+
+      const idx = i * 4;
+      data[idx] = Math.min(255, Math.max(0, Math.round(r)));
+      data[idx + 1] = Math.min(255, Math.max(0, Math.round(g)));
+      data[idx + 2] = Math.min(255, Math.max(0, Math.round(b)));
+      data[idx + 3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  const normalRoughCanvas = buildSobelNormalCanvas(height, size, 2.5, rough);
+  return {
+    albedo: wrapTexture(albedoCanvas, { isColor: true, anisotropy: aniso }),
+    normalRough: wrapTexture(normalRoughCanvas, { isColor: false, anisotropy: aniso }),
+  };
+}
+
+/** English Biome 3: Mossy Brook Bank Pebbles & Boxwood Garden Loam (512x512) */
+function buildEnglishBrookBankPBR(anisotropy) {
+  const size = 512;
+  const albedoCanvas = makeCanvas(size);
+  const ctx = albedoCanvas.getContext('2d');
+  const img = ctx.createImageData(size, size);
+  const data = img.data;
+  const height = new Float32Array(size * size);
+  const rough = new Float32Array(size * size);
+  const aniso = Math.min(4, anisotropy || 4);
+
+  for (let y = 0; y < size; y++) {
+    const v = y / size;
+    for (let x = 0; x < size; x++) {
+      const u = x / size;
+      const i = y * size + x;
+      const peb = tileWorley(u, v, 16, 11287);
+      const moss = tileFBM(u, v, 9, 3, 11299);
+      const micro = hash2i(x, y, 11311);
+
+      const isPebble = 1.0 - smoothstep(0.08, 0.28, peb.f1);
+      let r = lerp(66, 98, moss) + (micro - 0.5) * 10;
+      let g = lerp(96, 134, moss) + (micro - 0.5) * 10;
+      let b = lerp(52, 74, moss) + (micro - 0.5) * 8;
+
+      const pl = lerp(128, 172, peb.id);
+      r = lerp(r, pl, isPebble * 0.62);
+      g = lerp(g, pl * 0.96, isPebble * 0.62);
+      b = lerp(b, pl * 0.88, isPebble * 0.62);
+
+      height[i] = clamp01(0.36 + isPebble * 0.36 + (moss - 0.5) * 0.16);
+      rough[i] = clamp01(0.82 - isPebble * 0.18);
+
+      const idx = i * 4;
+      data[idx] = Math.min(255, Math.max(0, Math.round(r)));
+      data[idx + 1] = Math.min(255, Math.max(0, Math.round(g)));
+      data[idx + 2] = Math.min(255, Math.max(0, Math.round(b)));
+      data[idx + 3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  const normalRoughCanvas = buildSobelNormalCanvas(height, size, 2.8, rough);
+  return {
+    albedo: wrapTexture(albedoCanvas, { isColor: true, anisotropy: aniso }),
+    normalRough: wrapTexture(normalRoughCanvas, { isColor: false, anisotropy: aniso }),
+  };
+}
+
+/** 512x512 Edwardian Red & Cream Brick Masonry PBR (Albedo + Normal + Roughness) */
+function buildEdwardianBrickPBR(anisotropy) {
+  const size = 512;
+  const albedoCanvas = makeCanvas(size);
+  const roughCanvas = makeCanvas(size);
+  const ctx = albedoCanvas.getContext('2d');
+  const rCtx = roughCanvas.getContext('2d');
+  const img = ctx.createImageData(size, size);
+  const rImg = rCtx.createImageData(size, size);
+  const height = new Float32Array(size * size);
+  const aniso = Math.min(4, anisotropy || 4);
+
+  const rows = 8;
+  const cols = 4;
+
+  for (let y = 0; y < size; y++) {
+    const v = y / size;
+    const row = Math.floor(v * rows);
+    const rv = (v * rows) % 1;
+    const stagger = (row % 2) * 0.5;
+    for (let x = 0; x < size; x++) {
+      const u = x / size;
+      const i = y * size + x;
+      const uStag = (u * cols + stagger) % cols;
+      const col = Math.floor(uStag);
+      const cu = uStag % 1;
+
+      const brickTone = hash2i(col + 13, row + 23, 11321);
+      const clayGrain = tileFBM(u, v, 16, 3, 11351);
+      const micro = hash2i(x, y, 11369);
+
+      const jointV = Math.min(rv, 1.0 - rv);
+      const jointU = Math.min(cu, 1.0 - cu) * (rows / cols);
+      const minJ = Math.min(jointV, jointU);
+      const isMortar = 1.0 - smoothstep(0.036, 0.08, minJ);
+      const bevel = smoothstep(0.07, 0.16, minJ);
+
+      // Authentic Edwardian red brick with alternating cream-buff header accents
+      const isCreamHeader = (row % 4 === 0 && col % 2 === 0);
+      let r = isCreamHeader
+        ? lerp(212, 232, brickTone)
+        : lerp(152, 192, brickTone) + (clayGrain - 0.5) * 20;
+      let g = isCreamHeader
+        ? lerp(194, 214, brickTone)
+        : lerp(64, 92, brickTone) + (clayGrain - 0.5) * 14;
+      let b = isCreamHeader
+        ? lerp(158, 178, brickTone)
+        : lerp(46, 66, brickTone) + (clayGrain - 0.5) * 12;
+
+      r += (micro - 0.5) * 10;
+      g += (micro - 0.5) * 8;
+      b += (micro - 0.5) * 8;
+
+      // Crisp cream-lime Edwardian mortar joints
+      r = lerp(r, 224, isMortar * 0.86);
+      g = lerp(g, 216, isMortar * 0.86);
+      b = lerp(b, 198, isMortar * 0.86);
+
+      height[i] = clamp01(0.24 + bevel * 0.56 + (clayGrain - 0.5) * 0.14 - isMortar * 0.22);
+
+      const idx = i * 4;
+      img.data[idx] = Math.min(255, Math.max(0, Math.round(r)));
+      img.data[idx + 1] = Math.min(255, Math.max(0, Math.round(g)));
+      img.data[idx + 2] = Math.min(255, Math.max(0, Math.round(b)));
+      img.data[idx + 3] = 255;
+
+      const rvByte = Math.round(clamp01(0.8 + isMortar * 0.14 + (0.5 - clayGrain) * 0.08) * 255);
+      rImg.data[idx] = rvByte;
+      rImg.data[idx + 1] = rvByte;
+      rImg.data[idx + 2] = rvByte;
+      rImg.data[idx + 3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  rCtx.putImageData(rImg, 0, 0);
+  const normalCanvas = buildSobelNormalCanvas(height, size, 3.4);
+  return {
+    map: wrapTexture(albedoCanvas, { isColor: true, anisotropy: aniso }),
+    normalMap: wrapTexture(normalCanvas, { isColor: false, anisotropy: aniso }),
+    roughnessMap: wrapTexture(roughCanvas, { isColor: false, anisotropy: aniso }),
+  };
+}
+
+/** 512x512 Warm Cotswold Honey Limestone Ashlar PBR (Albedo + Normal + Roughness) */
+function buildCotswoldLimestonePBR(anisotropy) {
+  const size = 512;
+  const albedoCanvas = makeCanvas(size);
+  const roughCanvas = makeCanvas(size);
+  const ctx = albedoCanvas.getContext('2d');
+  const rCtx = roughCanvas.getContext('2d');
+  const img = ctx.createImageData(size, size);
+  const rImg = rCtx.createImageData(size, size);
+  const height = new Float32Array(size * size);
+  const aniso = Math.min(4, anisotropy || 4);
+
+  const rows = 5;
+  const cols = 3;
+
+  for (let y = 0; y < size; y++) {
+    const v = y / size;
+    const row = Math.floor(v * rows);
+    const rv = (v * rows) % 1;
+    const stagger = (row % 2) * 0.5;
+    for (let x = 0; x < size; x++) {
+      const u = x / size;
+      const i = y * size + x;
+      const uStag = (u * cols + stagger) % cols;
+      const col = Math.floor(uStag);
+      const cu = uStag % 1;
+
+      const tone = hash2i(col + 19, row + 37, 11383);
+      const grain = tileFBM(u, v, 14, 3, 11399);
+      const micro = hash2i(x, y, 11411);
+
+      const minJ = Math.min(Math.min(rv, 1 - rv), Math.min(cu, 1 - cu) * (rows / cols));
+      const isMortar = 1.0 - smoothstep(0.028, 0.066, minJ);
+      const bevel = smoothstep(0.06, 0.14, minJ);
+
+      // Iconic warm golden-honey Cotswold oolitic limestone
+      let r = lerp(204, 232, tone) + (grain - 0.5) * 20 + (micro - 0.5) * 8;
+      let g = lerp(180, 210, tone) + (grain - 0.5) * 18 + (micro - 0.5) * 8;
+      let b = lerp(132, 162, tone) + (grain - 0.5) * 16 + (micro - 0.5) * 7;
+
+      r = lerp(r, 146, isMortar * 0.72);
+      g = lerp(g, 132, isMortar * 0.72);
+      b = lerp(b, 102, isMortar * 0.72);
+
+      height[i] = clamp01(0.24 + bevel * 0.54 + (grain - 0.5) * 0.16 - isMortar * 0.22);
+
+      const idx = i * 4;
+      img.data[idx] = Math.min(255, Math.max(0, Math.round(r)));
+      img.data[idx + 1] = Math.min(255, Math.max(0, Math.round(g)));
+      img.data[idx + 2] = Math.min(255, Math.max(0, Math.round(b)));
+      img.data[idx + 3] = 255;
+
+      const rvByte = Math.round(clamp01(0.78 + isMortar * 0.16 + (0.5 - grain) * 0.08) * 255);
+      rImg.data[idx] = rvByte;
+      rImg.data[idx + 1] = rvByte;
+      rImg.data[idx + 2] = rvByte;
+      rImg.data[idx + 3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  rCtx.putImageData(rImg, 0, 0);
+  const normalCanvas = buildSobelNormalCanvas(height, size, 3.3);
+  return {
+    map: wrapTexture(albedoCanvas, { isColor: true, anisotropy: aniso }),
+    normalMap: wrapTexture(normalCanvas, { isColor: false, anisotropy: aniso }),
+    roughnessMap: wrapTexture(roughCanvas, { isColor: false, anisotropy: aniso }),
+  };
+}
+
+/** 512x512 Black-and-White Tudor/Edwardian Half-Timbering (Colombages) PBR */
+function buildEnglishHalfTimberPBR(anisotropy) {
+  const size = 512;
+  const albedoCanvas = makeCanvas(size);
+  const roughCanvas = makeCanvas(size);
+  const ctx = albedoCanvas.getContext('2d');
+  const rCtx = roughCanvas.getContext('2d');
+  const img = ctx.createImageData(size, size);
+  const rImg = rCtx.createImageData(size, size);
+  const height = new Float32Array(size * size);
+  const aniso = Math.min(4, anisotropy || 4);
+
+  for (let y = 0; y < size; y++) {
+    const v = y / size;
+    for (let x = 0; x < size; x++) {
+      const u = x / size;
+      const i = y * size + x;
+      const plasterNoise = tileFBM(u, v, 12, 3, 11423);
+      const woodGrain = tileFBM(u * 2.0, v * 8.0, 12, 2, 11437);
+      const micro = hash2i(x, y, 11447);
+
+      // Outer border beams + vertical center post + horizontal mid-rail + Tudor diagonal braces
+      const edgeU = Math.min(u, 1.0 - u);
+      const edgeV = Math.min(v, 1.0 - v);
+      const midU = Math.abs(u - 0.5);
+      const midV = Math.abs(v - 0.52);
+      const diagL = Math.abs((u - 0.08) - (v - 0.08));
+      const diagR = Math.abs((0.92 - u) - (v - 0.08));
+
+      const isBeam =
+        edgeU < 0.075 ||
+        edgeV < 0.08 ||
+        midU < 0.048 ||
+        midV < 0.046 ||
+        (v < 0.52 && (diagL < 0.038 || diagR < 0.038));
+
+      let r;
+      let g;
+      let b;
+      let h;
+      let roughVal;
+
+      if (isBeam) {
+        // Dark tarred Tudor-Edwardian oak timber beams
+        r = lerp(42, 68, woodGrain) + (micro - 0.5) * 9;
+        g = lerp(32, 52, woodGrain) + (micro - 0.5) * 8;
+        b = lerp(24, 40, woodGrain) + (micro - 0.5) * 7;
+        h = clamp01(0.76 + (woodGrain - 0.5) * 0.14);
+        roughVal = 0.78;
+      } else {
+        // Warm cream-white Edwardian limewashed stucco plaster
+        r = lerp(232, 246, plasterNoise) + (micro - 0.5) * 8;
+        g = lerp(224, 238, plasterNoise) + (micro - 0.5) * 8;
+        b = lerp(206, 222, plasterNoise) + (micro - 0.5) * 8;
+        h = clamp01(0.36 + (plasterNoise - 0.5) * 0.12);
+        roughVal = 0.88;
+      }
+
+      height[i] = h;
+      const idx = i * 4;
+      img.data[idx] = Math.min(255, Math.max(0, Math.round(r)));
+      img.data[idx + 1] = Math.min(255, Math.max(0, Math.round(g)));
+      img.data[idx + 2] = Math.min(255, Math.max(0, Math.round(b)));
+      img.data[idx + 3] = 255;
+
+      const rvByte = Math.round(clamp01(roughVal + (micro - 0.5) * 0.05) * 255);
+      rImg.data[idx] = rvByte;
+      rImg.data[idx + 1] = rvByte;
+      rImg.data[idx + 2] = rvByte;
+      rImg.data[idx + 3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  rCtx.putImageData(rImg, 0, 0);
+  const normalCanvas = buildSobelNormalCanvas(height, size, 3.6);
+  return {
+    map: wrapTexture(albedoCanvas, { isColor: true, anisotropy: aniso }),
+    normalMap: wrapTexture(normalCanvas, { isColor: false, anisotropy: aniso }),
+    roughnessMap: wrapTexture(roughCanvas, { isColor: false, anisotropy: aniso }),
+  };
+}
+
+/** 512x512 Steep Dark-Grey Welsh Slate Roof Shingles PBR (Albedo + Normal + Roughness) */
+function buildWelshSlateRoofPBR(anisotropy) {
+  const size = 512;
+  const albedoCanvas = makeCanvas(size);
+  const roughCanvas = makeCanvas(size);
+  const ctx = albedoCanvas.getContext('2d');
+  const rCtx = roughCanvas.getContext('2d');
+  const img = ctx.createImageData(size, size);
+  const rImg = rCtx.createImageData(size, size);
+  const height = new Float32Array(size * size);
+  const aniso = Math.min(4, anisotropy || 4);
+
+  const rows = 9;
+  const cols = 7;
+
+  for (let y = 0; y < size; y++) {
+    const v = y / size;
+    const row = Math.floor(v * rows);
+    const rv = (v * rows) % 1;
+    const stagger = (row % 2) * 0.5;
+    for (let x = 0; x < size; x++) {
+      const u = x / size;
+      const i = y * size + x;
+      const uStag = (u * cols + stagger) % cols;
+      const col = Math.floor(uStag);
+      const cu = uStag % 1;
+
+      const tileTone = hash2i(col + 17, row + 31, 11467);
+      const mineral = tileFBM(u, v, 14, 3, 11483);
+      const micro = hash2i(x, y, 11497);
+
+      const bottomShadow = 1.0 - smoothstep(0.0, 0.14, 1.0 - rv);
+      const sideGap = 1.0 - smoothstep(0.0, 0.055, Math.min(cu, 1.0 - cu));
+      const seam = Math.max(bottomShadow, sideGap * 0.72);
+
+      // Authentic cool blue-charcoal Welsh slate tiles with crisp pale cleaved edges
+      let r = lerp(58, 86, tileTone) + (mineral - 0.5) * 16 + (micro - 0.5) * 8;
+      let g = lerp(64, 94, tileTone) + (mineral - 0.5) * 16 + (micro - 0.5) * 8;
+      let b = lerp(76, 108, tileTone) + (mineral - 0.5) * 18 + (micro - 0.5) * 8;
+
+      const topLip = 1.0 - smoothstep(0.0, 0.09, rv);
+      r += topLip * 16;
+      g += topLip * 18;
+      b += topLip * 20;
+
+      r *= 1.0 - seam * 0.52;
+      g *= 1.0 - seam * 0.52;
+      b *= 1.0 - seam * 0.52;
+
+      height[i] = clamp01(0.3 + (1.0 - rv) * 0.44 + (mineral - 0.5) * 0.12 - seam * 0.3);
+
+      const idx = i * 4;
+      img.data[idx] = Math.min(255, Math.max(0, Math.round(r)));
+      img.data[idx + 1] = Math.min(255, Math.max(0, Math.round(g)));
+      img.data[idx + 2] = Math.min(255, Math.max(0, Math.round(b)));
+      img.data[idx + 3] = 255;
+
+      const rvByte = Math.round(clamp01(0.48 + seam * 0.28 + (0.5 - mineral) * 0.12) * 255);
+      rImg.data[idx] = rvByte;
+      rImg.data[idx + 1] = rvByte;
+      rImg.data[idx + 2] = rvByte;
+      rImg.data[idx + 3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  rCtx.putImageData(rImg, 0, 0);
+  const normalCanvas = buildSobelNormalCanvas(height, size, 3.2);
+  return {
+    map: wrapTexture(albedoCanvas, { isColor: true, anisotropy: aniso }),
+    normalMap: wrapTexture(normalCanvas, { isColor: false, anisotropy: aniso }),
+    roughnessMap: wrapTexture(roughCanvas, { isColor: false, anisotropy: aniso }),
+  };
+}
+
+/** 512x512 1900s Brass-and-White Edwardian Clockface Dial PBR (Albedo + Normal + Roughness) */
+function buildEdwardianClockFacePBR(anisotropy) {
+  const size = 512;
+  const albedoCanvas = makeCanvas(size);
+  const roughCanvas = makeCanvas(size);
+  const ctx = albedoCanvas.getContext('2d');
+  const rCtx = roughCanvas.getContext('2d');
+  const aniso = Math.min(4, anisotropy || 4);
+
+  // Warm Cotswold stone surround
+  ctx.fillStyle = '#d4bd91';
+  ctx.fillRect(0, 0, size, size);
+  ctx.strokeStyle = '#9c865e';
+  ctx.lineWidth = 10;
+  ctx.strokeRect(8, 8, size - 16, size - 16);
+
+  const cx = size * 0.5;
+  const cy = size * 0.5;
+
+  // Burnished brass outer bezel
+  const bezelGrad = ctx.createRadialGradient(cx - 30, cy - 30, 140, cx, cy, 212);
+  bezelGrad.addColorStop(0, '#f7dd7c');
+  bezelGrad.addColorStop(0.75, '#cfa032');
+  bezelGrad.addColorStop(1, '#7a5914');
+  ctx.fillStyle = bezelGrad;
+  ctx.beginPath();
+  ctx.arc(cx, cy, 208, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Luminous cream-white enamel dial
+  const dialGrad = ctx.createRadialGradient(cx, cy, 10, cx, cy, 184);
+  dialGrad.addColorStop(0, '#fffdf5');
+  dialGrad.addColorStop(0.85, '#f6eed8');
+  dialGrad.addColorStop(1, '#e0d2b0');
+  ctx.fillStyle = dialGrad;
+  ctx.beginPath();
+  ctx.arc(cx, cy, 184, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Minute ring & Roman hour ticks
+  ctx.strokeStyle = '#25262a';
+  ctx.lineWidth = 4;
+  ctx.beginPath();
+  ctx.arc(cx, cy, 168, 0, Math.PI * 2);
+  ctx.stroke();
+
+  const romans = ['XII', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X', 'XI'];
+  ctx.fillStyle = '#1b1d22';
+  ctx.font = 'bold 34px Georgia, serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  for (let h = 0; h < 12; h++) {
+    const a = (h / 12) * Math.PI * 2 - Math.PI * 0.5;
+    ctx.strokeStyle = '#25262a';
+    ctx.lineWidth = 5;
+    ctx.beginPath();
+    ctx.moveTo(cx + Math.cos(a) * 158, cy + Math.sin(a) * 158);
+    ctx.lineTo(cx + Math.cos(a) * 172, cy + Math.sin(a) * 172);
+    ctx.stroke();
+
+    ctx.fillText(romans[h], cx + Math.cos(a) * 130, cy + Math.sin(a) * 130);
+  }
+
+  // Ornate Edwardian wrought-iron hands (pointing cleanly to 10:10)
+  ctx.strokeStyle = '#14161a';
+  ctx.lineCap = 'round';
+  ctx.lineWidth = 14;
+  ctx.beginPath();
+  ctx.moveTo(cx, cy);
+  ctx.lineTo(cx - 78, cy - 52);
+  ctx.stroke();
+
+  ctx.lineWidth = 10;
+  ctx.beginPath();
+  ctx.moveTo(cx, cy);
+  ctx.lineTo(cx + 104, cy - 68);
+  ctx.stroke();
+
+  // Central brass boss pin
+  ctx.fillStyle = '#e6b83e';
+  ctx.beginPath();
+  ctx.arc(cx, cy, 16, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Roughness & height maps: glossy enamel dial & polished brass bezel, matte limestone surround
+  const height = new Float32Array(size * size);
+  const rImg = rCtx.createImageData(size, size);
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const i = y * size + x;
+      const d = Math.hypot(x - cx, y - cy);
+      let hVal = 0.45;
+      let rVal = 0.84;
+      if (d <= 184) {
+        hVal = 0.56;
+        rVal = 0.28;
+      } else if (d <= 208) {
+        hVal = 0.88;
+        rVal = 0.32;
+      }
+      height[i] = hVal;
+      const rvByte = Math.round(rVal * 255);
+      const idx = i * 4;
+      rImg.data[idx] = rvByte;
+      rImg.data[idx + 1] = rvByte;
+      rImg.data[idx + 2] = rvByte;
+      rImg.data[idx + 3] = 255;
+    }
+  }
+  rCtx.putImageData(rImg, 0, 0);
+  const normalCanvas = buildSobelNormalCanvas(height, size, 3.0);
+
+  return {
+    map: wrapTexture(albedoCanvas, { isColor: true, anisotropy: aniso }),
+    normalMap: wrapTexture(normalCanvas, { isColor: false, anisotropy: aniso }),
+    roughnessMap: wrapTexture(roughCanvas, { isColor: false, anisotropy: aniso }),
+  };
+}
+
+/** 512x512 English Village Cobblestone Lane Block PBR (Albedo + Normal + Roughness) */
+function buildEnglishCobbleBlockPBR(anisotropy) {
+  const size = 512;
+  const albedoCanvas = makeCanvas(size);
+  const roughCanvas = makeCanvas(size);
+  const ctx = albedoCanvas.getContext('2d');
+  const rCtx = roughCanvas.getContext('2d');
+  const img = ctx.createImageData(size, size);
+  const rImg = rCtx.createImageData(size, size);
+  const height = new Float32Array(size * size);
+  const aniso = Math.min(4, anisotropy || 4);
+
+  for (let y = 0; y < size; y++) {
+    const v = y / size;
+    for (let x = 0; x < size; x++) {
+      const u = x / size;
+      const i = y * size + x;
+      const sett = tileWorley(u * 1.1, v * 1.4, 7, 11527);
+      const grain = tileFBM(u, v, 12, 3, 11549);
+      const micro = hash2i(x, y, 11579);
+
+      const joint = 1.0 - smoothstep(0.03, 0.11, sett.edge);
+      let r = lerp(136, 178, sett.id) + (grain - 0.5) * 18 + (micro - 0.5) * 9;
+      let g = lerp(130, 170, sett.id) + (grain - 0.5) * 18 + (micro - 0.5) * 9;
+      let b = lerp(118, 154, sett.id) + (grain - 0.5) * 16 + (micro - 0.5) * 9;
+
+      r = lerp(r, 88, joint * 0.78);
+      g = lerp(g, 84, joint * 0.78);
+      b = lerp(b, 70, joint * 0.78);
+
+      height[i] = clamp01(0.66 - joint * 0.44 + (grain - 0.5) * 0.14);
+
+      const idx = i * 4;
+      img.data[idx] = Math.min(255, Math.max(0, Math.round(r)));
+      img.data[idx + 1] = Math.min(255, Math.max(0, Math.round(g)));
+      img.data[idx + 2] = Math.min(255, Math.max(0, Math.round(b)));
+      img.data[idx + 3] = 255;
+
+      const rvByte = Math.round(clamp01(0.78 + joint * 0.18) * 255);
+      rImg.data[idx] = rvByte;
+      rImg.data[idx + 1] = rvByte;
+      rImg.data[idx + 2] = rvByte;
+      rImg.data[idx + 3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  rCtx.putImageData(rImg, 0, 0);
+  const normalCanvas = buildSobelNormalCanvas(height, size, 3.2);
+  return {
+    map: wrapTexture(albedoCanvas, { isColor: true, anisotropy: aniso }),
+    normalMap: wrapTexture(normalCanvas, { isColor: false, anisotropy: aniso }),
+    roughnessMap: wrapTexture(roughCanvas, { isColor: false, anisotropy: aniso }),
+  };
+}
+
+/** 512x512 Raw Cotswold Honey-Limestone & Brick-Clay Quarry Rock PBR */
+function buildEnglishRawQuarryPBR(anisotropy) {
+  const size = 512;
+  const albedoCanvas = makeCanvas(size);
+  const roughCanvas = makeCanvas(size);
+  const ctx = albedoCanvas.getContext('2d');
+  const rCtx = roughCanvas.getContext('2d');
+  const img = ctx.createImageData(size, size);
+  const rImg = rCtx.createImageData(size, size);
+  const height = new Float32Array(size * size);
+  const aniso = Math.min(4, anisotropy || 4);
+
+  for (let y = 0; y < size; y++) {
+    const v = y / size;
+    for (let x = 0; x < size; x++) {
+      const u = x / size;
+      const i = y * size + x;
+      const vor = tileWorley(u, v, 8, 11593);
+      const strata = tileFBM(u * 1.4, v * 2.8, 8, 3, 11617);
+      const clayBand = smoothstep(0.58, 0.84, tileFBM(u, v * 1.8, 5, 3, 11633));
+      const micro = hash2i(x, y, 11657);
+
+      const crack = 1.0 - smoothstep(0.02, 0.088, vor.edge);
+      const lum = lerp(164, 218, vor.id * 0.45 + strata * 0.55) - crack * 48 + (micro - 0.5) * 14;
+
+      let r = lum * 1.02;
+      let g = lum * 0.9;
+      let b = lum * 0.68;
+
+      // Terracotta clay vein streaks running through the honey limestone
+      r = lerp(r, 158, clayBand * 0.45);
+      g = lerp(g, 82, clayBand * 0.45);
+      b = lerp(b, 58, clayBand * 0.45);
+
+      height[i] = clamp01(0.62 - crack * 0.46 + (strata - 0.5) * 0.24);
+
+      const idx = i * 4;
+      img.data[idx] = Math.min(255, Math.max(0, Math.round(r)));
+      img.data[idx + 1] = Math.min(255, Math.max(0, Math.round(g)));
+      img.data[idx + 2] = Math.min(255, Math.max(0, Math.round(b)));
+      img.data[idx + 3] = 255;
+
+      const rvByte = Math.round(clamp01(0.86 + crack * 0.12) * 255);
+      rImg.data[idx] = rvByte;
+      rImg.data[idx + 1] = rvByte;
+      rImg.data[idx + 2] = rvByte;
+      rImg.data[idx + 3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  rCtx.putImageData(rImg, 0, 0);
+  const normalCanvas = buildSobelNormalCanvas(height, size, 3.8);
   return {
     map: wrapTexture(albedoCanvas, { isColor: true, anisotropy: aniso }),
     normalMap: wrapTexture(normalCanvas, { isColor: false, anisotropy: aniso }),

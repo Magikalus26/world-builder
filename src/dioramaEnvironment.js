@@ -203,6 +203,25 @@ export const BIOME_ATMOSPHERES = {
     particleStyle: 'dust',
     particleCount: 40,
   },
+  english: {
+    id: 'english',
+    skyTop: '#5b9cd4',
+    skyHorizon: '#e4eff6',
+    skyBottom: '#bdd4b2',
+    fogColor: '#dceaf2',
+    fogNear: 54,
+    fogFar: 120,
+    sunColor: '#fff5d8',
+    sunIntensity: 2.16,
+    hemiSky: '#f6fbff',
+    hemiGround: '#5d7c46',
+    hemiIntensity: 0.94,
+    rimColor: '#b0dcf4',
+    rimIntensity: 0.52,
+    particleColor: '#fff7d2',
+    particleStyle: 'dust',
+    particleCount: 38,
+  },
   worldmap: {
     id: 'worldmap',
     skyTop: '#67add6',
@@ -253,6 +272,7 @@ export function resolveBiomeConfig(levelIdOrTheme = 'egypt', overrides = null) {
     else if (s.includes('penitentiary') || s.includes('prison') || s.includes('1800')) key = 'penitentiary';
     else if (s.includes('coal') || s.includes('mine') || s.includes('charbon')) key = 'coalmine';
     else if (s.includes('modern') || s.includes('villa') || s.includes('contemp')) key = 'modern';
+    else if (s.includes('english') || s.includes('edwardian') || s.includes('anglais') || s.includes('cotswold')) key = 'english';
     else if (s.includes('viking') || s.includes('fjord') || s.includes('nordic') || s.includes('drakkar')) key = 'viking';
     else if (s.includes('castle') || s.includes('chateau') || s.includes('medieval') || s.includes('village')) key = 'medieval';
     else if (s.includes('museum') || s.includes('musee') || s.includes('beaux')) key = 'museum';

@@ -238,7 +238,13 @@ function computeAll100LevelCoords() {
       let x = ox * dir;
       // Center the grand Lv 100 Imperial Capital symmetrically at the Northern summit
       if (levelIdx === 99) x = 0.0;
-      coords[levelIdx] = { x, z: z0 + oz };
+      let z = z0 + oz;
+      // Generous open-water clearance between playable Hero Islands Level 11 & Level 12
+      if (levelIdx === 11) {
+        x = 8.1;
+        z = 58.6;
+      }
+      coords[levelIdx] = { x, z };
     }
   }
 
@@ -727,7 +733,7 @@ export class WorldMapScene {
    *    - Levels 10, 20, ..., 100: Grand 2.2x Village / City Milestone Islands
    * ========================================================================== */
   _buildAll100Nodes() {
-    // 1. Build the 10 full 3D Playable Hero Islands (Levels 1–9 + Level 11 Viking Village)
+    // 1. Build the 11 full 3D Playable Hero Islands (Levels 1–9 + Level 11 Viking + Level 12 English 1900)
     this._buildHeroEgyptIsland(this.levelCoords[0]);
     this._buildHeroRomeIsland(this.levelCoords[1]);
     this._buildHeroJapanIsland(this.levelCoords[2]);
@@ -738,13 +744,14 @@ export class WorldMapScene {
     this._buildHeroMedievalCastleIsland(this.levelCoords[7]);
     this._buildHeroMuseumIsland(this.levelCoords[8]);
     this._buildHeroVikingVillageIsland(this.levelCoords[10]);
+    this._buildHeroEnglishVillageIsland(this.levelCoords[11]);
 
-    // 2. Collect regular "Bientôt" nodes (80: Levels 12–99 non-10) and Milestone Village/City nodes (10)
+    // 2. Collect regular "Bientôt" nodes (Levels 13–99 non-10) and Milestone Village/City nodes (10)
     const regularEntries = [];
     const milestoneEntries = [];
 
     for (let i = 9; i < 100; i++) {
-      if (i === 10) continue; // Level 11 built as full playable Hero Viking Village island
+      if (i === 10 || i === 11) continue; // Levels 11 & 12 built as playable Hero Village islands
       const levelNum = i + 1;
       const chapterIdx = Math.floor(i / 10);
       const chapter = WORLD_CHAPTERS[chapterIdx];
@@ -2471,6 +2478,202 @@ export class WorldMapScene {
       focusDistance: 17.5,
       focusElevation: 42,
       focusAzimuth: 0.16,
+      group,
+      hitbox,
+      bounceTime: 0,
+    };
+
+    hitbox.userData.interact = { type: 'map-node', node };
+    this.nodes.push(node);
+  }
+
+  /**
+   * Level 12 — Angleterre 1900 : Le Village Anglais (UNLOCKED & PLAYABLE, Tier 1 Village)
+   */
+  _buildHeroEnglishVillageIsland(coord) {
+    const pos = new THREE.Vector3(coord.x, 0, coord.z);
+    const group = new THREE.Group();
+    group.position.copy(pos);
+    this.root.add(group);
+
+    // Sculpted lush Cotswold meadow mound + glowing golden unlocked ring
+    const moundGeo = this._trackGeo(createIslandMoundGeometry(1.88, 1.76, 0.64, 12.6, 22));
+    const meadowMat = this._trackMat(
+      new THREE.MeshStandardMaterial({ color: '#5d9344', roughness: 0.88, metalness: 0.02 })
+    );
+    const mound = new THREE.Mesh(moundGeo, meadowMat);
+    mound.position.y = 0.12;
+    mound.castShadow = true;
+    mound.receiveShadow = true;
+    group.add(mound);
+    this._addShoreFoamRing(group, 1.98, 1.86, 12.4);
+    this._addUnlockedGoldRing(group, 'level12_english_village', 2.02, 1.9, 12.8);
+
+    const brickMat = this._trackMat(
+      new THREE.MeshStandardMaterial({ color: '#a84736', roughness: 0.84 })
+    );
+    const honeyStoneMat = this._trackMat(
+      new THREE.MeshStandardMaterial({ color: '#dcc496', roughness: 0.84 })
+    );
+    const timberPlasterMat = this._trackMat(
+      new THREE.MeshStandardMaterial({ color: '#f0e8d4', roughness: 0.86 })
+    );
+    const slateMat = this._trackMat(
+      new THREE.MeshStandardMaterial({ color: '#464e5a', roughness: 0.56, metalness: 0.16 })
+    );
+    const dialMat = this._trackMat(
+      new THREE.MeshStandardMaterial({
+        color: '#fffdf2',
+        emissive: '#ffe9a8',
+        emissiveIntensity: 0.35,
+        roughness: 0.32,
+      })
+    );
+    const brassMat = this._trackMat(
+      new THREE.MeshStandardMaterial({ color: '#e6ba42', roughness: 0.3, metalness: 0.85 })
+    );
+    const greenMat = this._trackMat(
+      new THREE.MeshStandardMaterial({ color: '#1f5c3a', roughness: 0.62 })
+    );
+    const brookMat = this._trackMat(
+      new THREE.MeshStandardMaterial({
+        color: '#2ca4b8',
+        roughness: 0.14,
+        metalness: 0.16,
+        transparent: true,
+        opacity: 0.9,
+      })
+    );
+
+    // 1. Miniature Edwardian Village Clocktower (Focal Center-North Monument)
+    const tower = new THREE.Group();
+    tower.position.set(-0.18, 0.56, -0.34);
+
+    const tBase = new THREE.Mesh(this._trackGeo(new THREE.BoxGeometry(0.58, 0.24, 0.58)), honeyStoneMat);
+    tBase.position.y = 0.12;
+    tBase.castShadow = true;
+    tower.add(tBase);
+
+    const tShaft = new THREE.Mesh(this._trackGeo(new THREE.BoxGeometry(0.42, 0.72, 0.42)), brickMat);
+    tShaft.position.y = 0.56;
+    tShaft.castShadow = true;
+    tower.add(tShaft);
+
+    const tBelfry = new THREE.Mesh(this._trackGeo(new THREE.BoxGeometry(0.46, 0.28, 0.46)), honeyStoneMat);
+    tBelfry.position.y = 1.02;
+    tBelfry.castShadow = true;
+    tower.add(tBelfry);
+
+    // 4 Glowing White Clockfaces on N/S/E/W belfry faces
+    const dialGeo = this._trackGeo(new THREE.CylinderGeometry(0.11, 0.11, 0.03, 12));
+    [
+      [0, 1.02, 0.23, Math.PI * 0.5, 0],
+      [0, 1.02, -0.23, Math.PI * 0.5, 0],
+      [0.23, 1.02, 0, Math.PI * 0.5, Math.PI * 0.5],
+      [-0.23, 1.02, 0, Math.PI * 0.5, Math.PI * 0.5],
+    ].forEach(([dx, dy, dz, rx, rz]) => {
+      const d = new THREE.Mesh(dialGeo, dialMat);
+      d.position.set(dx, dy, dz);
+      d.rotation.set(rx, 0, rz);
+      tower.add(d);
+    });
+
+    const tSpire = new THREE.Mesh(this._trackGeo(new THREE.ConeGeometry(0.34, 0.62, 4)), slateMat);
+    tSpire.rotation.y = Math.PI * 0.25;
+    tSpire.position.y = 1.46;
+    tSpire.castShadow = true;
+    tower.add(tSpire);
+
+    const vane = new THREE.Mesh(this._trackGeo(new THREE.CylinderGeometry(0.014, 0.022, 0.26, 6)), brassMat);
+    vane.position.y = 1.84;
+    tower.add(vane);
+    group.add(tower);
+
+    // 2. Two Charming Miniature Brick & Half-Timbered English Cottages
+    [
+      [-0.78, 0.56, 0.34, 0.22],
+      [0.28, 0.56, 0.64, -0.18],
+    ].forEach(([cx, cy, cz, rot]) => {
+      const cot = new THREE.Group();
+      cot.position.set(cx, cy, cz);
+      cot.rotation.y = rot;
+      const gnd = new THREE.Mesh(this._trackGeo(new THREE.BoxGeometry(0.52, 0.16, 0.38)), brickMat);
+      gnd.position.y = 0.08;
+      gnd.castShadow = true;
+      cot.add(gnd);
+      const upper = new THREE.Mesh(this._trackGeo(new THREE.BoxGeometry(0.54, 0.16, 0.4)), timberPlasterMat);
+      upper.position.y = 0.24;
+      upper.castShadow = true;
+      cot.add(upper);
+      const roof = new THREE.Mesh(this._trackGeo(new THREE.ConeGeometry(0.38, 0.3, 4)), slateMat);
+      roof.rotation.y = Math.PI * 0.25;
+      roof.scale.set(1.16, 1.0, 0.88);
+      roof.position.y = 0.45;
+      roof.castShadow = true;
+      cot.add(roof);
+      group.add(cot);
+    });
+
+    // 3. Miniature Victorian White-and-Green Bandstand Gazebo in Center Green
+    const gaz = new THREE.Group();
+    gaz.position.set(-0.08, 0.56, 0.24);
+    const gBase = new THREE.Mesh(this._trackGeo(new THREE.CylinderGeometry(0.24, 0.26, 0.1, 8)), timberPlasterMat);
+    gBase.position.y = 0.05;
+    gaz.add(gBase);
+    const gRoof = new THREE.Mesh(this._trackGeo(new THREE.ConeGeometry(0.28, 0.24, 8)), greenMat);
+    gRoof.position.y = 0.32;
+    gRoof.castShadow = true;
+    gaz.add(gRoof);
+    group.add(gaz);
+
+    // 4. Miniature Turquoise Brook & Arched Cotswold Stone Footbridge on NE Flank
+    const brook = new THREE.Mesh(this._trackGeo(new THREE.BoxGeometry(0.42, 0.04, 1.35)), brookMat);
+    brook.position.set(0.76, 0.5, -0.18);
+    brook.rotation.y = 0.42;
+    group.add(brook);
+
+    const bridge = new THREE.Mesh(this._trackGeo(new THREE.BoxGeometry(0.62, 0.14, 0.28)), honeyStoneMat);
+    bridge.position.set(0.72, 0.58, -0.2);
+    bridge.rotation.y = 0.42;
+    bridge.castShadow = true;
+    group.add(bridge);
+
+    // 5. Miniature Broadleaf English Oaks
+    const oakMat = this._trackMat(new THREE.MeshStandardMaterial({ color: '#3b7a34', roughness: 0.86 }));
+    const oakGeo = this._trackGeo(new THREE.DodecahedronGeometry(0.24, 0));
+    [
+      [-1.12, 0.82, -0.48],
+      [-0.68, 0.84, -0.92],
+      [0.98, 0.78, 0.42],
+    ].forEach(([ox, oy, oz]) => {
+      const o = new THREE.Mesh(oakGeo, oakMat);
+      o.position.set(ox, oy, oz);
+      o.castShadow = true;
+      group.add(o);
+    });
+
+    const hitbox = new THREE.Mesh(
+      this._trackGeo(new THREE.CylinderGeometry(2.1, 2.2, 2.4, 10)),
+      this.mats.hitbox
+    );
+    hitbox.position.y = 1.1;
+    group.add(hitbox);
+
+    const node = {
+      id: 'level12_english_village',
+      levelIndex: 11,
+      levelNum: 12,
+      chapter: WORLD_CHAPTERS[1],
+      unlocked: true,
+      isMilestone: false,
+      title: 'Niveau 12 : Angleterre 1900 — Le Village Anglais (104 blocs)',
+      shortLabel: 'Village Anglais',
+      labelText: 'Niveau 12 • Jouable',
+      position: pos,
+      labelAnchor: new THREE.Vector3(pos.x, 2.75, pos.z),
+      focusDistance: 17.5,
+      focusElevation: 42,
+      focusAzimuth: 0.18,
       group,
       hitbox,
       bounceTime: 0,
