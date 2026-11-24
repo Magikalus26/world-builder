@@ -188,9 +188,11 @@ export class DecorationSystem {
     }
 
     const h =
-      this.level && typeof this.level.getTerrainHeight === 'function'
-        ? this.level.getTerrainHeight(x, z)
-        : 0;
+      this.level && typeof this.level.getDecorationElevation === 'function'
+        ? this.level.getDecorationElevation(x, z)
+        : this.level && typeof this.level.getTerrainHeight === 'function'
+          ? this.level.getTerrainHeight(x, z)
+          : 0;
     if (h < WATER_LEVEL + 0.08) return false;
 
     const mirrorX = (this.level && this.level.mirrorX) || 1;
@@ -475,9 +477,11 @@ export class DecorationSystem {
 
     const group = new THREE.Group();
     const groundY =
-      this.level && typeof this.level.getTerrainHeight === 'function'
-        ? this.level.getTerrainHeight(x, z)
-        : 0;
+      this.level && typeof this.level.getDecorationElevation === 'function'
+        ? this.level.getDecorationElevation(x, z)
+        : this.level && typeof this.level.getTerrainHeight === 'function'
+          ? this.level.getTerrainHeight(x, z)
+          : 0;
     group.position.set(x, groundY, z);
     group.rotation.y = rotY;
 

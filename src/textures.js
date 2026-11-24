@@ -3116,6 +3116,165 @@ export function createTextureLibrary(renderer) {
     return englishPack;
   }
 
+  let lagoonPack = null;
+  const lagoonTextures = [];
+  const lagoonMaterials = [];
+
+  function ensureLagoonPack() {
+    if (lagoonPack) return lagoonPack;
+
+    const riverGrass = buildLagoonRiverGrassPBR(anisotropy);
+    const beachSand = buildLagoonBeachSandPBR(anisotropy);
+    const quarryGravel = buildLagoonQuarryGravelPBR(anisotropy);
+    const sandbar = buildLagoonSandbarPBR(anisotropy);
+
+    const stiltPilings = buildStiltHardwoodPilingsPBR(anisotropy);
+    const bambooWalls = buildBambooReedWallsPBR(anisotropy);
+    const deckPlanks = buildSunBleachedDeckPlanksPBR(anisotropy);
+    const palmThatch = buildPalmThatchRoofPBR(anisotropy);
+    const rawLagoon = buildLagoonRawQuarryPBR(anisotropy);
+
+    [riverGrass, beachSand, quarryGravel, sandbar].forEach((b) => {
+      lagoonTextures.push(b.albedo, b.normalRough);
+    });
+    [stiltPilings, bambooWalls, deckPlanks, palmThatch, rawLagoon].forEach((pack) => {
+      if (pack.map) lagoonTextures.push(pack.map);
+      if (pack.normalMap) lagoonTextures.push(pack.normalMap);
+      if (pack.roughnessMap) lagoonTextures.push(pack.roughnessMap);
+    });
+
+    const lagoonTerrainSplat = createTerrainSplatMaterial({
+      sand: riverGrass,         // Biome 0: Lush riverbank grass & tropical ferns
+      earthPath: beachSand,     // Biome 1: Warm golden-sand beach shorelines & compacted paths
+      quarryDust: quarryGravel, // Biome 2: Compacted timber-and-gravel coastal quarry & workshop yard
+      oasisGrass: sandbar,      // Biome 3: Submerged turquoise-tinted lagoon sandbars & river pebbles
+    });
+    lagoonTerrainSplat.customProgramCacheKey = () => 'workd-builder-lagoon-terrain-splat-v1';
+
+    const lagoonWaterNormal = waterNormal.clone();
+    lagoonWaterNormal.wrapS = THREE.RepeatWrapping;
+    lagoonWaterNormal.wrapT = THREE.RepeatWrapping;
+    lagoonWaterNormal.repeat.set(6.5, 6.5);
+    lagoonWaterNormal.needsUpdate = true;
+    lagoonTextures.push(lagoonWaterNormal);
+
+    const lMats = {
+      terrainSplat: lagoonTerrainSplat,
+      stiltPilings: new THREE.MeshStandardMaterial({
+        map: stiltPilings.map,
+        normalMap: stiltPilings.normalMap,
+        normalScale: new THREE.Vector2(1.48, 1.48),
+        roughnessMap: stiltPilings.roughnessMap,
+        roughness: 0.84,
+        metalness: 0.04,
+      }),
+      bambooWalls: new THREE.MeshStandardMaterial({
+        map: bambooWalls.map,
+        normalMap: bambooWalls.normalMap,
+        normalScale: new THREE.Vector2(1.42, 1.42),
+        roughnessMap: bambooWalls.roughnessMap,
+        roughness: 0.82,
+        metalness: 0.03,
+      }),
+      bambooWallsWarm: new THREE.MeshStandardMaterial({
+        map: bambooWalls.map,
+        normalMap: bambooWalls.normalMap,
+        normalScale: new THREE.Vector2(1.38, 1.38),
+        roughnessMap: bambooWalls.roughnessMap,
+        color: new THREE.Color('#e6d2ae'),
+        roughness: 0.84,
+        metalness: 0.03,
+      }),
+      deckPlanks: new THREE.MeshStandardMaterial({
+        map: deckPlanks.map,
+        normalMap: deckPlanks.normalMap,
+        normalScale: new THREE.Vector2(1.38, 1.38),
+        roughnessMap: deckPlanks.roughnessMap,
+        roughness: 0.84,
+        metalness: 0.03,
+      }),
+      palmThatch: new THREE.MeshStandardMaterial({
+        map: palmThatch.map,
+        normalMap: palmThatch.normalMap,
+        normalScale: new THREE.Vector2(1.46, 1.46),
+        roughnessMap: palmThatch.roughnessMap,
+        roughness: 0.9,
+        metalness: 0.02,
+      }),
+      palmThatchDeep: new THREE.MeshStandardMaterial({
+        map: palmThatch.map,
+        normalMap: palmThatch.normalMap,
+        normalScale: new THREE.Vector2(1.44, 1.44),
+        roughnessMap: palmThatch.roughnessMap,
+        color: new THREE.Color('#c8a26a'),
+        roughness: 0.9,
+        metalness: 0.02,
+      }),
+      rawLagoonQuarry: new THREE.MeshStandardMaterial({
+        map: rawLagoon.map,
+        normalMap: rawLagoon.normalMap,
+        normalScale: new THREE.Vector2(1.58, 1.58),
+        roughnessMap: rawLagoon.roughnessMap,
+        roughness: 0.92,
+        metalness: 0.04,
+      }),
+      lagoonWater: new THREE.MeshStandardMaterial({
+        color: new THREE.Color('#14a9bc'),
+        normalMap: lagoonWaterNormal,
+        normalScale: new THREE.Vector2(0.46, 0.46),
+        roughness: 0.1,
+        metalness: 0.16,
+        envMapIntensity: 1.45,
+        transparent: true,
+        opacity: 0.86,
+      }),
+      hardwoodDark: new THREE.MeshStandardMaterial({
+        color: new THREE.Color('#4c331e'),
+        roughness: 0.86,
+        metalness: 0.04,
+      }),
+      ropeHemp: new THREE.MeshStandardMaterial({
+        color: new THREE.Color('#bfa16a'),
+        roughness: 0.92,
+        metalness: 0.02,
+      }),
+      reedGreen: new THREE.MeshStandardMaterial({
+        color: new THREE.Color('#3f7d42'),
+        roughness: 0.88,
+        metalness: 0.0,
+      }),
+      cattailBrown: new THREE.MeshStandardMaterial({
+        color: new THREE.Color('#5e3820'),
+        roughness: 0.9,
+      }),
+      lanternGlow: new THREE.MeshStandardMaterial({
+        color: new THREE.Color('#fff4c4'),
+        emissive: new THREE.Color('#ffaa2b'),
+        emissiveIntensity: 1.65,
+        roughness: 0.24,
+      }),
+      canoeWood: new THREE.MeshStandardMaterial({
+        color: new THREE.Color('#7a4b2a'),
+        roughness: 0.78,
+        metalness: 0.04,
+      }),
+      tribalBannerRed: new THREE.MeshStandardMaterial({
+        color: new THREE.Color('#c84432'),
+        roughness: 0.76,
+        side: THREE.DoubleSide,
+      }),
+      tribalBannerTeal: new THREE.MeshStandardMaterial({
+        color: new THREE.Color('#1d8a94'),
+        roughness: 0.76,
+        side: THREE.DoubleSide,
+      }),
+    };
+
+    Object.values(lMats).forEach((m) => lagoonMaterials.push(m));
+    lagoonPack = { materials: lMats };
+    return lagoonPack;
+  }
+
   return {
     maps: {
       blueprint: blueprintMap,
@@ -3135,6 +3294,7 @@ export function createTextureLibrary(renderer) {
     ensureMuseumPack,
     ensureVikingPack,
     ensureEnglishVillagePack,
+    ensureLagoonPack,
     dispose() {
       textures.forEach((t) => t.dispose());
       Object.values(materials).forEach((m) => m.dispose());
@@ -3158,6 +3318,8 @@ export function createTextureLibrary(renderer) {
       vikingMaterials.forEach((m) => m.dispose());
       englishTextures.forEach((t) => t.dispose());
       englishMaterials.forEach((m) => m.dispose());
+      lagoonTextures.forEach((t) => t.dispose());
+      lagoonMaterials.forEach((m) => m.dispose());
       materialFactory.dispose();
     },
   };
@@ -8809,6 +8971,515 @@ function buildEnglishRawQuarryPBR(anisotropy) {
       r = lerp(r, 158, clayBand * 0.45);
       g = lerp(g, 82, clayBand * 0.45);
       b = lerp(b, 58, clayBand * 0.45);
+
+      height[i] = clamp01(0.62 - crack * 0.46 + (strata - 0.5) * 0.24);
+
+      const idx = i * 4;
+      img.data[idx] = Math.min(255, Math.max(0, Math.round(r)));
+      img.data[idx + 1] = Math.min(255, Math.max(0, Math.round(g)));
+      img.data[idx + 2] = Math.min(255, Math.max(0, Math.round(b)));
+      img.data[idx + 3] = 255;
+
+      const rvByte = Math.round(clamp01(0.86 + crack * 0.12) * 255);
+      rImg.data[idx] = rvByte;
+      rImg.data[idx + 1] = rvByte;
+      rImg.data[idx + 2] = rvByte;
+      rImg.data[idx + 3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  rCtx.putImageData(rImg, 0, 0);
+  const normalCanvas = buildSobelNormalCanvas(height, size, 3.8);
+  return {
+    map: wrapTexture(albedoCanvas, { isColor: true, anisotropy: aniso }),
+    normalMap: wrapTexture(normalCanvas, { isColor: false, anisotropy: aniso }),
+    roughnessMap: wrapTexture(roughCanvas, { isColor: false, anisotropy: aniso }),
+  };
+}
+
+/* ============================================================================
+ * LEVEL 13 (LAKESIDE & LAGOON — LE VILLAGE SUR PILOTIS) — 512x512 LAGOON PBR
+ * ========================================================================== */
+
+/** Lagoon Biome 0: Lush Riverbank Grass & Tropical Ferns (512x512) */
+function buildLagoonRiverGrassPBR(anisotropy) {
+  const size = 512;
+  const albedoCanvas = makeCanvas(size);
+  const ctx = albedoCanvas.getContext('2d');
+  const img = ctx.createImageData(size, size);
+  const data = img.data;
+  const height = new Float32Array(size * size);
+  const rough = new Float32Array(size * size);
+  const aniso = Math.min(4, anisotropy || 4);
+
+  for (let y = 0; y < size; y++) {
+    const v = y / size;
+    for (let x = 0; x < size; x++) {
+      const u = x / size;
+      const i = y * size + x;
+      const macro = tileFBM(u, v, 5, 3, 12101);
+      const fern = tileFBM(u, v, 12, 3, 12119);
+      const blades = tileFBM(u * 2.5, v * 2.5, 22, 2, 12143);
+      const micro = hash2i(x, y, 12157);
+
+      let r = lerp(52, 96, macro) + (fern - 0.5) * 18 + (blades - 0.5) * 14;
+      let g = lerp(118, 168, macro) + (fern - 0.5) * 20 + (blades - 0.5) * 18;
+      let b = lerp(52, 86, macro) + (blades - 0.5) * 12;
+
+      height[i] = clamp01(0.46 + (blades - 0.5) * 0.34 + (macro - 0.5) * 0.14);
+      rough[i] = clamp01(0.88 + (0.5 - blades) * 0.08 + (micro - 0.5) * 0.04);
+
+      const idx = i * 4;
+      data[idx] = Math.min(255, Math.max(0, Math.round(r + (micro - 0.5) * 8)));
+      data[idx + 1] = Math.min(255, Math.max(0, Math.round(g + (micro - 0.5) * 8)));
+      data[idx + 2] = Math.min(255, Math.max(0, Math.round(b + (micro - 0.5) * 6)));
+      data[idx + 3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  const normalRoughCanvas = buildSobelNormalCanvas(height, size, 2.3, rough);
+  return {
+    albedo: wrapTexture(albedoCanvas, { isColor: true, anisotropy: aniso }),
+    normalRough: wrapTexture(normalRoughCanvas, { isColor: false, anisotropy: aniso }),
+  };
+}
+
+/** Lagoon Biome 1: Warm Golden-Sand Beach Shoreline & Compacted Earth Lanes (512x512) */
+function buildLagoonBeachSandPBR(anisotropy) {
+  const size = 512;
+  const albedoCanvas = makeCanvas(size);
+  const ctx = albedoCanvas.getContext('2d');
+  const img = ctx.createImageData(size, size);
+  const data = img.data;
+  const height = new Float32Array(size * size);
+  const rough = new Float32Array(size * size);
+  const aniso = Math.min(4, anisotropy || 4);
+
+  for (let y = 0; y < size; y++) {
+    const v = y / size;
+    for (let x = 0; x < size; x++) {
+      const u = x / size;
+      const i = y * size + x;
+      const dune = tileFBM(u, v, 6, 3, 12163);
+      const ripple = Math.sin((u * 12 + dune * 2.2) * Math.PI) * 0.5 + 0.5;
+      const grit = hash2i(x, y, 12197);
+
+      const r = lerp(212, 240, dune * 0.65 + ripple * 0.35) + (grit - 0.5) * 12;
+      const g = lerp(186, 216, dune * 0.65 + ripple * 0.35) + (grit - 0.5) * 11;
+      const b = lerp(136, 166, dune * 0.65 + ripple * 0.35) + (grit - 0.5) * 9;
+
+      height[i] = clamp01(0.42 + ripple * 0.24 + (dune - 0.5) * 0.16);
+      rough[i] = clamp01(0.86 + (grit - 0.5) * 0.08);
+
+      const idx = i * 4;
+      data[idx] = Math.min(255, Math.max(0, Math.round(r)));
+      data[idx + 1] = Math.min(255, Math.max(0, Math.round(g)));
+      data[idx + 2] = Math.min(255, Math.max(0, Math.round(b)));
+      data[idx + 3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  const normalRoughCanvas = buildSobelNormalCanvas(height, size, 2.0, rough);
+  return {
+    albedo: wrapTexture(albedoCanvas, { isColor: true, anisotropy: aniso }),
+    normalRough: wrapTexture(normalRoughCanvas, { isColor: false, anisotropy: aniso }),
+  };
+}
+
+/** Lagoon Biome 2: Compacted Coastal Quarry Gravel & Sawdust Yard (512x512) */
+function buildLagoonQuarryGravelPBR(anisotropy) {
+  const size = 512;
+  const albedoCanvas = makeCanvas(size);
+  const ctx = albedoCanvas.getContext('2d');
+  const img = ctx.createImageData(size, size);
+  const data = img.data;
+  const height = new Float32Array(size * size);
+  const rough = new Float32Array(size * size);
+  const aniso = Math.min(4, anisotropy || 4);
+
+  for (let y = 0; y < size; y++) {
+    const v = y / size;
+    for (let x = 0; x < size; x++) {
+      const u = x / size;
+      const i = y * size + x;
+      const dust = tileFBM(u, v, 8, 3, 12211);
+      const chips = tileWorley(u, v, 18, 12227);
+      const grit = hash2i(x, y, 12241);
+
+      const chip = 1.0 - smoothstep(0.06, 0.25, chips.f1);
+      const r = lerp(142, 184, dust) + chip * 14 + (grit - 0.5) * 14;
+      const g = lerp(136, 174, dust) + chip * 12 + (grit - 0.5) * 13;
+      const b = lerp(120, 152, dust) + chip * 10 + (grit - 0.5) * 12;
+
+      height[i] = clamp01(0.42 + chip * 0.3 + (dust - 0.5) * 0.18);
+      rough[i] = clamp01(0.89 - chip * 0.08);
+
+      const idx = i * 4;
+      data[idx] = Math.min(255, Math.max(0, Math.round(r)));
+      data[idx + 1] = Math.min(255, Math.max(0, Math.round(g)));
+      data[idx + 2] = Math.min(255, Math.max(0, Math.round(b)));
+      data[idx + 3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  const normalRoughCanvas = buildSobelNormalCanvas(height, size, 2.5, rough);
+  return {
+    albedo: wrapTexture(albedoCanvas, { isColor: true, anisotropy: aniso }),
+    normalRough: wrapTexture(normalRoughCanvas, { isColor: false, anisotropy: aniso }),
+  };
+}
+
+/** Lagoon Biome 3: Submerged Turquoise-Tinted Golden Lagoon Sandbars (512x512) */
+function buildLagoonSandbarPBR(anisotropy) {
+  const size = 512;
+  const albedoCanvas = makeCanvas(size);
+  const ctx = albedoCanvas.getContext('2d');
+  const img = ctx.createImageData(size, size);
+  const data = img.data;
+  const height = new Float32Array(size * size);
+  const rough = new Float32Array(size * size);
+  const aniso = Math.min(4, anisotropy || 4);
+
+  for (let y = 0; y < size; y++) {
+    const v = y / size;
+    for (let x = 0; x < size; x++) {
+      const u = x / size;
+      const i = y * size + x;
+      const wave = tileFBM(u, v, 6, 3, 12253);
+      const caustics = Math.sin((u * 10 + v * 6 + wave * 2.5) * Math.PI) * 0.5 + 0.5;
+      const peb = tileWorley(u, v, 16, 12269);
+      const grit = hash2i(x, y, 12281);
+
+      const r = lerp(128, 186, wave * 0.6 + caustics * 0.4) + (grit - 0.5) * 10;
+      const g = lerp(176, 214, wave * 0.6 + caustics * 0.4) + (grit - 0.5) * 10;
+      const b = lerp(164, 198, wave * 0.6 + caustics * 0.4) + (grit - 0.5) * 9;
+
+      height[i] = clamp01(0.38 + caustics * 0.24 + (1.0 - peb.f1) * 0.16);
+      rough[i] = clamp01(0.72 + (grit - 0.5) * 0.08);
+
+      const idx = i * 4;
+      data[idx] = Math.min(255, Math.max(0, Math.round(r)));
+      data[idx + 1] = Math.min(255, Math.max(0, Math.round(g)));
+      data[idx + 2] = Math.min(255, Math.max(0, Math.round(b)));
+      data[idx + 3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  const normalRoughCanvas = buildSobelNormalCanvas(height, size, 2.1, rough);
+  return {
+    albedo: wrapTexture(albedoCanvas, { isColor: true, anisotropy: aniso }),
+    normalRough: wrapTexture(normalRoughCanvas, { isColor: false, anisotropy: aniso }),
+  };
+}
+
+/** 512x512 Weathered Hardwood Stilt Pilings (Pilotis en Bois Exotique) PBR */
+function buildStiltHardwoodPilingsPBR(anisotropy) {
+  const size = 512;
+  const albedoCanvas = makeCanvas(size);
+  const roughCanvas = makeCanvas(size);
+  const ctx = albedoCanvas.getContext('2d');
+  const rCtx = roughCanvas.getContext('2d');
+  const img = ctx.createImageData(size, size);
+  const rImg = rCtx.createImageData(size, size);
+  const height = new Float32Array(size * size);
+  const aniso = Math.min(4, anisotropy || 4);
+
+  const posts = 4;
+  for (let y = 0; y < size; y++) {
+    const v = y / size;
+    // Horizontal hemp rope lashing bands near top & bottom of pilings
+    const ropeBand = Math.max(
+      1.0 - smoothstep(0.03, 0.08, Math.abs(v - 0.16)),
+      1.0 - smoothstep(0.03, 0.08, Math.abs(v - 0.84))
+    );
+    for (let x = 0; x < size; x++) {
+      const u = x / size;
+      const i = y * size + x;
+      const pIdx = Math.floor(u * posts);
+      const pu = (u * posts) % 1;
+      const cyl = Math.sin(pu * Math.PI);
+      const seam = 1.0 - smoothstep(0.0, 0.1, Math.min(pu, 1.0 - pu));
+
+      const tone = hash2i(pIdx + 5, 17, 12301);
+      const bark = tileFBM(u * 8.0, v * 1.4, 12, 3, 12323);
+      const micro = hash2i(x, y, 12343);
+
+      // Rich weathered tropical ironwood / dark teak pilings
+      let r = lerp(74, 118, tone * 0.4 + bark * 0.35 + cyl * 0.25) + (micro - 0.5) * 10;
+      let g = lerp(52, 84, tone * 0.4 + bark * 0.35 + cyl * 0.25) + (micro - 0.5) * 8;
+      let b = lerp(34, 54, tone * 0.4 + bark * 0.35 + cyl * 0.25) + (micro - 0.5) * 7;
+
+      // Subtle mossy waterline sheen on lower third
+      const moss = smoothstep(0.68, 0.96, v) * smoothstep(0.4, 0.78, bark);
+      r = lerp(r, 56, moss * 0.55);
+      g = lerp(g, 92, moss * 0.55);
+      b = lerp(b, 54, moss * 0.55);
+
+      // Hemp rope lashing stripes
+      const ropeTwist = Math.sin((u * 26 + v * 12) * Math.PI) * 0.5 + 0.5;
+      r = lerp(r, lerp(164, 206, ropeTwist), ropeBand * 0.88);
+      g = lerp(g, lerp(136, 174, ropeTwist), ropeBand * 0.88);
+      b = lerp(b, lerp(86, 116, ropeTwist), ropeBand * 0.88);
+
+      r = lerp(r, 28, seam * 0.78 * (1.0 - ropeBand));
+      g = lerp(g, 20, seam * 0.78 * (1.0 - ropeBand));
+      b = lerp(b, 14, seam * 0.78 * (1.0 - ropeBand));
+
+      height[i] = clamp01(0.2 + cyl * 0.55 + (bark - 0.5) * 0.14 + ropeBand * 0.22 - seam * 0.28);
+
+      const idx = i * 4;
+      img.data[idx] = Math.min(255, Math.max(0, Math.round(r)));
+      img.data[idx + 1] = Math.min(255, Math.max(0, Math.round(g)));
+      img.data[idx + 2] = Math.min(255, Math.max(0, Math.round(b)));
+      img.data[idx + 3] = 255;
+
+      const rvByte = Math.round(clamp01(0.8 + seam * 0.16 + ropeBand * 0.12) * 255);
+      rImg.data[idx] = rvByte;
+      rImg.data[idx + 1] = rvByte;
+      rImg.data[idx + 2] = rvByte;
+      rImg.data[idx + 3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  rCtx.putImageData(rImg, 0, 0);
+  const normalCanvas = buildSobelNormalCanvas(height, size, 3.5);
+  return {
+    map: wrapTexture(albedoCanvas, { isColor: true, anisotropy: aniso }),
+    normalMap: wrapTexture(normalCanvas, { isColor: false, anisotropy: aniso }),
+    roughnessMap: wrapTexture(roughCanvas, { isColor: false, anisotropy: aniso }),
+  };
+}
+
+/** 512x512 Bamboo & Woven Reed Wall Panels PBR (Albedo + Normal + Roughness) */
+function buildBambooReedWallsPBR(anisotropy) {
+  const size = 512;
+  const albedoCanvas = makeCanvas(size);
+  const roughCanvas = makeCanvas(size);
+  const ctx = albedoCanvas.getContext('2d');
+  const rCtx = roughCanvas.getContext('2d');
+  const img = ctx.createImageData(size, size);
+  const rImg = rCtx.createImageData(size, size);
+  const height = new Float32Array(size * size);
+  const aniso = Math.min(4, anisotropy || 4);
+
+  const reeds = 14;
+  for (let y = 0; y < size; y++) {
+    const v = y / size;
+    const isFrameV = Math.min(v, 1.0 - v) < 0.068 || Math.abs(v - 0.5) < 0.032;
+    for (let x = 0; x < size; x++) {
+      const u = x / size;
+      const i = y * size + x;
+      const isFrameU = Math.min(u, 1.0 - u) < 0.068;
+      const grain = tileFBM(u * 4.0, v * 4.0, 12, 2, 12377);
+      const micro = hash2i(x, y, 12391);
+
+      let r;
+      let g;
+      let b;
+      let h;
+      let roughVal;
+
+      if (isFrameU || isFrameV) {
+        // Dark exotic timber frame posts & cross rails
+        r = lerp(72, 102, grain) + (micro - 0.5) * 9;
+        g = lerp(48, 70, grain) + (micro - 0.5) * 8;
+        b = lerp(28, 44, grain) + (micro - 0.5) * 7;
+        h = clamp01(0.76 + (grain - 0.5) * 0.14);
+        roughVal = 0.8;
+      } else {
+        // Woven golden bamboo culms + horizontal reed weave
+        const col = Math.floor(u * reeds);
+        const cu = (u * reeds) % 1;
+        const row = Math.floor(v * reeds);
+        const rv = (v * reeds) % 1;
+        const weave = (col + row) % 2 === 0 ? Math.sin(cu * Math.PI) : Math.sin(rv * Math.PI);
+        const tone = hash2i(col + 3, row + 9, 12409);
+
+        r = lerp(186, 224, tone * 0.35 + weave * 0.5 + grain * 0.15) + (micro - 0.5) * 9;
+        g = lerp(152, 190, tone * 0.35 + weave * 0.5 + grain * 0.15) + (micro - 0.5) * 8;
+        b = lerp(96, 128, tone * 0.35 + weave * 0.5 + grain * 0.15) + (micro - 0.5) * 7;
+        h = clamp01(0.28 + weave * 0.44 + (grain - 0.5) * 0.1);
+        roughVal = 0.82 - weave * 0.1;
+      }
+
+      height[i] = h;
+      const idx = i * 4;
+      img.data[idx] = Math.min(255, Math.max(0, Math.round(r)));
+      img.data[idx + 1] = Math.min(255, Math.max(0, Math.round(g)));
+      img.data[idx + 2] = Math.min(255, Math.max(0, Math.round(b)));
+      img.data[idx + 3] = 255;
+
+      const rvByte = Math.round(clamp01(roughVal + (micro - 0.5) * 0.05) * 255);
+      rImg.data[idx] = rvByte;
+      rImg.data[idx + 1] = rvByte;
+      rImg.data[idx + 2] = rvByte;
+      rImg.data[idx + 3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  rCtx.putImageData(rImg, 0, 0);
+  const normalCanvas = buildSobelNormalCanvas(height, size, 3.4);
+  return {
+    map: wrapTexture(albedoCanvas, { isColor: true, anisotropy: aniso }),
+    normalMap: wrapTexture(normalCanvas, { isColor: false, anisotropy: aniso }),
+    roughnessMap: wrapTexture(roughCanvas, { isColor: false, anisotropy: aniso }),
+  };
+}
+
+/** 512x512 Sun-Bleached Wooden Deck Planks (Pontons) PBR (Albedo + Normal + Roughness) */
+function buildSunBleachedDeckPlanksPBR(anisotropy) {
+  const size = 512;
+  const albedoCanvas = makeCanvas(size);
+  const roughCanvas = makeCanvas(size);
+  const ctx = albedoCanvas.getContext('2d');
+  const rCtx = roughCanvas.getContext('2d');
+  const img = ctx.createImageData(size, size);
+  const rImg = rCtx.createImageData(size, size);
+  const height = new Float32Array(size * size);
+  const aniso = Math.min(4, anisotropy || 4);
+
+  const planks = 6;
+  for (let y = 0; y < size; y++) {
+    const v = y / size;
+    const pIdx = Math.floor(v * planks);
+    const pv = (v * planks) % 1;
+    const gap = 1.0 - smoothstep(0.0, 0.085, Math.min(pv, 1.0 - pv));
+
+    for (let x = 0; x < size; x++) {
+      const u = x / size;
+      const i = y * size + x;
+      const tone = hash2i(pIdx + 11, 29, 12433);
+      const grain = tileFBM(u * 0.8, v * 9.0 + pIdx * 0.41, 12, 3, 12451);
+      const micro = hash2i(x, y, 12473);
+
+      // Sun-bleached driftwood honey-silver pier deck planks
+      let r = lerp(152, 196, tone * 0.55 + grain * 0.45) + (micro - 0.5) * 10;
+      let g = lerp(128, 168, tone * 0.55 + grain * 0.45) + (micro - 0.5) * 9;
+      let b = lerp(96, 132, tone * 0.55 + grain * 0.45) + (micro - 0.5) * 8;
+
+      // Dark plank gap showing lagoon shadow underneath
+      r = lerp(r, 42, gap * 0.84);
+      g = lerp(g, 38, gap * 0.84);
+      b = lerp(b, 32, gap * 0.84);
+
+      height[i] = clamp01(0.64 + (grain - 0.5) * 0.16 - gap * 0.46);
+
+      const idx = i * 4;
+      img.data[idx] = Math.min(255, Math.max(0, Math.round(r)));
+      img.data[idx + 1] = Math.min(255, Math.max(0, Math.round(g)));
+      img.data[idx + 2] = Math.min(255, Math.max(0, Math.round(b)));
+      img.data[idx + 3] = 255;
+
+      const rvByte = Math.round(clamp01(0.82 + gap * 0.14 + (0.5 - grain) * 0.08) * 255);
+      rImg.data[idx] = rvByte;
+      rImg.data[idx + 1] = rvByte;
+      rImg.data[idx + 2] = rvByte;
+      rImg.data[idx + 3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  rCtx.putImageData(rImg, 0, 0);
+  const normalCanvas = buildSobelNormalCanvas(height, size, 3.3);
+  return {
+    map: wrapTexture(albedoCanvas, { isColor: true, anisotropy: aniso }),
+    normalMap: wrapTexture(normalCanvas, { isColor: false, anisotropy: aniso }),
+    roughnessMap: wrapTexture(roughCanvas, { isColor: false, anisotropy: aniso }),
+  };
+}
+
+/** 512x512 Steep Palm-Thatch & Reed Stilt Roof PBR (Albedo + Normal + Roughness) */
+function buildPalmThatchRoofPBR(anisotropy) {
+  const size = 512;
+  const albedoCanvas = makeCanvas(size);
+  const roughCanvas = makeCanvas(size);
+  const ctx = albedoCanvas.getContext('2d');
+  const rCtx = roughCanvas.getContext('2d');
+  const img = ctx.createImageData(size, size);
+  const rImg = rCtx.createImageData(size, size);
+  const height = new Float32Array(size * size);
+  const aniso = Math.min(4, anisotropy || 4);
+
+  const courses = 7;
+  for (let y = 0; y < size; y++) {
+    const v = y / size;
+    const course = Math.floor(v * courses);
+    const cv = (v * courses) % 1;
+    const layerEdge = 1.0 - smoothstep(0.0, 0.16, 1.0 - cv);
+
+    for (let x = 0; x < size; x++) {
+      const u = x / size;
+      const i = y * size + x;
+      const frond = tileFBM(u * 14.0, v * 3.0 + course * 0.37, 14, 2, 12491);
+      const bundle = tileFBM(u * 4.0, v * 2.0, 8, 3, 12503);
+      const micro = hash2i(x, y, 12527);
+
+      // Sun-baked golden-amber tropical palm thatch with layered overhanging courses
+      let r = lerp(164, 218, frond * 0.55 + bundle * 0.45) + (micro - 0.5) * 14;
+      let g = lerp(124, 174, frond * 0.55 + bundle * 0.45) + (micro - 0.5) * 12;
+      let b = lerp(62, 98, frond * 0.55 + bundle * 0.45) + (micro - 0.5) * 10;
+
+      // Deep warm shadow under each overlapping thatch course
+      r *= 1.0 - layerEdge * 0.44;
+      g *= 1.0 - layerEdge * 0.44;
+      b *= 1.0 - layerEdge * 0.44;
+
+      height[i] = clamp01(0.32 + (1.0 - cv) * 0.38 + (frond - 0.5) * 0.24 - layerEdge * 0.26);
+
+      const idx = i * 4;
+      img.data[idx] = Math.min(255, Math.max(0, Math.round(r)));
+      img.data[idx + 1] = Math.min(255, Math.max(0, Math.round(g)));
+      img.data[idx + 2] = Math.min(255, Math.max(0, Math.round(b)));
+      img.data[idx + 3] = 255;
+
+      const rvByte = Math.round(clamp01(0.86 + layerEdge * 0.1 + (0.5 - frond) * 0.08) * 255);
+      rImg.data[idx] = rvByte;
+      rImg.data[idx + 1] = rvByte;
+      rImg.data[idx + 2] = rvByte;
+      rImg.data[idx + 3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  rCtx.putImageData(rImg, 0, 0);
+  const normalCanvas = buildSobelNormalCanvas(height, size, 3.6);
+  return {
+    map: wrapTexture(albedoCanvas, { isColor: true, anisotropy: aniso }),
+    normalMap: wrapTexture(normalCanvas, { isColor: false, anisotropy: aniso }),
+    roughnessMap: wrapTexture(roughCanvas, { isColor: false, anisotropy: aniso }),
+  };
+}
+
+/** 512x512 Coastal Grey-Stone & Hardwood Raw Quarry Resource PBR */
+function buildLagoonRawQuarryPBR(anisotropy) {
+  const size = 512;
+  const albedoCanvas = makeCanvas(size);
+  const roughCanvas = makeCanvas(size);
+  const ctx = albedoCanvas.getContext('2d');
+  const rCtx = roughCanvas.getContext('2d');
+  const img = ctx.createImageData(size, size);
+  const rImg = rCtx.createImageData(size, size);
+  const height = new Float32Array(size * size);
+  const aniso = Math.min(4, anisotropy || 4);
+
+  for (let y = 0; y < size; y++) {
+    const v = y / size;
+    for (let x = 0; x < size; x++) {
+      const u = x / size;
+      const i = y * size + x;
+      const vor = tileWorley(u, v, 8, 12547);
+      const strata = tileFBM(u * 1.5, v * 2.6, 8, 3, 12569);
+      const moss = smoothstep(0.62, 0.88, tileFBM(u, v, 7, 3, 12583));
+      const micro = hash2i(x, y, 12601);
+
+      const crack = 1.0 - smoothstep(0.02, 0.09, vor.edge);
+      const lum = lerp(112, 168, vor.id * 0.45 + strata * 0.55) - crack * 48 + (micro - 0.5) * 14;
+
+      let r = lum * 0.98;
+      let g = lum * 0.96;
+      let b = lum * 0.9;
+
+      r = lerp(r, 78, moss * 0.42);
+      g = lerp(g, 114, moss * 0.42);
+      b = lerp(b, 68, moss * 0.42);
 
       height[i] = clamp01(0.62 - crack * 0.46 + (strata - 0.5) * 0.24);
 

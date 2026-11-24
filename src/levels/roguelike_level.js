@@ -1129,6 +1129,116 @@ export const ROGUELIKE_THEMES = [
       },
     ],
   },
+  {
+    id: 'stilt_village',
+    levelNum: 13,
+    shortName: 'Village sur Pilotis',
+    title: 'Niveau 13 : Village sur Pilotis — Lagon & Rivière',
+    biomeLabel: 'Pilotis en Bois Dur, Bambou Tressé, Pontons & Chaume de Palmier',
+    skyColor: '#d2eff5',
+    terrainTint: '#62b89e',
+    stoneTint: '#cfa977',
+    accentColor: '#1ea9b8',
+    rewardRangeLabel: '+35 à +55 Éclats',
+    structures: [
+      {
+        id: 'stilt_chief_lodge',
+        name: 'La Grande Maison du Chef sur Pilotis',
+        subtitle: 'Grande maison lacustre sur pilotis, véranda en bois & double toit de chaume',
+        // 12 + 8 + 6 + 2 = 28 blocks
+        layers: [
+          { cells: makeRectCells(4, 3) },
+          {
+            cells: [
+              [-1.5, -1], [-0.5, -1], [0.5, -1], [1.5, -1],
+              [-1.5, 1], [-0.5, 1], [0.5, 1], [1.5, 1],
+            ],
+          },
+          { cells: makeRectCells(3, 2) },
+          { cells: [[-0.5, 0], [0.5, 0]] },
+        ],
+      },
+      {
+        id: 'stilt_lakeside_hamlet',
+        name: 'Le Hameau Lacustre & Pontons',
+        subtitle: 'Cabanes en bambou reliées par un réseau de pontons sur le lagon turquoise',
+        // 14 + 12 + 8 = 34 blocks
+        layers: [
+          {
+            cells: [
+              [-2, -1], [-1, -1], [-2, 0], [-1, 0],
+              [1, -1], [2, -1], [1, 0], [2, 0],
+              [0, -1], [0, 0], [0, 1],
+              [-1, 1], [1, 1], [0, 2],
+            ],
+          },
+          {
+            cells: [
+              [-2, -1], [-1, -1], [-2, 0], [-1, 0],
+              [1, -1], [2, -1], [1, 0], [2, 0],
+              [-1, 1], [0, 1], [1, 1], [0, 2],
+            ],
+          },
+          {
+            cells: [
+              [-2, -0.5], [-1, -0.5],
+              [1, -0.5], [2, -0.5],
+              [-1, 1], [0, 1], [1, 1], [0, 2],
+            ],
+          },
+        ],
+      },
+      {
+        id: 'stilt_lagoon_watchtower',
+        name: 'La Tour de Guet du Lagon',
+        subtitle: 'Haute vigie en bois sur pilotis, balcon panoramique & fanal lumineux',
+        // 9 + 4 + 4 + 4 + 2 + 1 = 24 blocks
+        layers: [
+          { cells: makeRectCells(3, 3) },
+          { cells: makeRectCells(2, 2) },
+          { cells: makeRectCells(2, 2) },
+          { cells: makeRectCells(2, 2) },
+          { cells: [[-0.5, 0], [0.5, 0]] },
+          { cells: [[0, 0]], isCapstone: true },
+        ],
+      },
+      {
+        id: 'stilt_floating_market',
+        name: 'Le Marché Flottant & Quai Couvert',
+        subtitle: 'Halle en bambou sur pilotis, étals lacustres & auvent en feuilles de palmier',
+        // 15 + 9 + 4 + 2 = 30 blocks
+        layers: [
+          { cells: makeRectCells(5, 3) },
+          {
+            cells: [
+              [-2, -1], [-1, -1], [0, -1], [1, -1], [2, -1],
+              [-2, 1], [0, 1], [2, 1], [0, 0],
+            ],
+          },
+          { cells: makeRectCells(4, 1) },
+          { cells: [[-0.5, 0], [0.5, 0]] },
+        ],
+      },
+      {
+        id: 'stilt_water_sanctuary',
+        name: 'Le Sanctuaire des Eaux sur Pilotis',
+        subtitle: 'Pavillon sacré sur le lagon entouré de pilotis sculptés & toit pointu',
+        // 16 + 10 + 4 + 2 = 32 blocks
+        layers: [
+          { cells: makeRectCells(4, 4) },
+          {
+            cells: [
+              [-1.5, -1.5], [-0.5, -1.5], [0.5, -1.5], [1.5, -1.5],
+              [-1.5, 0], [1.5, 0],
+              [-1.5, 1.5], [-0.5, 1.5], [0.5, 1.5], [1.5, 1.5],
+            ],
+          },
+          { cells: makeRectCells(2, 2) },
+          { cells: [[-0.5, 0], [0.5, 0]] },
+        ],
+      },
+    ],
+  },
 ];
 
 /** 4 randomized gameplay run modifiers */

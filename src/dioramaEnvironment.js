@@ -222,6 +222,25 @@ export const BIOME_ATMOSPHERES = {
     particleStyle: 'dust',
     particleCount: 38,
   },
+  lagoon: {
+    id: 'lagoon',
+    skyTop: '#36a4d6',
+    skyHorizon: '#d6f2f6',
+    skyBottom: '#8cd6dc',
+    fogColor: '#c4eaf2',
+    fogNear: 88,
+    fogFar: 195,
+    sunColor: '#fff5d2',
+    sunIntensity: 2.18,
+    hemiSky: '#efffff',
+    hemiGround: '#4a988e',
+    hemiIntensity: 0.96,
+    rimColor: '#76f0e4',
+    rimIntensity: 0.56,
+    particleColor: '#e8fffb',
+    particleStyle: 'spray',
+    particleCount: 40,
+  },
   worldmap: {
     id: 'worldmap',
     skyTop: '#67add6',
@@ -272,6 +291,7 @@ export function resolveBiomeConfig(levelIdOrTheme = 'egypt', overrides = null) {
     else if (s.includes('penitentiary') || s.includes('prison') || s.includes('1800')) key = 'penitentiary';
     else if (s.includes('coal') || s.includes('mine') || s.includes('charbon')) key = 'coalmine';
     else if (s.includes('modern') || s.includes('villa') || s.includes('contemp')) key = 'modern';
+    else if (s.includes('stilt') || s.includes('lagoon') || s.includes('pilotis') || s.includes('lagon')) key = 'lagoon';
     else if (s.includes('english') || s.includes('edwardian') || s.includes('anglais') || s.includes('cotswold')) key = 'english';
     else if (s.includes('viking') || s.includes('fjord') || s.includes('nordic') || s.includes('drakkar')) key = 'viking';
     else if (s.includes('castle') || s.includes('chateau') || s.includes('medieval') || s.includes('village')) key = 'medieval';

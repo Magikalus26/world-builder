@@ -37,6 +37,7 @@ import { Level9Museum } from './levels/level9_museum.js';
 import { Level10Village } from './levels/level10_village.js';
 import { Level11Viking } from './levels/level11_viking.js';
 import { Level12EnglishVillage } from './levels/level12_english_village.js';
+import { Level13StiltVillage } from './levels/level13_stilt_village.js';
 import { RoguelikeLevel, generateRoguelikeConfig } from './levels/roguelike_level.js';
 
 const LEVEL_REGISTRY = [
@@ -52,6 +53,7 @@ const LEVEL_REGISTRY = [
   Level10Village,
   Level11Viking,
   Level12EnglishVillage,
+  Level13StiltVillage,
 ];
 
 class WorkdBuilderApp {

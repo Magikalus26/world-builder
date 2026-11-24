@@ -152,6 +152,18 @@ export const THEME_PALETTES = {
     metal: { base: '#d6ae4c', mortar: '#7b5f1c', roughness: 0.3, metalness: 0.84, pattern: 'metal' },
     accent: { base: '#1e5c3a', mortar: '#0e331f', roughness: 0.54, metalness: 0.12, pattern: 'wood' },
   },
+  lagoon: {
+    id: 'lagoon',
+    groundBase: '#4c9866',
+    groundDetail: '#e4cc92',
+    strataColors: ['#e0c88c', '#c6a268', '#52827c', '#2d5256'],
+    stone: { base: '#969e9c', mortar: '#5c6664', roughness: 0.86, metalness: 0.04, pattern: 'ashlar' },
+    brick: { base: '#c4a678', mortar: '#886e48', roughness: 0.84, metalness: 0.03, pattern: 'wood' },
+    wood: { base: '#785636', mortar: '#46301b', roughness: 0.82, metalness: 0.03, pattern: 'wood' },
+    roof: { base: '#c9a152', mortar: '#8a6828', roughness: 0.88, metalness: 0.02, pattern: 'wood' },
+    metal: { base: '#d4a644', mortar: '#7a5c1c', roughness: 0.36, metalness: 0.76, pattern: 'metal' },
+    accent: { base: '#24b2c4', mortar: '#126878', roughness: 0.22, metalness: 0.16, pattern: 'ashlar' },
+  },
   arabian: {
     id: 'arabian',
     groundBase: '#e4b37a',

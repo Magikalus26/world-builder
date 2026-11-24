@@ -239,10 +239,13 @@ function computeAll100LevelCoords() {
       // Center the grand Lv 100 Imperial Capital symmetrically at the Northern summit
       if (levelIdx === 99) x = 0.0;
       let z = z0 + oz;
-      // Generous open-water clearance between playable Hero Islands Level 11 & Level 12
+      // Generous open-water clearance between playable Hero Islands Levels 11, 12 & 13
       if (levelIdx === 11) {
         x = 8.1;
         z = 58.6;
+      } else if (levelIdx === 12) {
+        x = 2.9;
+        z = 56.6;
       }
       coords[levelIdx] = { x, z };
     }
@@ -733,7 +736,7 @@ export class WorldMapScene {
    *    - Levels 10, 20, ..., 100: Grand 2.2x Village / City Milestone Islands
    * ========================================================================== */
   _buildAll100Nodes() {
-    // 1. Build the 11 full 3D Playable Hero Islands (Levels 1–9 + Level 11 Viking + Level 12 English 1900)
+    // 1. Build the 12 full 3D Playable Hero Islands (Levels 1–9 + Level 11 Viking + Level 12 English + Level 13 Stilt Village)
     this._buildHeroEgyptIsland(this.levelCoords[0]);
     this._buildHeroRomeIsland(this.levelCoords[1]);
     this._buildHeroJapanIsland(this.levelCoords[2]);
@@ -745,13 +748,14 @@ export class WorldMapScene {
     this._buildHeroMuseumIsland(this.levelCoords[8]);
     this._buildHeroVikingVillageIsland(this.levelCoords[10]);
     this._buildHeroEnglishVillageIsland(this.levelCoords[11]);
+    this._buildHeroStiltVillageIsland(this.levelCoords[12]);
 
-    // 2. Collect regular "Bientôt" nodes (Levels 13–99 non-10) and Milestone Village/City nodes (10)
+    // 2. Collect regular "Bientôt" nodes (Levels 14–99 non-10) and Milestone Village/City nodes (10)
     const regularEntries = [];
     const milestoneEntries = [];
 
     for (let i = 9; i < 100; i++) {
-      if (i === 10 || i === 11) continue; // Levels 11 & 12 built as playable Hero Village islands
+      if (i === 10 || i === 11 || i === 12) continue; // Levels 11, 12 & 13 built as playable Hero Village islands
       const levelNum = i + 1;
       const chapterIdx = Math.floor(i / 10);
       const chapter = WORLD_CHAPTERS[chapterIdx];
@@ -2674,6 +2678,181 @@ export class WorldMapScene {
       focusDistance: 17.5,
       focusElevation: 42,
       focusAzimuth: 0.18,
+      group,
+      hitbox,
+      bounceTime: 0,
+    };
+
+    hitbox.userData.interact = { type: 'map-node', node };
+    this.nodes.push(node);
+  }
+
+  /**
+   * Level 13 — Lagon & Rivière : Le Village sur Pilotis (UNLOCKED & PLAYABLE, Tier 1 Village)
+   */
+  _buildHeroStiltVillageIsland(coord) {
+    const pos = new THREE.Vector3(coord.x, 0, coord.z);
+    const group = new THREE.Group();
+    group.position.copy(pos);
+    this.root.add(group);
+
+    // Sculpted tropical sandy lagoon cove & glowing golden unlocked ring
+    const lagoonDiscGeo = this._trackGeo(new THREE.CylinderGeometry(1.78, 1.94, 0.24, 22));
+    const lagoonMat = this._trackMat(
+      new THREE.MeshStandardMaterial({
+        color: '#22c2ce',
+        roughness: 0.14,
+        metalness: 0.18,
+        transparent: true,
+        opacity: 0.9,
+      })
+    );
+    const lagoonDisc = new THREE.Mesh(lagoonDiscGeo, lagoonMat);
+    lagoonDisc.position.y = 0.08;
+    lagoonDisc.receiveShadow = true;
+    group.add(lagoonDisc);
+
+    // Crescent tropical riverbank peninsula on the West flank of the lagoon cove
+    const shoreGeo = this._trackGeo(createIslandMoundGeometry(1.04, 1.38, 0.56, 13.7, 18));
+    const shoreSandMat = this._trackMat(
+      new THREE.MeshStandardMaterial({ color: '#e0c68c', roughness: 0.88 })
+    );
+    const shore = new THREE.Mesh(shoreGeo, shoreSandMat);
+    shore.position.set(-0.88, 0.14, 0.05);
+    shore.castShadow = true;
+    shore.receiveShadow = true;
+    group.add(shore);
+
+    const grassCap = new THREE.Mesh(
+      this._trackGeo(new THREE.CylinderGeometry(0.68, 0.84, 0.16, 14)),
+      this._trackMat(new THREE.MeshStandardMaterial({ color: '#4c9446', roughness: 0.86 }))
+    );
+    grassCap.position.set(-0.95, 0.56, 0.05);
+    grassCap.scale.set(0.95, 1, 1.25);
+    group.add(grassCap);
+
+    this._addShoreFoamRing(group, 1.98, 1.88, 13.4);
+    this._addUnlockedGoldRing(group, 'level13_stilt_village', 2.02, 1.92, 13.8);
+
+    const pilingMat = this._trackMat(
+      new THREE.MeshStandardMaterial({ color: '#5b3c22', roughness: 0.86 })
+    );
+    const deckMat = this._trackMat(
+      new THREE.MeshStandardMaterial({ color: '#c8a572', roughness: 0.84 })
+    );
+    const bambooMat = this._trackMat(
+      new THREE.MeshStandardMaterial({ color: '#e2cb98', roughness: 0.82 })
+    );
+    const thatchMat = this._trackMat(
+      new THREE.MeshStandardMaterial({ color: '#c29248', roughness: 0.9 })
+    );
+    const lanternMat = this._trackMat(
+      new THREE.MeshStandardMaterial({
+        color: '#fff4c2',
+        emissive: '#ffaa28',
+        emissiveIntensity: 1.5,
+        roughness: 0.25,
+      })
+    );
+
+    const buildMiniStiltHouse = (hx, hz, w, d, h, roofH) => {
+      const house = new THREE.Group();
+      house.position.set(hx, 0.44, hz);
+
+      // 4 dark hardwood stilts plunging into the turquoise lagoon
+      const stiltGeo = this._trackGeo(new THREE.CylinderGeometry(0.026, 0.032, 0.48, 6));
+      [
+        [-w * 0.38, -0.22, -d * 0.38],
+        [w * 0.38, -0.22, -d * 0.38],
+        [-w * 0.38, -0.22, d * 0.38],
+        [w * 0.38, -0.22, d * 0.38],
+      ].forEach(([sx, sy, sz]) => {
+        const s = new THREE.Mesh(stiltGeo, pilingMat);
+        s.position.set(sx, sy, sz);
+        house.add(s);
+      });
+
+      const deck = new THREE.Mesh(this._trackGeo(new THREE.BoxGeometry(w * 1.12, 0.08, d * 1.12)), deckMat);
+      deck.castShadow = true;
+      house.add(deck);
+
+      const walls = new THREE.Mesh(this._trackGeo(new THREE.BoxGeometry(w * 0.9, h, d * 0.9)), bambooMat);
+      walls.position.y = h * 0.5 + 0.04;
+      walls.castShadow = true;
+      house.add(walls);
+
+      const roof = new THREE.Mesh(this._trackGeo(new THREE.ConeGeometry(Math.max(w, d) * 0.78, roofH, 4)), thatchMat);
+      roof.rotation.y = Math.PI * 0.25;
+      roof.scale.set(w / Math.max(w, d) * 1.05, 1.0, d / Math.max(w, d) * 1.05);
+      roof.position.y = h + roofH * 0.5;
+      roof.castShadow = true;
+      house.add(roof);
+
+      group.add(house);
+    };
+
+    // 1. Chief's Large Stilt Lodge (NE Lagoon Focal Monument)
+    buildMiniStiltHouse(0.45, -0.62, 0.72, 0.48, 0.34, 0.42);
+    // 2. Two Spaced Lagoon Stilt Houses
+    buildMiniStiltHouse(-0.08, 0.14, 0.44, 0.38, 0.26, 0.32);
+    buildMiniStiltHouse(0.32, 0.74, 0.46, 0.38, 0.26, 0.32);
+
+    // 3. Miniature Lagoon Watchtower & Glowing Lantern Beacon (East Edge)
+    const tower = new THREE.Group();
+    tower.position.set(0.96, 0.44, 0.18);
+    const tShaft = new THREE.Mesh(this._trackGeo(new THREE.BoxGeometry(0.28, 0.68, 0.28)), pilingMat);
+    tShaft.position.y = 0.26;
+    tShaft.castShadow = true;
+    tower.add(tShaft);
+    const tBeacon = new THREE.Mesh(this._trackGeo(new THREE.OctahedronGeometry(0.1, 0)), lanternMat);
+    tBeacon.position.y = 0.68;
+    tower.add(tBeacon);
+    const tRoof = new THREE.Mesh(this._trackGeo(new THREE.ConeGeometry(0.26, 0.28, 4)), thatchMat);
+    tRoof.rotation.y = Math.PI * 0.25;
+    tRoof.position.y = 0.88;
+    tRoof.castShadow = true;
+    tower.add(tRoof);
+    group.add(tower);
+
+    // 4. Connecting Wooden Boardwalks over the Turquoise Lagoon
+    [
+      [-0.45, 0.42, 0.14, 0.62, 0.06, 0.18, 0],
+      [0.34, 0.42, 0.04, 0.18, 0.06, 1.18, 0],
+      [0.64, 0.42, 0.18, 0.62, 0.06, 0.18, 0],
+    ].forEach(([bx, by, bz, bw, bh, bd, ry]) => {
+      const pier = new THREE.Mesh(this._trackGeo(new THREE.BoxGeometry(bw, bh, bd)), deckMat);
+      pier.position.set(bx, by, bz);
+      pier.rotation.y = ry;
+      pier.castShadow = true;
+      group.add(pier);
+    });
+
+    // 5. Miniature Tropical Palms on the Western Peninsula
+    this._createMiniPalm(group, -1.08, 0.52, -0.58, 0.42, 0.18);
+    this._createMiniPalm(group, -1.12, 0.52, 0.64, 0.38, -0.16);
+
+    const hitbox = new THREE.Mesh(
+      this._trackGeo(new THREE.CylinderGeometry(2.1, 2.2, 2.4, 10)),
+      this.mats.hitbox
+    );
+    hitbox.position.y = 1.1;
+    group.add(hitbox);
+
+    const node = {
+      id: 'level13_stilt_village',
+      levelIndex: 12,
+      levelNum: 13,
+      chapter: WORLD_CHAPTERS[1],
+      unlocked: true,
+      isMilestone: false,
+      title: 'Niveau 13 : Lagon & Rivière — Le Village sur Pilotis (114 blocs)',
+      shortLabel: 'Village Pilotis',
+      labelText: 'Niveau 13 • Jouable',
+      position: pos,
+      labelAnchor: new THREE.Vector3(pos.x, 2.75, pos.z),
+      focusDistance: 17.5,
+      focusElevation: 42,
+      focusAzimuth: 0.16,
       group,
       hitbox,
       bounceTime: 0,
