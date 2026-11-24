@@ -234,7 +234,7 @@ export function resolveBiomeConfig(levelIdOrTheme = 'egypt', overrides = null) {
     else if (s.includes('penitentiary') || s.includes('prison') || s.includes('1800')) key = 'penitentiary';
     else if (s.includes('coal') || s.includes('mine') || s.includes('charbon')) key = 'coalmine';
     else if (s.includes('modern') || s.includes('villa') || s.includes('contemp')) key = 'modern';
-    else if (s.includes('castle') || s.includes('chateau') || s.includes('medieval')) key = 'medieval';
+    else if (s.includes('castle') || s.includes('chateau') || s.includes('medieval') || s.includes('village')) key = 'medieval';
     else if (s.includes('museum') || s.includes('musee') || s.includes('beaux')) key = 'museum';
     else if (s.includes('worldmap')) key = 'worldmap';
     else if (s.includes('menu')) key = 'menu';

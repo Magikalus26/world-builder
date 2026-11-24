@@ -34,6 +34,7 @@ import { Level6CoalMine } from './levels/level6_coalmine.js';
 import { Level7Modern } from './levels/level7_modern.js';
 import { Level8Castle } from './levels/level8_castle.js';
 import { Level9Museum } from './levels/level9_museum.js';
+import { Level10Village } from './levels/level10_village.js';
 import { RoguelikeLevel, generateRoguelikeConfig } from './levels/roguelike_level.js';
 
 const LEVEL_REGISTRY = [
@@ -46,6 +47,7 @@ const LEVEL_REGISTRY = [
   Level7Modern,
   Level8Castle,
   Level9Museum,
+  Level10Village,
 ];
 
 class WorkdBuilderApp {
@@ -606,15 +608,26 @@ class WorkdBuilderApp {
       scene: this.scene,
       textures: this.textures,
       audio: this.audio,
+      cameraController: this.cameraController,
       upgrades: this.save.getUpgrades(),
       blueprintSkinId: this.save.getEquippedBlueprintSkin(),
       onProgress: (count, total) => {
-        this._updateHUD(count, total, LevelClass.meta.hudLabel, true);
+        this._updateHUD(count, total, this.currentLevel.hudLabel || LevelClass.meta.hudLabel, true);
       },
       onComplete: (payload) => {
         this._handleLevelComplete(payload);
       },
     });
+
+    if (typeof this.currentLevel.getCameraPreset === 'function') {
+      this.cameraController.configurePreset(this.currentLevel.getCameraPreset());
+    }
+    this._updateHUD(
+      this.currentLevel.placedCount || 0,
+      this.currentLevel.totalGoal || LevelClass.meta.totalGoal,
+      this.currentLevel.hudLabel || LevelClass.meta.hudLabel,
+      false
+    );
 
     if (
       this.dioramaEnv &&
@@ -819,6 +832,9 @@ class WorkdBuilderApp {
         this._setActiveChapterUI(chIdx, true);
       }
     } else if ((this.mode === 'level' || this.mode === 'roguelike') && this.currentLevel) {
+      if (this.currentLevel.cityConfig) {
+        this._syncSunLightToTarget(this.cameraController.target.x, this.cameraController.target.z);
+      }
       this.currentLevel.update(dt, this.elapsed);
       if (this.decorationSystem) {
         this.decorationSystem.update(dt, this.elapsed);

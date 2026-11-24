@@ -108,8 +108,14 @@ const GHOST_FACE_VERT = /* glsl */ `
   void main() {
     vUv = uv;
     vLocalPos = position;
-    vec4 mvPos = modelViewMatrix * vec4(position, 1.0);
-    vViewNormal = normalize(normalMatrix * normal);
+    vec4 transformed = vec4(position, 1.0);
+    vec3 objectNormal = normal;
+    #ifdef USE_INSTANCING
+      transformed = instanceMatrix * transformed;
+      objectNormal = mat3(instanceMatrix) * objectNormal;
+    #endif
+    vec4 mvPos = modelViewMatrix * transformed;
+    vViewNormal = normalize(normalMatrix * objectNormal);
     vViewDir = normalize(-mvPos.xyz);
     gl_Position = projectionMatrix * mvPos;
   }

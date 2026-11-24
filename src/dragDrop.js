@@ -483,9 +483,13 @@ export class TouchInteractionEngine {
     if (this.mode === 'DRAG_BLOCK' && this.dragBlock) {
       const thumbOffset = e.pointerType === 'touch' ? -30 : 0;
       if (this._raycastGroundPlane(e.clientX, e.clientY, this.dragHoverY, thumbOffset)) {
-        // Keep block within playable diorama area
-        const clampedX = THREE.MathUtils.clamp(this.planeHit.x, -9.5, 9.5);
-        const clampedZ = THREE.MathUtils.clamp(this.planeHit.z, -9.5, 9.5);
+        // Keep block within playable diorama area (expanded cleanly for City Milestone levels)
+        const bounds =
+          this.level && typeof this.level.getDragBounds === 'function'
+            ? this.level.getDragBounds()
+            : { minX: -9.5, maxX: 9.5, minZ: -9.5, maxZ: 9.5 };
+        const clampedX = THREE.MathUtils.clamp(this.planeHit.x, bounds.minX, bounds.maxX);
+        const clampedZ = THREE.MathUtils.clamp(this.planeHit.z, bounds.minZ, bounds.maxZ);
         this.dragTargetPos.set(clampedX, this.dragHoverY, clampedZ);
         this._refreshBlockDropZones();
       }

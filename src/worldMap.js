@@ -21,7 +21,7 @@ export const WORLD_CHAPTERS = [
     rangeLabel: '1–10',
     biomeName: 'Égypte — Sables de Gizeh',
     shortRegion: 'Égypte',
-    milestoneCity: 'Cité de Thèbes',
+    milestoneCity: 'Village Médiéval',
     archetype: 'egypt',
     groundHex: '#e6c07b',
     wallHex: '#e8d5a8',
@@ -2624,18 +2624,29 @@ export class WorldMapScene {
       hitbox.position.y = 1.25;
       group.add(hitbox);
 
+      const isPlayableCity = e.levelNum === 10;
+      if (isPlayableCity) {
+        this._addUnlockedGoldRing(group, 'level10_village', 2.58, 2.38, 12.2);
+      }
+
       const node = {
-        id: `level_${e.levelNum}`,
+        id: isPlayableCity ? 'level10_village' : `level_${e.levelNum}`,
         levelIndex: e.levelIndex,
         levelNum: e.levelNum,
         chapter: e.chapter,
-        unlocked: false,
+        unlocked: isPlayableCity,
         isMilestone: true,
         milestoneCity: e.chapter.milestoneCity,
-        title: `Niveau ${e.levelNum} • Grand Chantier Village/Ville — Bientôt`,
-        subtitle: `🏛️ ${e.chapter.milestoneCity} • ${e.chapter.biomeName}`,
+        title: isPlayableCity
+          ? 'Niveau 10 : Village Médiéval (Palier Ville)'
+          : `Niveau ${e.levelNum} • Grand Chantier Village/Ville — Bientôt`,
+        subtitle: isPlayableCity
+          ? '🏘️ Puits, Chemins, 6 Maisons, Grande Ferme, Église & Cimetière'
+          : `🏛️ ${e.chapter.milestoneCity} • ${e.chapter.biomeName}`,
         shortLabel: e.chapter.milestoneCity,
-        labelText: `🏛️ Village/Ville • Niv. ${e.levelNum}`,
+        labelText: isPlayableCity
+          ? `🏘️ Niv. 10 • ${e.chapter.milestoneCity}`
+          : `🏛️ Village/Ville • Niv. ${e.levelNum}`,
         position: pos,
         labelAnchor: new THREE.Vector3(e.x, 2.85, e.z),
         focusDistance: 19.0,
