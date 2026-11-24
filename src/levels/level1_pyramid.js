@@ -1804,12 +1804,42 @@ export class Level1Pyramid {
   /* ============================================================================
    * 7. BLOCK CREATION & QUARRY EXTRACTION
    * ========================================================================== */
+  _isQuarrySlotBlockedByMesh(slot, ignoreBlock = null) {
+    if (!slot || !slot.position) return true;
+    const sx = slot.position.x;
+    const sz = slot.position.z;
+    const minDistSq = 0.4 * 0.4;
+
+    for (let i = 0; i < this.blocks.length; i++) {
+      const b = this.blocks[i];
+      if (!b || b === ignoreBlock || b.locked || b.isDragging) continue;
+      if (b.slot === slot) return true;
+      if (b.mesh && b.mesh.position) {
+        const dx = b.mesh.position.x - sx;
+        const dz = b.mesh.position.z - sz;
+        if (dx * dx + dz * dz < minDistSq) return true;
+      }
+    }
+
+    for (let i = 0; i < this.tweens.length; i++) {
+      const tw = this.tweens[i];
+      if (!tw || tw.block === ignoreBlock || !tw.to) continue;
+      const dx = tw.to.x - sx;
+      const dz = tw.to.z - sz;
+      if (dx * dx + dz * dz < minDistSq) return true;
+    }
+
+    return false;
+  }
+
   _findFreeQuarrySpawnSlot() {
     for (let i = 0; i < this.quarrySlots.length; i++) {
       const slot = this.quarrySlots[i];
-      if (!slot.occupied && !slot.block) return slot;
+      if (slot.occupied !== false || slot.block !== null) continue;
+      if (this._isQuarrySlotBlockedByMesh(slot)) continue;
+      return slot;
     }
-    return null;
+    return undefined;
   }
 
   chipQuarryNode(node) {
@@ -1861,7 +1891,14 @@ export class Level1Pyramid {
   }
 
   _spawnRawBlock(fromPos, targetSlot) {
-    if (!targetSlot || targetSlot.occupied || targetSlot.block) return null;
+    if (
+      !targetSlot ||
+      targetSlot.occupied !== false ||
+      targetSlot.block !== null ||
+      this._isQuarrySlotBlockedByMesh(targetSlot)
+    ) {
+      return null;
+    }
 
     const mesh = new THREE.Mesh(this.geos.rawBlock, this._getRawBlockMaterial());
     mesh.castShadow = true;
@@ -2218,7 +2255,13 @@ export class Level1Pyramid {
         valid.push(this.workbenchSlot);
       }
       this.quarrySlots.forEach((slot) => {
-        if (!slot.occupied && !slot.block) valid.push(slot);
+        if (
+          slot.occupied === false &&
+          slot.block === null &&
+          !this._isQuarrySlotBlockedByMesh(slot, block)
+        ) {
+          valid.push(slot);
+        }
       });
       return valid;
     }
@@ -2260,7 +2303,9 @@ export class Level1Pyramid {
     const candidates = [];
     if (block.kind === 'raw') {
       this.quarrySlots.forEach((s) => {
-        if (!s.occupied && !s.block) candidates.push(s);
+        if (s.occupied === false && s.block === null && !this._isQuarrySlotBlockedByMesh(s, block)) {
+          candidates.push(s);
+        }
       });
       this.sleds.forEach((sled) => {
         if (sled.id === 'sledA') {

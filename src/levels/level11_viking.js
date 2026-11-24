@@ -855,12 +855,12 @@ export class Level11Viking extends Level1Pyramid {
       this.quarryNodes.push(node);
     });
 
-    // 6 Explicit Ground Quarry Output Storage Slots (strict slot.occupied -> zero stacking!)
+    // 6 Explicit Ground Quarry Output Storage Slots (strict { index, position, occupied, block } -> zero stacking!)
     const padCx = -9.4;
-    const padCz = -5.2;
+    const padCz = -5.35;
     const padY = sampleVikingTerrainHeight(padCx, padCz);
     const pad = new THREE.Mesh(
-      this._trackGeo(new THREE.BoxGeometry(3.85, 0.14, 2.25)),
+      this._trackGeo(new THREE.BoxGeometry(4.2, 0.14, 2.65)),
       vm.flagstonePath
     );
     pad.position.set(padCx, padY + 0.07, padCz);
@@ -869,17 +869,18 @@ export class Level11Viking extends Level1Pyramid {
     quarry.add(pad);
 
     [
-      [-1.16, -0.52],
-      [0.0, -0.52],
-      [1.16, -0.52],
-      [-1.16, 0.52],
-      [0.0, 0.52],
-      [1.16, 0.52],
+      [-1.28, -0.66],
+      [0.0, -0.66],
+      [1.28, -0.66],
+      [-1.28, 0.66],
+      [0.0, 0.66],
+      [1.28, 0.66],
     ].forEach(([ox, oz], idx) => {
       const sx = padCx + ox;
       const sz = padCz + oz;
       const marker = this._createSlotMarker(quarry, sx, padY + 0.155, sz);
       this.quarrySlots.push({
+        index: idx,
         id: `quarry_slot_${idx}`,
         zoneType: 'quarry',
         accepts: ['raw'],
@@ -892,6 +893,105 @@ export class Level11Viking extends Level1Pyramid {
     });
 
     this.root.add(quarry);
+  }
+
+  /**
+   * Returns the first genuinely empty quarry storage slot where `occupied === false`,
+   * `block === null`, and no active raw block mesh or in-flight tween sits within 0.4 units.
+   */
+  _findFreeQuarrySpawnSlot() {
+    for (let i = 0; i < this.quarrySlots.length; i++) {
+      const slot = this.quarrySlots[i];
+      if (!slot || slot.occupied !== false || slot.block !== null) continue;
+      if (this._isQuarrySlotBlockedByMesh(slot)) continue;
+      return slot;
+    }
+    return undefined;
+  }
+
+  /**
+   * Shows a brief mobile-friendly UI pill hint when all 6 Viking quarry storage slots are full.
+   */
+  _showQuarryFullHint() {
+    if (typeof document === 'undefined') return;
+    const rootEl = document.getElementById('game-root') || document.body;
+    if (!this.quarryHintEl) {
+      const pill = document.createElement('div');
+      pill.id = 'viking-quarry-full-hint';
+      pill.style.cssText =
+        'position:fixed;top:calc(env(safe-area-inset-top, 0px) + 64px);left:50%;transform:translateX(-50%);' +
+        'z-index:35;padding:7px 14px;border-radius:999px;pointer-events:none;' +
+        'background:rgba(44,24,10,0.92);border:1.5px solid #f5c256;color:#fff2d0;' +
+        'font-family:var(--font-ui,system-ui,sans-serif);font-size:12px;font-weight:800;' +
+        'white-space:nowrap;box-shadow:0 6px 16px rgba(0,0,0,0.42);transition:opacity 0.22s ease;';
+      rootEl.appendChild(pill);
+      this.quarryHintEl = pill;
+    }
+    this.quarryHintEl.textContent = '⛏️ Stockage plein ! Déplacez un bloc sur le chariot';
+    this.quarryHintEl.style.opacity = '1';
+    clearTimeout(this._quarryHintTimer);
+    this._quarryHintTimer = setTimeout(() => {
+      if (this.quarryHintEl) this.quarryHintEl.style.opacity = '0';
+    }, 1700);
+  }
+
+  _removeQuarryFullHint() {
+    clearTimeout(this._quarryHintTimer);
+    this._quarryHintTimer = null;
+    if (this.quarryHintEl && this.quarryHintEl.parentNode) {
+      this.quarryHintEl.parentNode.removeChild(this.quarryHintEl);
+    }
+    this.quarryHintEl = null;
+  }
+
+  /**
+   * Mines a Viking quarry rock node with strict slot occupancy enforcement.
+   * Refuses spawning if all 6 quarry storage slots are occupied, shaking the rock & showing a hint.
+   */
+  chipQuarryNode(node) {
+    if (!node || node.depleted || this.isComplete) return;
+
+    const freeSlot = this._findFreeQuarrySpawnSlot();
+    if (freeSlot === undefined) {
+      node.shakeTime = 0.28;
+      if (this.audio && typeof this.audio.playHeavyThud === 'function') {
+        this.audio.playHeavyThud();
+      }
+      this._spawnParticles(node.basePos, {
+        count: 6,
+        material: this.vikingFxMats ? this.vikingFxMats.chipGranite : this.mats.dustLimestone,
+        speed: 1.5,
+        upSpeed: 2.1,
+        scale: 0.72,
+      });
+      this._showQuarryFullHint();
+      return;
+    }
+
+    super.chipQuarryNode(node);
+  }
+
+  onBlockDragStart(block) {
+    const prevSlot = block ? block.slot : null;
+    const res = super.onBlockDragStart(block);
+    // Guarantee the origin quarry storage slot is immediately freed on pickup
+    if (res && prevSlot && prevSlot.zoneType === 'quarry') {
+      prevSlot.occupied = false;
+      prevSlot.block = null;
+    }
+    return res;
+  }
+
+  onBlockDragCancel(block) {
+    const origin = block ? block.originSlot : null;
+    super.onBlockDragCancel(block);
+    // Guarantee origin slot occupancy is cleanly restored if snapped back to it
+    if (block && block.slot && block.slot.zoneType === 'quarry') {
+      block.slot.occupied = true;
+      block.slot.block = block;
+    } else if (origin && origin.zoneType === 'quarry' && origin.block === block) {
+      origin.occupied = true;
+    }
   }
 
   /* ============================================================================
@@ -1804,7 +1904,13 @@ export class Level11Viking extends Level1Pyramid {
         valid.push(this.workbenchSlot);
       }
       this.quarrySlots.forEach((slot) => {
-        if (!slot.occupied && !slot.block) valid.push(slot);
+        if (
+          slot.occupied === false &&
+          slot.block === null &&
+          !this._isQuarrySlotBlockedByMesh(slot, block)
+        ) {
+          valid.push(slot);
+        }
       });
       return valid;
     }
@@ -2458,6 +2564,7 @@ export class Level11Viking extends Level1Pyramid {
 
   dispose() {
     this._unmountZoneSelectorHud();
+    this._removeQuarryFullHint();
     if (this.cozyFoliageSystem && typeof this.cozyFoliageSystem.dispose === 'function') {
       this.cozyFoliageSystem.dispose();
       this.cozyFoliageSystem = null;
