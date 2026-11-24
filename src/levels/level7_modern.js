@@ -1310,6 +1310,16 @@ export class Level7Modern extends Level1Pyramid {
     return 'concrete_base';
   }
 
+  _resolveCarvingTargetMaterial() {
+    const pieceType = this._pickNextCarvedPieceType();
+    if (pieceType === 'roof_pergola' || pieceType === 'roof_slab') {
+      return this.modern.materials.whiteConcreteRoof;
+    }
+    if (pieceType === 'glass') return this.modern.materials.panoramicGlass;
+    if (pieceType === 'brick') return this.modern.materials.redBrick;
+    return this.modern.materials.whiteConcreteWall || this.carvedBlockMat;
+  }
+
   carveWorkbenchBlock(swipeVec) {
     const stillRaw = super.carveWorkbenchBlock(swipeVec);
     const block = this.workbenchSlot ? this.workbenchSlot.block : null;

@@ -1648,6 +1648,15 @@ export class Level5Penitentiary extends Level1Pyramid {
     return 'foundation';
   }
 
+  _resolveCarvingTargetMaterial() {
+    const pieceType = this._pickNextCarvedPieceType();
+    if (pieceType === 'slate_roof') return this.pen.materials.darkSlateRoof;
+    if (pieceType === 'brick_cell') return this.pen.materials.brickCellBars;
+    if (pieceType === 'gate_lintel') return this.pen.materials.darkRedBrick;
+    if (pieceType === 'granite_wall') return this.pen.materials.graniteLoophole;
+    return this.pen.materials.dressedGranite || this.carvedBlockMat;
+  }
+
   carveWorkbenchBlock(swipeVec) {
     const stillRaw = super.carveWorkbenchBlock(swipeVec);
     const block = this.workbenchSlot ? this.workbenchSlot.block : null;

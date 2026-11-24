@@ -1446,6 +1446,14 @@ export class Level3Japan extends Level1Pyramid {
     return 'ishigaki';
   }
 
+  _resolveCarvingTargetMaterial() {
+    const pieceType = this._pickNextCarvedPieceType();
+    if (pieceType === 'kawara') return this.japan.materials.kawaraRoof;
+    if (pieceType === 'beam') return this.japan.materials.cedarBeam;
+    if (pieceType === 'shoji') return this.japan.materials.shojiWall;
+    return this.carvedBlockMat;
+  }
+
   carveWorkbenchBlock(swipeVec) {
     const stillRaw = super.carveWorkbenchBlock(swipeVec);
     const block = this.workbenchSlot ? this.workbenchSlot.block : null;

@@ -7065,3 +7065,381 @@ function buildMuseumRawMarbleRockPBR(anisotropy) {
     roughnessMap: wrapTexture(roughCanvas, { isColor: false, anisotropy }),
   };
 }
+
+/* ============================================================================
+ * PROGRESSIVE 4-STAGE CARVING TRANSITION MATERIAL GENERATOR (ALL LEVELS)
+ * Blends the level's actual Raw Quarry Rock texture smoothly into the exact
+ * Target Finished Material across 4 distinct, cached 512x512 PBR stages:
+ *   Stage 0 (0%):   Raw Quarry Block (rough cracks, dusty matte roughness 0.92)
+ *   Stage 1 (33%):  Rough-Hewn (diagonal bright chisel gouges exposing inner grain)
+ *   Stage 2 (66%):  Fine-Dressed (70% final architectural pattern + parallel dressing marks)
+ *   Stage 3 (100%): Crisp Finalized Architectural PBR Material
+ * ========================================================================== */
+
+const _carvingStagePackCache = new Map();
+
+function sampleTexturePixels512(texOrMat, fallbackHex = '#bfa882') {
+  const size = 512;
+  const mat = texOrMat && texOrMat.isMaterial ? texOrMat : null;
+  const tex = mat ? mat.map : texOrMat && texOrMat.isTexture ? texOrMat : null;
+  const tint = mat && mat.color ? mat.color : new THREE.Color(fallbackHex);
+
+  const canvas = makeCanvas(size);
+  const ctx = canvas.getContext('2d');
+
+  const img = tex && tex.image ? tex.image : null;
+  if (img && (img.width > 0 || img.naturalWidth > 0)) {
+    try {
+      ctx.drawImage(img, 0, 0, size, size);
+      const id = ctx.getImageData(0, 0, size, size);
+      const d = id.data;
+      const tr = tint.r;
+      const tg = tint.g;
+      const tb = tint.b;
+      // Apply material color multiplier if non-white
+      if (Math.abs(tr - 1) > 0.01 || Math.abs(tg - 1) > 0.01 || Math.abs(tb - 1) > 0.01) {
+        for (let i = 0; i < d.length; i += 4) {
+          d[i] = Math.min(255, Math.round(d[i] * tr));
+          d[i + 1] = Math.min(255, Math.round(d[i + 1] * tg));
+          d[i + 2] = Math.min(255, Math.round(d[i + 2] * tb));
+        }
+      }
+      return d;
+    } catch (_) {
+      // Fall back to solid tint fill
+    }
+  }
+
+  const baseR = Math.round(clamp01(tint.r) * 255);
+  const baseG = Math.round(clamp01(tint.g) * 255);
+  const baseB = Math.round(clamp01(tint.b) * 255);
+  const id = ctx.createImageData(size, size);
+  const d = id.data;
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const idx = (y * size + x) * 4;
+      const n = (hash2i(x, y, 409) - 0.5) * 16;
+      d[idx] = Math.min(255, Math.max(0, Math.round(baseR + n)));
+      d[idx + 1] = Math.min(255, Math.max(0, Math.round(baseG + n)));
+      d[idx + 2] = Math.min(255, Math.max(0, Math.round(baseB + n)));
+      d[idx + 3] = 255;
+    }
+  }
+  return d;
+}
+
+function configureCarvingTex(canvas, isColor, anisotropy) {
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = isColor ? THREE.SRGBColorSpace : THREE.NoColorSpace;
+  tex.wrapS = THREE.RepeatWrapping;
+  tex.wrapT = THREE.RepeatWrapping;
+  tex.anisotropy = anisotropy;
+  tex.generateMipmaps = true;
+  tex.minFilter = THREE.LinearMipmapLinearFilter;
+  tex.magFilter = THREE.LinearFilter;
+  tex.needsUpdate = true;
+  return tex;
+}
+
+function buildBlendedCarvingStagePBR(stageIdx, rawPixels, finPixels, dustRGB, anisotropy) {
+  const size = 512;
+  const albedoCanvas = makeCanvas(size);
+  const roughCanvas = makeCanvas(size);
+  const ctx = albedoCanvas.getContext('2d');
+  const rCtx = roughCanvas.getContext('2d');
+  const img = ctx.createImageData(size, size);
+  const rImg = rCtx.createImageData(size, size);
+  const out = img.data;
+  const rOut = rImg.data;
+  const height = new Float32Array(size * size);
+
+  const dustR = dustRGB[0];
+  const dustG = dustRGB[1];
+  const dustB = dustRGB[2];
+
+  for (let y = 0; y < size; y++) {
+    const v = y / size;
+    for (let x = 0; x < size; x++) {
+      const u = x / size;
+      const i = y * size + x;
+      const idx = i * 4;
+
+      const rr = rawPixels[idx];
+      const rg = rawPixels[idx + 1];
+      const rb = rawPixels[idx + 2];
+
+      const fr = finPixels[idx];
+      const fg = finPixels[idx + 1];
+      const fb = finPixels[idx + 2];
+
+      const rawLum = (rr * 0.299 + rg * 0.587 + rb * 0.114) / 255;
+      const finLum = (fr * 0.299 + fg * 0.587 + fb * 0.114) / 255;
+
+      const edgeDist = Math.min(u, 1 - u, v, 1 - v);
+      const cornerDist = Math.min(
+        Math.hypot(u, v),
+        Math.hypot(1 - u, v),
+        Math.hypot(u, 1 - v),
+        Math.hypot(1 - u, 1 - v)
+      );
+
+      const macro = tileFBM(u, v, 6, 3, stageIdx === 0 ? 733 : stageIdx === 1 ? 811 : 853);
+      const fine = tileFBM(u, v, 18, 2, stageIdx === 1 ? 829 : 863);
+      const micro = hash2i(x, y, 881 + stageIdx * 7);
+
+      let r, g, b, h, roughVal;
+
+      if (stageIdx === 0) {
+        // STAGE 0 (0% Carved — Raw Quarry Block):
+        // Unworked stone/mineral with irregular cracks, rugged chipped edges & matte roughness 0.92
+        const vor = tileWorley(u, v, 7, 743);
+        const crack = 1.0 - smoothstep(0.018, 0.08, vor.edge);
+        const rimChip = 1.0 - smoothstep(0.02, 0.11, edgeDist);
+        const dustVeil = smoothstep(0.55, 0.88, macro) * 0.18 + rimChip * 0.14;
+
+        r = lerp(rr, dustR, dustVeil) * (1.0 - crack * 0.34) + (micro - 0.5) * 10;
+        g = lerp(rg, dustG, dustVeil) * (1.0 - crack * 0.34) + (micro - 0.5) * 10;
+        b = lerp(rb, dustB, dustVeil) * (1.0 - crack * 0.34) + (micro - 0.5) * 10;
+
+        h = clamp01(rawLum * 0.55 + 0.25 - crack * 0.38 - rimChip * 0.18 + (fine - 0.5) * 0.2);
+        roughVal = clamp01(0.92 + crack * 0.06 - (fine - 0.5) * 0.06);
+      } else if (stageIdx === 1) {
+        // STAGE 1 (33% Carved — 1st Chisel Strike / Rough-Hewn):
+        // Raw outer crust split open across the center by bright diagonal chisel gouge marks,
+        // exposing inner finished grain + pale carved dust lines around corners
+        const diag = u * 10.5 + v * 6.5 + (macro - 0.5) * 1.15;
+        const gougeWave = Math.sin(diag * Math.PI * 2);
+        const gougeBright = smoothstep(0.42, 0.9, gougeWave);
+        const gougeGroove = 1.0 - smoothstep(-0.92, -0.35, gougeWave);
+
+        const centerReveal = smoothstep(0.08, 0.28, edgeDist);
+        const rawCorner = 1.0 - smoothstep(0.09, 0.3 + (macro - 0.5) * 0.08, cornerDist);
+        const exposeMix = clamp01(
+          centerReveal * (0.36 + gougeBright * 0.42) - rawCorner * 0.52
+        );
+
+        // Pale chalky chisel dust framing the chipped corners & gouge ridges
+        const cornerDust =
+          smoothstep(0.06, 0.12, cornerDist) * (1.0 - smoothstep(0.14, 0.24, cornerDist));
+        const dustAmt = clamp01(gougeBright * 0.28 * centerReveal + cornerDust * 0.44);
+
+        const br = lerp(rr, fr, exposeMix);
+        const bg = lerp(rg, fg, exposeMix);
+        const bb = lerp(rb, fb, exposeMix);
+
+        r = lerp(br, dustR, dustAmt) - gougeGroove * 20 * centerReveal + (micro - 0.5) * 8;
+        g = lerp(bg, dustG, dustAmt) - gougeGroove * 19 * centerReveal + (micro - 0.5) * 8;
+        b = lerp(bb, dustB, dustAmt) - gougeGroove * 17 * centerReveal + (micro - 0.5) * 8;
+
+        h = clamp01(
+          lerp(rawLum, finLum, exposeMix) * 0.5 +
+            0.3 -
+            gougeGroove * 0.26 * centerReveal +
+            gougeBright * 0.14 * centerReveal -
+            rawCorner * 0.2
+        );
+        roughVal = clamp01(0.88 - exposeMix * 0.14 + dustAmt * 0.1 - gougeBright * 0.08);
+      } else {
+        // STAGE 2 (66% Carved — 2nd Chisel Strike / Fine-Dressed):
+        // Nearly squared architectural surface showing 70% of the final pattern overlaid with
+        // fine parallel stonemason dressing marks & chalky edge highlights
+        const dressingU = Math.sin((u * 34.0 + (macro - 0.5) * 0.25) * Math.PI * 2) * 0.5 + 0.5;
+        const dressingV = Math.sin((v * 20.0 + (macro - 0.5) * 0.2) * Math.PI * 2) * 0.5 + 0.5;
+        const parallelMarks = dressingU * 0.72 + dressingV * 0.28;
+
+        const chalkBorder =
+          smoothstep(0.025, 0.055, edgeDist) * (1.0 - smoothstep(0.062, 0.102, edgeDist));
+        const bevelGroove = Math.abs(edgeDist - 0.082) < 0.008 ? 1.0 : 0.0;
+        const rawPatch = (1.0 - smoothstep(0.04, 0.16, cornerDist)) * 0.45;
+        const finMix = clamp01(0.72 + (parallelMarks - 0.5) * 0.08 - rawPatch);
+
+        const br = lerp(rr, fr, finMix);
+        const bg = lerp(rg, fg, finMix);
+        const bb = lerp(rb, fb, finMix);
+
+        const dressingDelta = (parallelMarks - 0.5) * 20;
+        const dustAmt = clamp01(chalkBorder * 0.46 + smoothstep(0.75, 0.98, parallelMarks) * 0.1);
+
+        r = lerp(br + dressingDelta, dustR, dustAmt) - bevelGroove * 26 + (micro - 0.5) * 5;
+        g = lerp(bg + dressingDelta, dustG, dustAmt) - bevelGroove * 25 + (micro - 0.5) * 5;
+        b = lerp(bb + dressingDelta, dustB, dustAmt) - bevelGroove * 22 + (micro - 0.5) * 5;
+
+        h = clamp01(
+          lerp(rawLum, finLum, finMix) * 0.58 +
+            0.26 +
+            (parallelMarks - 0.5) * 0.18 -
+            bevelGroove * 0.25
+        );
+        roughVal = clamp01(0.72 - parallelMarks * 0.08 + chalkBorder * 0.16 + bevelGroove * 0.14);
+      }
+
+      height[i] = h;
+      out[idx] = Math.min(255, Math.max(0, Math.round(r)));
+      out[idx + 1] = Math.min(255, Math.max(0, Math.round(g)));
+      out[idx + 2] = Math.min(255, Math.max(0, Math.round(b)));
+      out[idx + 3] = 255;
+
+      const rbByte = Math.round(clamp01(roughVal) * 255);
+      rOut[idx] = rbByte;
+      rOut[idx + 1] = rbByte;
+      rOut[idx + 2] = rbByte;
+      rOut[idx + 3] = 255;
+    }
+  }
+
+  ctx.putImageData(img, 0, 0);
+  rCtx.putImageData(rImg, 0, 0);
+  const normalStrength = stageIdx === 0 ? 4.0 : stageIdx === 1 ? 3.6 : 2.9;
+  const normalCanvas = buildSobelNormalCanvas(height, size, normalStrength);
+
+  return {
+    map: configureCarvingTex(albedoCanvas, true, anisotropy),
+    normalMap: configureCarvingTex(normalCanvas, false, anisotropy),
+    roughnessMap: configureCarvingTex(roughCanvas, false, anisotropy),
+  };
+}
+
+/**
+ * Generates and caches 4 distinct, non-overlapping 512x512 PBR carving transition materials
+ * (Stage 0 Raw -> Stage 1 Rough-Hewn 33% -> Stage 2 Fine-Dressed 66% -> Stage 3 Finished 100%)
+ * tailored dynamically to the exact raw quarry texture and target architectural material.
+ */
+export function createCarvingStageMaterials(
+  baseRawTexture,
+  targetFinishedMaterial,
+  themeColors = {}
+) {
+  const anisotropy = Math.min(4, themeColors.anisotropy || 4);
+  const rawKey =
+    (baseRawTexture && baseRawTexture.uuid) ||
+    (themeColors && themeColors.rawKey) ||
+    'default_raw';
+  const finKey =
+    (targetFinishedMaterial && targetFinishedMaterial.uuid) ||
+    (themeColors && themeColors.finishedKey) ||
+    'default_fin';
+  const cacheKey = `${rawKey}|${finKey}|${themeColors.cacheKey || ''}`;
+
+  if (_carvingStagePackCache.has(cacheKey)) {
+    return _carvingStagePackCache.get(cacheKey);
+  }
+
+  const rawPixels = sampleTexturePixels512(baseRawTexture, themeColors.rawTint || '#b9a37e');
+  const finPixels = sampleTexturePixels512(
+    targetFinishedMaterial,
+    themeColors.finishedTint || '#dec9a4'
+  );
+
+  // Derive bright pale stone/brick dust color + matching chip particle color
+  let avgFR = 0;
+  let avgFG = 0;
+  let avgFB = 0;
+  const step = 32;
+  let samples = 0;
+  for (let y = 0; y < 512; y += step) {
+    for (let x = 0; x < 512; x += step) {
+      const idx = (y * 512 + x) * 4;
+      avgFR += finPixels[idx];
+      avgFG += finPixels[idx + 1];
+      avgFB += finPixels[idx + 2];
+      samples++;
+    }
+  }
+  avgFR /= Math.max(1, samples);
+  avgFG /= Math.max(1, samples);
+  avgFB /= Math.max(1, samples);
+
+  const dustColor = themeColors.dustColor
+    ? new THREE.Color(themeColors.dustColor)
+    : new THREE.Color(
+        Math.min(1, (avgFR * 0.45 + 242 * 0.55) / 255),
+        Math.min(1, (avgFG * 0.45 + 236 * 0.55) / 255),
+        Math.min(1, (avgFB * 0.45 + 224 * 0.55) / 255)
+      );
+  const dustRGB = [
+    Math.round(dustColor.r * 255),
+    Math.round(dustColor.g * 255),
+    Math.round(dustColor.b * 255),
+  ];
+
+  const chipColor = themeColors.chipColor
+    ? new THREE.Color(themeColors.chipColor)
+    : new THREE.Color(avgFR / 255, avgFG / 255, avgFB / 255);
+
+  const pbr0 = buildBlendedCarvingStagePBR(0, rawPixels, finPixels, dustRGB, anisotropy);
+  const pbr1 = buildBlendedCarvingStagePBR(1, rawPixels, finPixels, dustRGB, anisotropy);
+  const pbr2 = buildBlendedCarvingStagePBR(2, rawPixels, finPixels, dustRGB, anisotropy);
+
+  const finRough =
+    targetFinishedMaterial && typeof targetFinishedMaterial.roughness === 'number'
+      ? targetFinishedMaterial.roughness
+      : 0.72;
+  const finMetal =
+    targetFinishedMaterial && typeof targetFinishedMaterial.metalness === 'number'
+      ? targetFinishedMaterial.metalness
+      : 0.04;
+
+  const stage0 = new THREE.MeshStandardMaterial({
+    map: pbr0.map,
+    normalMap: pbr0.normalMap,
+    normalScale: new THREE.Vector2(1.48, 1.48),
+    roughnessMap: pbr0.roughnessMap,
+    roughness: 0.92,
+    metalness: 0.02,
+  });
+  stage0.userData.carvingStage = 0;
+
+  const stage1 = new THREE.MeshStandardMaterial({
+    map: pbr1.map,
+    normalMap: pbr1.normalMap,
+    normalScale: new THREE.Vector2(1.38, 1.38),
+    roughnessMap: pbr1.roughnessMap,
+    roughness: 0.86,
+    metalness: Math.min(0.1, finMetal * 0.35),
+  });
+  stage1.userData.carvingStage = 1;
+
+  const stage2 = new THREE.MeshStandardMaterial({
+    map: pbr2.map,
+    normalMap: pbr2.normalMap,
+    normalScale: new THREE.Vector2(1.22, 1.22),
+    roughnessMap: pbr2.roughnessMap,
+    roughness: lerp(0.84, finRough, 0.65),
+    metalness: finMetal * 0.7,
+  });
+  stage2.userData.carvingStage = 2;
+
+  const stage3 =
+    targetFinishedMaterial && targetFinishedMaterial.isMaterial
+      ? targetFinishedMaterial
+      : new THREE.MeshStandardMaterial({
+          color: chipColor,
+          roughness: finRough,
+          metalness: finMetal,
+        });
+
+  const pack = {
+    stages: [stage0, stage1, stage2, stage3],
+    stage0,
+    stage1,
+    stage2,
+    stage3,
+    chipColor,
+    dustColor,
+    cacheKey,
+    dispose() {
+      [pbr0, pbr1, pbr2].forEach((p) => {
+        p.map.dispose();
+        p.normalMap.dispose();
+        p.roughnessMap.dispose();
+      });
+      stage0.dispose();
+      stage1.dispose();
+      stage2.dispose();
+      _carvingStagePackCache.delete(cacheKey);
+    },
+  };
+
+  _carvingStagePackCache.set(cacheKey, pack);
+  return pack;
+}

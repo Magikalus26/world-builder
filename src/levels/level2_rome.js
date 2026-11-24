@@ -1234,6 +1234,13 @@ export class Level2Rome extends Level1Pyramid {
     return 'ashlar';
   }
 
+  _resolveCarvingTargetMaterial() {
+    const pieceType = this._pickNextCarvedPieceType();
+    if (pieceType === 'column') return this.rome.materials.flutedColumn;
+    if (pieceType === 'roof') return this.rome.materials.terracottaRoof;
+    return this.carvedBlockMat;
+  }
+
   carveWorkbenchBlock(swipeVec) {
     const stillRaw = super.carveWorkbenchBlock(swipeVec);
     const block = this.workbenchSlot ? this.workbenchSlot.block : null;

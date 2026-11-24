@@ -1560,6 +1560,16 @@ export class Level9Museum extends Level1Pyramid {
     return 'podium_base';
   }
 
+  _resolveCarvingTargetMaterial() {
+    const pieceType = this._pickNextCarvedPieceType();
+    if (pieceType === 'grand_stair' || pieceType === 'fluted_column') {
+      return this.museum.materials.flutedMarble;
+    }
+    if (pieceType === 'verriere_glass') return this.museum.materials.verriereGlass;
+    if (pieceType === 'wing_roof') return this.museum.materials.zincRoof;
+    return this.museum.materials.galleryStone || this.carvedBlockMat;
+  }
+
   carveWorkbenchBlock(swipeVec) {
     const stillRaw = super.carveWorkbenchBlock(swipeVec);
     const block = this.workbenchSlot ? this.workbenchSlot.block : null;

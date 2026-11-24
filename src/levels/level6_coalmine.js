@@ -1314,6 +1314,16 @@ export class Level6CoalMine extends Level1Pyramid {
     return 'concrete';
   }
 
+  _resolveCarvingTargetMaterial() {
+    const pieceType = this._pickNextCarvedPieceType();
+    if (pieceType === 'roof_zinc') return this.coal.materials.corrugatedZinc;
+    if (pieceType === 'pulley_wheel') return this.coal.materials.pulleySteel;
+    if (pieceType === 'headframe') return this.coal.materials.rivetedIron;
+    if (pieceType === 'brick_window') return this.coal.materials.industrialBrickWindow;
+    if (pieceType === 'brick' || pieceType === 'smokestack') return this.coal.materials.industrialBrick;
+    return this.coal.materials.concreteFoundation || this.carvedBlockMat;
+  }
+
   carveWorkbenchBlock(swipeVec) {
     const stillRaw = super.carveWorkbenchBlock(swipeVec);
     const block = this.workbenchSlot ? this.workbenchSlot.block : null;

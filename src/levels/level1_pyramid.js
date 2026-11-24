@@ -15,6 +15,7 @@
  */
 
 import * as THREE from 'three';
+import { createCarvingStageMaterials } from '../textures.js';
 import {
   DEFAULT_BLUEPRINT_SKIN,
   createBlueprintSkinMaterialSet,
@@ -421,6 +422,10 @@ export class Level1Pyramid {
     this._buildQuarryStation();
     this._buildTransportTracksAndSleds();
     this._buildStonecutterWorkshop();
+    if (this.workbenchSlot && this.workbenchSlot.position) {
+      // Zero Z-fighting clearance above anvil top (anvilTopY + blockHeight / 2 + 0.002)
+      this.workbenchSlot.position.y += 0.002;
+    }
     this._buildPyramidSite();
     this._buildParticlePool();
     this._rebuildHitTargets();
@@ -432,6 +437,10 @@ export class Level1Pyramid {
 
   _getRawBlockMaterial() {
     return this.textures.materials.rawBlock;
+  }
+
+  _resolveCarvingTargetMaterial() {
+    return this.carvedBlockMat;
   }
 
   _fitPlacedBlock(_block, _slot) {
@@ -475,9 +484,9 @@ export class Level1Pyramid {
 
   _initSharedGeometries() {
     this.geos = {
-      rawBlock: this._trackGeo(createRoughStoneGeometry(0.92, 0.66, 0.92, 0.14, 17)),
-      stage1Block: this._trackGeo(createRoughStoneGeometry(0.93, 0.67, 0.93, 0.08, 29)),
-      stage2Block: this._trackGeo(createBeveledBlockGeometry(0.95, 0.67, 0.95, 0.06)),
+      rawBlock: this._trackGeo(createRoughStoneGeometry(0.9, 0.65, 0.9, 0.14, 17)),
+      stage1Block: this._trackGeo(createRoughStoneGeometry(0.925, 0.655, 0.925, 0.08, 29)),
+      stage2Block: this._trackGeo(createBeveledBlockGeometry(0.948, 0.648, 0.948, 0.055)),
       carvedBlock: this._trackGeo(createConnectedMasonryGeometry(BLOCK_W, BLOCK_H, BLOCK_D, 0, 0.044)),
       capstone: this._trackGeo(
         (() => {
@@ -1912,44 +1921,103 @@ export class Level1Pyramid {
     return !this.blocks.some((b) => b.kind === 'capstone');
   }
 
+  _clearBlockEmissiveFlash(block) {
+    if (!block) return;
+    if (block._flashCloneMat) {
+      if (block.mesh && block.mesh.material === block._flashCloneMat && block._flashBaseMat) {
+        block.mesh.material = block._flashBaseMat;
+      }
+      block._flashCloneMat.dispose();
+      block._flashCloneMat = null;
+    }
+    block._flashBaseMat = null;
+    block._flashPending = false;
+    block._flashTimer = 0;
+  }
+
+  _getCarvingPackForBlock(block) {
+    if (block && block._carvingPack) return block._carvingPack;
+    const rawMat = this._getRawBlockMaterial();
+    const targetMat = this._resolveCarvingTargetMaterial() || this.carvedBlockMat;
+    const pack = createCarvingStageMaterials(rawMat, targetMat, { anisotropy: 4 });
+    if (block) block._carvingPack = pack;
+    return pack;
+  }
+
+  _getCarveChipParticleMaterial(chipColor) {
+    if (!this._carveChipMat) {
+      this._carveChipMat = this._trackMat(
+        new THREE.MeshStandardMaterial({
+          color: new THREE.Color('#d8c49e'),
+          roughness: 0.88,
+          metalness: 0.04,
+        })
+      );
+    }
+    if (chipColor) {
+      this._carveChipMat.color.copy(chipColor);
+    }
+    return this._carveChipMat;
+  }
+
+  _triggerCarveScalePulse(mesh) {
+    if (!mesh) return;
+    mesh.scale.set(1.08, 0.88, 1.08);
+    mesh.userData._springTime = 0;
+    mesh.userData._carvePulseTime = 0.0001;
+    mesh.userData._carvePulseDuration = 0.18; // Exact 180ms elastic squash-and-pop
+  }
+
+  _queueCarveEmissiveFlash(block) {
+    if (!block) return;
+    this._clearBlockEmissiveFlash(block);
+    block._flashPending = true;
+    block._flashTimer = 0.22; // Exact 220ms warm golden/white emissive rim flash
+    block._flashDuration = 0.22;
+  }
+
   carveWorkbenchBlock(swipeVec) {
     const block = this.workbenchSlot ? this.workbenchSlot.block : null;
     if (!block || block.kind !== 'raw' || block.isDragging || block.isTweening) {
       return false;
     }
 
+    // Ensure clean single-mesh swap without lingering flash clones
+    this._clearBlockEmissiveFlash(block);
+    const pack = this._getCarvingPackForBlock(block);
+
     block.carveStage = Math.min(3, block.carveStage + this.carveStep);
     const stage = block.carveStage;
     this.audio.playChiselPing(stage);
 
-    const burstOrigin = block.mesh.position.clone().add(new THREE.Vector3(0, 0.25, 0));
+    // 8–12 matching stone/brick chip particles flying off the carved block
+    const chipMat = this._getCarveChipParticleMaterial(pack.chipColor);
+    const burstOrigin = block.mesh.position.clone().add(new THREE.Vector3(0, 0.24, 0));
     this._spawnParticles(burstOrigin, {
-      count: stage === 3 ? 16 : 11,
-      material: stage === 3 ? this.mats.dustGold : this.mats.dustLimestone,
-      speed: stage === 3 ? 3.2 : 2.5,
-      upSpeed: stage === 3 ? 4.2 : 3.2,
-      scale: stage === 3 ? 0.95 : 0.85,
+      count: stage === 3 ? 12 : 10,
+      material: stage === 3 ? this.mats.dustGold : chipMat,
+      speed: stage === 3 ? 3.1 : 2.55,
+      upSpeed: stage === 3 ? 4.0 : 3.2,
+      scale: stage === 3 ? 0.92 : 0.82,
     });
     this._spawnParticles(burstOrigin, {
-      count: 6,
+      count: 5,
       material: this.mats.sparkCopper,
-      speed: 3.8,
-      upSpeed: 3.4,
+      speed: 3.7,
+      upSpeed: 3.3,
       gravity: 6.5,
-      life: 0.32,
-      scale: 0.55,
+      life: 0.3,
+      scale: 0.52,
     });
 
     if (stage === 1) {
       block.mesh.geometry = this.geos.stage1Block;
-      block.mesh.material = this._getCarvingStageMaterial(1);
+      block.mesh.material = pack.stage1;
       block.mesh.userData.state = 'carving_stage1';
-      this._triggerSquashBounce(block.mesh, 1.16, 0.82);
     } else if (stage === 2) {
       block.mesh.geometry = this.geos.stage2Block;
-      block.mesh.material = this._getCarvingStageMaterial(2);
+      block.mesh.material = pack.stage2;
       block.mesh.userData.state = 'carving_stage2';
-      this._triggerSquashBounce(block.mesh, 1.14, 0.85);
     } else if (stage >= 3) {
       const makeCapstone = this._shouldForgeCapstone();
       if (makeCapstone) {
@@ -1957,16 +2025,19 @@ export class Level1Pyramid {
       } else {
         block.kind = 'carved';
         block.mesh.geometry = this.geos.carvedBlock;
-        block.mesh.material = this.carvedBlockMat;
+        block.mesh.material = pack.stage3;
       }
       block.mesh.rotation.set(0, 0, 0);
       block.mesh.userData.draggable = true;
       block.mesh.userData.state = block.kind;
       block.mesh.userData.interact = { type: 'block', block };
       block.mesh.updateMatrixWorld(true);
-      this._triggerSquashBounce(block.mesh, 1.2, 0.84);
       this._rebuildHitTargets();
     }
+
+    // 180ms elastic squash-and-pop + 220ms warm golden/white emissive rim flash
+    this._triggerCarveScalePulse(block.mesh);
+    this._queueCarveEmissiveFlash(block);
 
     // Subtle directional nudge if swiped
     if (swipeVec) {
@@ -2356,6 +2427,11 @@ export class Level1Pyramid {
       block.mesh.userData.draggable = false;
       block.mesh.userData.state = 'raw';
       block.mesh.userData.interact = { type: 'workbench-carve', block };
+      block._carvingPack = null;
+      const pack = this._getCarvingPackForBlock(block);
+      if (block.carveStage === 0 && pack && pack.stage0) {
+        block.mesh.material = pack.stage0;
+      }
       this._rebuildHitTargets();
     } else {
       block.mesh.userData.draggable = true;
@@ -2499,7 +2575,8 @@ export class Level1Pyramid {
   }
 
   _getCarvingStageMaterial(stage) {
-    return stage === 1 ? this.textures.materials.carvingStage1 : this.textures.materials.carvingStage2;
+    const pack = this._getCarvingPackForBlock(this.workbenchSlot ? this.workbenchSlot.block : null);
+    return pack.stages[Math.min(3, Math.max(0, stage))] || this.carvedBlockMat;
   }
 
   _updateConnectedMasonryAround(slot) {
@@ -2707,10 +2784,62 @@ export class Level1Pyramid {
       }
     }
 
-    // 2. Damped harmonic elastic spring bounce on placed & carved blocks (all levels)
+    // 2. 180ms elastic carve squash-pop, 220ms warm emissive rim flash, & harmonic spring bounce
     const scaleRecover = 1 - Math.exp(-14 * dt);
     for (let i = 0; i < this.blocks.length; i++) {
-      const m = this.blocks[i].mesh;
+      const b = this.blocks[i];
+      const m = b.mesh;
+
+      // 2a. Warm golden/white emissive rim flash (emissiveIntensity: 0.45 -> 0 over 220ms)
+      if (b._flashPending && m && m.material && typeof m.material.clone === 'function') {
+        b._flashPending = false;
+        const baseMat = m.material;
+        const cloneMat = baseMat.clone();
+        const hasBaseEmissive = Boolean(baseMat.emissive && baseMat.emissive.getHex() !== 0);
+        const baseEI =
+          hasBaseEmissive && typeof baseMat.emissiveIntensity === 'number'
+            ? baseMat.emissiveIntensity
+            : 0;
+        if (cloneMat.emissive) {
+          cloneMat.emissive.setHex(0xffe8b0);
+        }
+        cloneMat.userData._flashBaseEI = baseEI;
+        cloneMat.emissiveIntensity = baseEI + 0.45;
+        b._flashBaseMat = baseMat;
+        b._flashCloneMat = cloneMat;
+        m.material = cloneMat;
+      }
+      if (b._flashCloneMat && b._flashTimer > 0) {
+        b._flashTimer = Math.max(0, b._flashTimer - dt);
+        const ratio = b._flashTimer / Math.max(0.001, b._flashDuration || 0.22);
+        if (b._flashTimer <= 0) {
+          this._clearBlockEmissiveFlash(b);
+        } else {
+          const baseEI = b._flashCloneMat.userData._flashBaseEI || 0;
+          b._flashCloneMat.emissiveIntensity = baseEI + 0.45 * ratio * ratio;
+        }
+      }
+
+      // 2b. 180ms elastic squash-and-pop scale pulse: (1.08, 0.88, 1.08) -> (1.0, 1.0, 1.0)
+      const cpt = m.userData._carvePulseTime;
+      if (cpt > 0) {
+        const dur = m.userData._carvePulseDuration || 0.18;
+        const nextC = cpt + dt;
+        if (nextC >= dur) {
+          m.userData._carvePulseTime = 0;
+          m.scale.set(1, 1, 1);
+        } else {
+          m.userData._carvePulseTime = nextC;
+          const p = nextC / dur;
+          const decay = Math.exp(-5.2 * p);
+          const wave = Math.cos(p * Math.PI * 2.1);
+          const sy = 1.0 - 0.12 * decay * wave;
+          const sxz = 1.0 + 0.08 * decay * wave;
+          m.scale.set(sxz, sy, sxz);
+        }
+        continue;
+      }
+
       const st = m.userData._springTime;
       if (st > 0) {
         const nextT = st + dt;
@@ -2895,6 +3024,7 @@ export class Level1Pyramid {
    * Cleanly disposes all level-owned GPU geometries, materials, and scene graph nodes.
    */
   dispose() {
+    this.blocks.forEach((b) => this._clearBlockEmissiveFlash(b));
     this.tweens.length = 0;
     this.blocks.length = 0;
     this.quarryNodes.length = 0;

@@ -341,6 +341,15 @@ export class CityLevelBuilder extends Level1Pyramid {
     };
   }
 
+  _resolveCarvingTargetMaterial() {
+    const dist = this.getActiveDistrict ? this.getActiveDistrict() : null;
+    const mats = this._getCityBlockMaterials();
+    if (dist && dist.def && dist.def.blockType && mats[dist.def.blockType]) {
+      return mats[dist.def.blockType];
+    }
+    return this.carvedBlockMat;
+  }
+
   getDragBounds() {
     const cfg = this.cityConfig;
     return (

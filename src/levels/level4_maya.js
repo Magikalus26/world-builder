@@ -1217,6 +1217,15 @@ export class Level4Maya extends Level1Pyramid {
     return 'terrace';
   }
 
+  _resolveCarvingTargetMaterial() {
+    const pieceType = this._pickNextCarvedPieceType();
+    if (pieceType === 'crest' || pieceType === 'shrine' || pieceType === 'stucco') {
+      return this.maya.materials.mayaStucco;
+    }
+    if (pieceType === 'relief') return this.maya.materials.mayaRelief;
+    return this.limestoneMat || this.carvedBlockMat;
+  }
+
   carveWorkbenchBlock(swipeVec) {
     const stillRaw = super.carveWorkbenchBlock(swipeVec);
     const block = this.workbenchSlot ? this.workbenchSlot.block : null;

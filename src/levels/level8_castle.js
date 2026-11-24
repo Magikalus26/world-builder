@@ -1444,6 +1444,17 @@ export class Level8Castle extends Level1Pyramid {
     return 'rampart_base';
   }
 
+  _resolveCarvingTargetMaterial() {
+    const pieceType = this._pickNextCarvedPieceType();
+    if (pieceType === 'turret_spire' || pieceType === 'keep_roof') {
+      return this.castle.materials.conicalSlate;
+    }
+    if (pieceType === 'gate_threshold') return this.castle.materials.portcullisOak;
+    if (pieceType === 'battlement') return this.castle.materials.crenellationStone;
+    if (pieceType === 'arrow_slit') return this.castle.materials.arrowSlitStone;
+    return this.castle.materials.castleAshlar || this.carvedBlockMat;
+  }
+
   carveWorkbenchBlock(swipeVec) {
     const stillRaw = super.carveWorkbenchBlock(swipeVec);
     const block = this.workbenchSlot ? this.workbenchSlot.block : null;
