@@ -15,6 +15,7 @@ import {
   calibrateShadowCamera,
 } from './graphicsCore.js';
 import { buildDioramaEnvironment } from './dioramaEnvironment.js';
+import { resolveSolarPresetId } from './solarLighting.js';
 import { SoundEngine } from './audio.js';
 import { createTextureLibrary } from './textures.js';
 import { DioramaCameraController } from './camera.js';
@@ -426,16 +427,21 @@ class WorkdBuilderApp {
     }
   }
 
-  _applyDioramaEnvironment(biomeKey) {
+  _applyDioramaEnvironment(biomeKey, { solarPresetId = null, levelNum = null } = {}) {
     if (this.dioramaEnv) {
       this.dioramaEnv.dispose();
       this.dioramaEnv = null;
+      this.solarLighting = null;
     }
     this.dioramaEnv = buildDioramaEnvironment(biomeKey, {
       scene: this.scene,
+      renderer: this.renderer,
       lights: this.lights,
       materialFactory: this.textures ? this.textures.materialFactory : null,
+      solarPresetId: solarPresetId || resolveSolarPresetId(biomeKey, levelNum),
+      levelNum,
     });
+    this.solarLighting = this.dioramaEnv.solar || null;
   }
 
   _syncSunLightToTarget(x, z) {
@@ -587,7 +593,10 @@ class WorkdBuilderApp {
 
     this.mode = 'level';
     const biomeKey = (LevelClass.meta && LevelClass.meta.id) || 'level1_pyramid';
-    this._applyDioramaEnvironment(biomeKey);
+    this._applyDioramaEnvironment(biomeKey, {
+      solarPresetId: LevelClass.meta && LevelClass.meta.solarPreset,
+      levelNum: index + 1,
+    });
     this._syncSunLightToTarget(0, 0);
 
     this.hudMapTop.hidden = true;
@@ -664,7 +673,10 @@ class WorkdBuilderApp {
 
     this.mode = 'roguelike';
     this.activeRoguelikeConfig = cfg;
-    this._applyDioramaEnvironment(cfg.themeId || cfg.themeShortName || 'egypt');
+    this._applyDioramaEnvironment(cfg.themeId || cfg.themeShortName || 'egypt', {
+      solarPresetId: cfg.solarPreset || null,
+      levelNum: cfg.levelNum || null,
+    });
     this._syncSunLightToTarget(0, 0);
 
     this.hudMapTop.hidden = true;
@@ -823,7 +835,8 @@ class WorkdBuilderApp {
         dt,
         this.elapsed,
         this.cameraController.target.x,
-        this.cameraController.target.z
+        this.cameraController.target.z,
+        this.camera
       );
     }
 

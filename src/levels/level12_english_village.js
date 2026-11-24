@@ -240,6 +240,7 @@ export class Level12EnglishVillage extends Level1Pyramid {
     hudLabel: 'Village Anglais',
     totalGoal: 104,
     tier: 1,
+    solarPreset: 'england_1900_soft_meadow',
   };
 
   constructor(options = {}) {

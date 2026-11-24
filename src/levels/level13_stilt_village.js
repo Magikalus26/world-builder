@@ -285,6 +285,7 @@ export class Level13StiltVillage extends Level1Pyramid {
     hudLabel: 'Village Pilotis',
     totalGoal: 114,
     tier: 1,
+    solarPreset: 'lagoon_tropical_sunlight',
   };
 
   constructor(options = {}) {

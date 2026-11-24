@@ -255,6 +255,7 @@ export class Level11Viking extends Level1Pyramid {
     hudLabel: 'Village Viking',
     totalGoal: 94,
     tier: 1,
+    solarPreset: 'viking_nordic_fjord',
   };
 
   constructor(options = {}) {

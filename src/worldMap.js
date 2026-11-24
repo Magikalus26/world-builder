@@ -255,6 +255,8 @@ function computeAll100LevelCoords() {
 }
 
 export class WorldMapScene {
+  static solarPreset = 'worldmap_golden_archipelago';
+
   constructor({ scene, textures, audio, cameraController, onSelectNode, onClearSelection }) {
     this.scene = scene;
     this.textures = textures;

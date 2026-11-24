@@ -281,6 +281,7 @@ export class Level6CoalMine extends Level1Pyramid {
     hudLabel: 'Mine de Charbon',
     totalGoal: 50,
     skyColor: '#c9d6de',
+    solarPreset: 'coalmine_overcast_amber',
   };
 
   constructor(options) {

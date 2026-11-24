@@ -255,6 +255,7 @@ export class Level3Japan extends Level1Pyramid {
     totalGoal: 46,
     rewardCoins: 160,
     firstCompletionTokens: 20,
+    solarPreset: 'japan_sakura_dawn',
   };
 
   constructor(opts) {

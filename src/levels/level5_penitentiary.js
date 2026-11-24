@@ -275,6 +275,7 @@ export class Level5Penitentiary extends Level1Pyramid {
     rewardCoins: 225,
     firstCompletionTokens: 30,
     rewardFurniture: ['item_13', 'item_14'],
+    solarPreset: 'frontier_1800_dusty_afternoon',
   };
 
   constructor(opts) {

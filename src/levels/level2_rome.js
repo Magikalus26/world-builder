@@ -285,6 +285,7 @@ export class Level2Rome extends Level1Pyramid {
     totalGoal: 48,
     rewardCoins: 120,
     firstCompletionTokens: 15,
+    solarPreset: 'rome_mediterranean_morning',
   };
 
   constructor(opts) {

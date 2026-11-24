@@ -388,6 +388,7 @@ export class Level9Museum extends Level1Pyramid {
     totalGoal: 58,
     rewardCoins: 360,
     rewardTokens: 45,
+    solarPreset: 'museum_neoclassical_afternoon',
   };
 
   constructor(options) {

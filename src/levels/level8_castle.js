@@ -291,6 +291,7 @@ export class Level8Castle extends Level1Pyramid {
     totalGoal: 56,
     rewardCoins: 320,
     rewardTokens: 40,
+    solarPreset: 'medieval_crisp_morning',
   };
 
   constructor(options) {

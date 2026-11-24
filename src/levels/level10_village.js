@@ -173,6 +173,7 @@ export class Level10Village extends CityLevelBuilder {
     title: 'Niveau 10 : Village Médiéval',
     hudLabel: 'Village',
     totalGoal: 782,
+    solarPreset: 'village_warm_harvest',
   };
 
   constructor(options) {

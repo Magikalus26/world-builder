@@ -11,6 +11,7 @@
 
 import * as THREE from 'three';
 import { applyCrispTextureSettings } from './graphicsCore.js';
+import { applyLevelSolarLighting, resolveSolarPresetId } from './solarLighting.js';
 
 export const BIOME_ATMOSPHERES = {
   egypt: {
@@ -369,87 +370,23 @@ function createAtmosphericSkyDome(cfg) {
 
 /**
  * Generic Diorama & Atmosphere Envelope (`buildDioramaEnvironment(biomeConfig)`).
- * Wraps the active scene with dynamic gradient sky, calibrated 3-point lighting,
- * distance fog, ambient floating biome particles, and a 1024x1024 HD geological plinth material.
+ * Delegates soft solar lighting, custom GLSL Mie sky dome, FogExp2 atmospheric haze,
+ * and <= 40 instanced sun-beam dust motes to `applyLevelSolarLighting` (`src/solarLighting.js`),
+ * while preserving the 1024x1024 HD geological cross-section plinth material from MaterialFactory.
  */
-export function buildDioramaEnvironment(biomeConfig, { scene, lights, materialFactory } = {}) {
+export function buildDioramaEnvironment(
+  biomeConfig,
+  { scene, renderer = null, lights, materialFactory, solarPresetId = null, levelNum = null } = {}
+) {
   const cfg = resolveBiomeConfig(biomeConfig);
+  const resolvedPresetId = resolveSolarPresetId(solarPresetId || biomeConfig || cfg.id, levelNum);
 
-  // 1. Calibrate background, distance fog & cinematic 3-point lights
-  if (scene) {
-    if (!scene.background) scene.background = new THREE.Color(cfg.fogColor);
-    else scene.background.set(cfg.fogColor);
-
-    if (!scene.fog) {
-      scene.fog = new THREE.Fog(cfg.fogColor, cfg.fogNear, cfg.fogFar);
-    } else {
-      scene.fog.color.set(cfg.fogColor);
-      scene.fog.near = cfg.fogNear;
-      scene.fog.far = cfg.fogFar;
-    }
-  }
-
-  if (lights) {
-    if (lights.sunLight) {
-      lights.sunLight.color.set(cfg.sunColor);
-      lights.sunLight.intensity = cfg.sunIntensity;
-    }
-    if (lights.hemiLight) {
-      lights.hemiLight.color.set(cfg.hemiSky);
-      lights.hemiLight.groundColor.set(cfg.hemiGround);
-      lights.hemiLight.intensity = cfg.hemiIntensity;
-    }
-    if (lights.rimLight) {
-      lights.rimLight.color.set(cfg.rimColor);
-      lights.rimLight.intensity = cfg.rimIntensity;
-    }
-  }
-
-  // 2. Dynamic atmospheric gradient sky dome
-  const root = new THREE.Group();
-  root.name = `DioramaAtmosphere_${cfg.id}`;
-  const sky = createAtmosphericSkyDome(cfg);
-  root.add(sky.mesh);
-
-  // 3. Subtle ambient floating biome particles (1 draw call via THREE.Points)
-  const count = cfg.particleCount || 40;
-  const pPos = new Float32Array(count * 3);
-  const pSeeds = new Float32Array(count * 4); // x0, y0, z0, phase
-  const spread = cfg.id === 'worldmap' ? 18 : 15;
-
-  for (let i = 0; i < count; i++) {
-    const x0 = ((i * 73.13) % 100) / 100 * spread * 2 - spread;
-    const y0 = 0.8 + (((i * 41.7) % 100) / 100) * 5.2;
-    const z0 = ((i * 29.31) % 100) / 100 * spread * 2 - spread;
-    pPos[i * 3] = x0;
-    pPos[i * 3 + 1] = y0;
-    pPos[i * 3 + 2] = z0;
-    pSeeds[i * 4] = x0;
-    pSeeds[i * 4 + 1] = y0;
-    pSeeds[i * 4 + 2] = z0;
-    pSeeds[i * 4 + 3] = i * 0.77;
-  }
-
-  const pGeo = new THREE.BufferGeometry();
-  pGeo.setAttribute('position', new THREE.BufferAttribute(pPos, 3));
-  const pMat = new THREE.PointsMaterial({
-    color: new THREE.Color(cfg.particleColor || '#ffe8b4'),
-    map: getSoftParticleTexture(),
-    size: cfg.particleStyle === 'petal' ? 0.34 : cfg.particleStyle === 'firefly' ? 0.28 : 0.22,
-    transparent: true,
-    opacity: cfg.particleStyle === 'firefly' ? 0.72 : 0.46,
-    depthWrite: false,
-    blending: cfg.particleStyle === 'firefly' ? THREE.AdditiveBlending : THREE.NormalBlending,
+  const solar = applyLevelSolarLighting(scene, renderer, resolvedPresetId, {
+    lights,
+    levelNum,
   });
-  const particles = new THREE.Points(pGeo, pMat);
-  particles.frustumCulled = false;
-  root.add(particles);
 
-  if (scene) {
-    scene.add(root);
-  }
-
-  // 4. Fetch 1024x1024 HD geological cross-section plinth material from MaterialFactory
+  // Fetch 1024x1024 HD geological cross-section plinth material from MaterialFactory
   const plinthMaterial =
     materialFactory && cfg.id !== 'worldmap' && cfg.id !== 'menu'
       ? materialFactory.getGeologicalPlinthMaterial(cfg.id)
@@ -457,52 +394,18 @@ export function buildDioramaEnvironment(biomeConfig, { scene, lights, materialFa
 
   return {
     config: cfg,
-    root,
-    skyMesh: sky.mesh,
-    particles,
+    solarPresetId: solar.presetId,
+    solarPreset: solar.preset,
+    solar,
+    root: solar.root,
+    skyMesh: solar.skyMesh,
+    particles: solar.motesMesh,
     plinthMaterial,
-    update(dt, elapsed, centerX = 0, centerZ = 0) {
-      // Keep sky dome & ambient particle field centered around active camera target
-      sky.mesh.position.set(centerX, 0, centerZ);
-      particles.position.set(centerX, 0, centerZ);
-
-      const arr = pGeo.attributes.position.array;
-      const isPetal = cfg.particleStyle === 'petal';
-      const isFirefly = cfg.particleStyle === 'firefly';
-
-      for (let i = 0; i < count; i++) {
-        const sIdx = i * 4;
-        const phase = pSeeds[sIdx + 3];
-        const x0 = pSeeds[sIdx];
-        const y0 = pSeeds[sIdx + 1];
-        const z0 = pSeeds[sIdx + 2];
-
-        if (isPetal) {
-          // Gentle diagonal falling & fluttering sakura petals
-          const fall = ((elapsed * 0.55 + phase) % 5.4);
-          arr[i * 3] = x0 + Math.sin(elapsed * 1.1 + phase) * 0.9;
-          arr[i * 3 + 1] = 6.0 - fall;
-          arr[i * 3 + 2] = z0 + Math.cos(elapsed * 0.9 + phase) * 0.7;
-        } else if (isFirefly) {
-          // Soft bobbing luminous jungle fireflies
-          arr[i * 3] = x0 + Math.sin(elapsed * 0.7 + phase) * 0.85;
-          arr[i * 3 + 1] = y0 + Math.sin(elapsed * 1.5 + phase * 1.3) * 0.45;
-          arr[i * 3 + 2] = z0 + Math.cos(elapsed * 0.65 + phase) * 0.85;
-        } else {
-          // Slow warm atmospheric frontier / desert dust drift
-          arr[i * 3] = x0 + Math.sin(elapsed * 0.35 + phase) * 1.1;
-          arr[i * 3 + 1] = y0 + Math.sin(elapsed * 0.5 + phase * 1.1) * 0.25;
-          arr[i * 3 + 2] = z0 + Math.cos(elapsed * 0.3 + phase) * 0.9;
-        }
-      }
-      pGeo.attributes.position.needsUpdate = true;
+    update(dt, elapsed, centerX = 0, centerZ = 0, camera = null) {
+      solar.update(dt, elapsed, centerX, centerZ, camera);
     },
     dispose() {
-      if (scene) scene.remove(root);
-      sky.geo.dispose();
-      sky.mat.dispose();
-      pGeo.dispose();
-      pMat.dispose();
+      solar.dispose();
     },
   };
 }

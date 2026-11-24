@@ -312,6 +312,7 @@ export class Level1Pyramid {
     title: 'La Petite Pyramide - 5 Étages',
     hudLabel: 'Pyramide',
     totalGoal: 55,
+    solarPreset: 'egypt_golden_noon',
   };
 
   constructor({

@@ -158,22 +158,23 @@ export function createRoomEnvironmentIBL(renderer) {
  * with calibrated 2048x2048 PCFSoftShadowMap (bias = -0.0004).
  */
 export function createThreePointLightingRig(scene, { shadowBounds = 16.5 } = {}) {
-  const hemiLight = new THREE.HemisphereLight('#fff8ec', '#b8844c', 0.86);
-  hemiLight.position.set(0, 22, 0);
+  const hemiLight = new THREE.HemisphereLight('#fff8ec', '#b8844c', 0.9);
+  hemiLight.position.set(0, 24, 0);
   scene.add(hemiLight);
 
-  const sunLight = new THREE.DirectionalLight('#fff0cf', 2.1);
-  sunLight.position.set(-12, 19, 13);
+  const sunLight = new THREE.DirectionalLight('#fff0cf', 2.08);
+  sunLight.position.set(-13.5, 18.8, 12.0);
   sunLight.castShadow = true;
-  sunLight.shadow.mapSize.set(2048, 2048);
-  sunLight.shadow.camera.near = 5;
-  sunLight.shadow.camera.far = 62;
+  sunLight.shadow.mapSize.set(1024, 1024);
+  sunLight.shadow.radius = 2.6;
+  sunLight.shadow.camera.near = 4;
+  sunLight.shadow.camera.far = 72;
   sunLight.shadow.camera.left = -shadowBounds;
   sunLight.shadow.camera.right = shadowBounds;
   sunLight.shadow.camera.top = shadowBounds;
   sunLight.shadow.camera.bottom = -shadowBounds;
-  sunLight.shadow.bias = -0.0004;
-  sunLight.shadow.normalBias = 0.022;
+  sunLight.shadow.bias = -0.00045;
+  sunLight.shadow.normalBias = 0.024;
   scene.add(sunLight);
   scene.add(sunLight.target);
 
@@ -181,17 +182,26 @@ export function createThreePointLightingRig(scene, { shadowBounds = 16.5 } = {})
   rimLight.position.set(14, 10, -13);
   scene.add(rimLight);
 
-  return { hemiLight, sunLight, rimLight };
+  return {
+    hemiLight,
+    sunLight,
+    rimLight,
+    sunOffset: new THREE.Vector3(-13.5, 18.8, 12.0),
+  };
 }
 
 /**
  * Dynamically calibrates the directional Sun shadow camera around any active focus point
- * (supports both compact playable dioramas and the 186-unit 100-level World Map).
+ * while preserving the active level's unique solar angle (`rig.sunOffset`).
  */
 export function calibrateShadowCamera(rig, targetX = 0, targetZ = 0, halfExtent = null) {
   if (!rig || !rig.sunLight) return;
   const sun = rig.sunLight;
-  sun.position.set(targetX - 12, 19, targetZ + 13);
+  const ox = rig.sunOffset ? rig.sunOffset.x : -13.5;
+  const oy = rig.sunOffset ? rig.sunOffset.y : 18.8;
+  const oz = rig.sunOffset ? rig.sunOffset.z : 12.0;
+
+  sun.position.set(targetX + ox, oy, targetZ + oz);
   sun.target.position.set(targetX, 0, targetZ);
   sun.target.updateMatrixWorld();
 

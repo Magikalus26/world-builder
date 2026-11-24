@@ -248,6 +248,7 @@ export class Level4Maya extends Level1Pyramid {
     totalGoal: 52,
     rewardCoins: 200,
     firstCompletionTokens: 25,
+    solarPreset: 'maya_jungle_zenith',
   };
 
   constructor(opts) {

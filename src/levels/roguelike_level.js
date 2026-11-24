@@ -6,6 +6,7 @@
  */
 
 import { Level1Pyramid } from './level1_pyramid.js';
+import { resolveSolarPresetId } from '../solarLighting.js';
 
 function makeRectCells(sizeX, sizeZ, skipCorners = false) {
   const ox = (sizeX - 1) * 0.5;
@@ -1323,6 +1324,8 @@ export function generateRoguelikeConfig({
 
   return {
     themeId: theme.id,
+    levelNum: theme.levelNum,
+    solarPreset: theme.solarPreset || resolveSolarPresetId(theme.id, theme.levelNum),
     themeShortName: theme.shortName,
     themeTitle: theme.title,
     biomeName: theme.biomeLabel,

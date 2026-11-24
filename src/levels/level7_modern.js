@@ -224,6 +224,7 @@ export class Level7Modern extends Level1Pyramid {
     hudLabel: 'Villa Moderne',
     totalGoal: 54,
     rewardCoins: 280,
+    solarPreset: 'modern_coastal_daylight',
     rewardTokens: 35,
   };
 
