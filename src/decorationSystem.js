@@ -174,7 +174,18 @@ export class DecorationSystem {
    */
   isValidPlacement(x, z, ignoreUid = null) {
     if (!Number.isFinite(x) || !Number.isFinite(z)) return false;
-    if (Math.abs(x) > 8.9 || Math.abs(z) > 8.3) return false;
+
+    const bounds =
+      this.level && typeof this.level.getDragBounds === 'function'
+        ? this.level.getDragBounds()
+        : null;
+    if (bounds) {
+      if (x < bounds.minX + 0.6 || x > bounds.maxX - 0.6 || z < bounds.minZ + 0.6 || z > bounds.maxZ - 0.6) {
+        return false;
+      }
+    } else if (Math.abs(x) > 8.9 || Math.abs(z) > 8.3) {
+      return false;
+    }
 
     const h =
       this.level && typeof this.level.getTerrainHeight === 'function'
@@ -185,21 +196,24 @@ export class DecorationSystem {
     const mirrorX = (this.level && this.level.mirrorX) || 1;
     const sx = x * mirrorX;
 
-    // Blocked gameplay station footprints (un-mirrored coordinates)
-    const blockedBoxes = [
-      // Quarry cliffs, rock nodes & drop pad
-      { minX: -7.9, maxX: -1.3, minZ: -7.5, maxZ: -2.0 },
-      // Track A & Sled A
-      { minX: -6.5, maxX: -2.5, minZ: -2.4, maxZ: 2.8 },
-      // Stonecutter Workshop & carved output pad
-      { minX: -6.9, maxX: -2.3, minZ: 2.8, maxZ: 7.0 },
-      // Track B & Sled B
-      { minX: -2.6, maxX: 3.0, minZ: 3.0, maxZ: 6.5 },
-      // Pyramid Staging Pallet
-      { minX: 2.6, maxX: 5.9, minZ: 3.0, maxZ: 6.6 },
-      // Pyramid Construction Foundation
-      { minX: 0.1, maxX: 7.1, minZ: -4.3, maxZ: 2.8 },
-    ];
+    // Use level-specific blocked station footprints when provided (expanded village/city boards)
+    const blockedBoxes =
+      this.level && typeof this.level.getDecorationBlockedBoxes === 'function'
+        ? this.level.getDecorationBlockedBoxes()
+        : [
+            // Quarry cliffs, rock nodes & drop pad
+            { minX: -7.9, maxX: -1.3, minZ: -7.5, maxZ: -2.0 },
+            // Track A & Sled A
+            { minX: -6.5, maxX: -2.5, minZ: -2.4, maxZ: 2.8 },
+            // Stonecutter Workshop & carved output pad
+            { minX: -6.9, maxX: -2.3, minZ: 2.8, maxZ: 7.0 },
+            // Track B & Sled B
+            { minX: -2.6, maxX: 3.0, minZ: 3.0, maxZ: 6.5 },
+            // Pyramid Staging Pallet
+            { minX: 2.6, maxX: 5.9, minZ: 3.0, maxZ: 6.6 },
+            // Pyramid Construction Foundation
+            { minX: 0.1, maxX: 7.1, minZ: -4.3, maxZ: 2.8 },
+          ];
 
     for (let i = 0; i < blockedBoxes.length; i++) {
       const b = blockedBoxes[i];

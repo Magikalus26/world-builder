@@ -727,7 +727,7 @@ export class WorldMapScene {
    *    - Levels 10, 20, ..., 100: Grand 2.2x Village / City Milestone Islands
    * ========================================================================== */
   _buildAll100Nodes() {
-    // 1. Build the 9 full 3D Playable Hero Islands (Levels 1–9)
+    // 1. Build the 10 full 3D Playable Hero Islands (Levels 1–9 + Level 11 Viking Village)
     this._buildHeroEgyptIsland(this.levelCoords[0]);
     this._buildHeroRomeIsland(this.levelCoords[1]);
     this._buildHeroJapanIsland(this.levelCoords[2]);
@@ -737,12 +737,14 @@ export class WorldMapScene {
     this._buildHeroModernVillaIsland(this.levelCoords[6]);
     this._buildHeroMedievalCastleIsland(this.levelCoords[7]);
     this._buildHeroMuseumIsland(this.levelCoords[8]);
+    this._buildHeroVikingVillageIsland(this.levelCoords[10]);
 
-    // 2. Collect regular "Bientôt" nodes (81) and Milestone Village/City nodes (10)
+    // 2. Collect regular "Bientôt" nodes (80: Levels 12–99 non-10) and Milestone Village/City nodes (10)
     const regularEntries = [];
     const milestoneEntries = [];
 
     for (let i = 9; i < 100; i++) {
+      if (i === 10) continue; // Level 11 built as full playable Hero Viking Village island
       const levelNum = i + 1;
       const chapterIdx = Math.floor(i / 10);
       const chapter = WORLD_CHAPTERS[chapterIdx];
@@ -756,7 +758,7 @@ export class WorldMapScene {
       }
     }
 
-    // 3. Build all 86 Regular "Bientôt" Islands via InstancedMesh (minimal draw calls!)
+    // 3. Build all Regular "Bientôt" Islands via InstancedMesh (minimal draw calls!)
     this._buildInstancedRegularIslands(regularEntries);
 
     // 4. Build all 10 Grand Village / City Milestone Islands (Levels 10, 20, ..., 100)
@@ -2282,7 +2284,204 @@ export class WorldMapScene {
   }
 
   /**
-   * Builds all 83 regular "Bientôt" islands using shared InstancedMesh batches
+   * Level 11 — Ère Viking : Le Village Viking du Fjord (UNLOCKED & PLAYABLE, Tier 1 Village)
+   */
+  _buildHeroVikingVillageIsland(coord) {
+    const pos = new THREE.Vector3(coord.x, 0, coord.z);
+    const group = new THREE.Group();
+    group.position.copy(pos);
+    this.root.add(group);
+
+    // Sculpted Nordic mossy granite mound + glowing golden ring
+    const moundGeo = this._trackGeo(createIslandMoundGeometry(1.94, 1.82, 0.64, 11.4, 22));
+    const nordicMossMat = this._trackMat(
+      new THREE.MeshStandardMaterial({ color: '#587858', roughness: 0.88, metalness: 0.03 })
+    );
+    const mound = new THREE.Mesh(moundGeo, nordicMossMat);
+    mound.position.y = 0.12;
+    mound.castShadow = true;
+    mound.receiveShadow = true;
+    group.add(mound);
+    this._addShoreFoamRing(group, 2.04, 1.92, 11.2);
+    this._addUnlockedGoldRing(group, 'level11_viking', 2.08, 1.96, 11.5);
+
+    const timberMat = this._trackMat(
+      new THREE.MeshStandardMaterial({ color: '#6b472d', roughness: 0.84 })
+    );
+    const roofTurfMat = this._trackMat(
+      new THREE.MeshStandardMaterial({ color: '#3f5f42', roughness: 0.86 })
+    );
+    const stoneMat = this._trackMat(
+      new THREE.MeshStandardMaterial({ color: '#869098', roughness: 0.88 })
+    );
+    const goldMat = this._trackMat(
+      new THREE.MeshStandardMaterial({ color: '#e6b83e', roughness: 0.34, metalness: 0.78 })
+    );
+    const sailRedMat = this._trackMat(
+      new THREE.MeshStandardMaterial({ color: '#b83028', roughness: 0.76, side: THREE.DoubleSide })
+    );
+    const sailWhiteMat = this._trackMat(
+      new THREE.MeshStandardMaterial({ color: '#f2ead8', roughness: 0.8, side: THREE.DoubleSide })
+    );
+    const fjordMat = this._trackMat(
+      new THREE.MeshStandardMaterial({
+        color: '#1f8ea4',
+        roughness: 0.14,
+        metalness: 0.18,
+        transparent: true,
+        opacity: 0.92,
+      })
+    );
+    const wheatMat = this._trackMat(
+      new THREE.MeshStandardMaterial({ color: '#e2b648', roughness: 0.86 })
+    );
+
+    // 1. Miniature Jarl's Great Longhouse (Mjødhall) with steep roof & crossed golden dragon gables
+    const hall = new THREE.Group();
+    hall.position.set(-0.22, 0.56, -0.34);
+
+    const hallPlinth = new THREE.Mesh(this._trackGeo(new THREE.BoxGeometry(1.18, 0.16, 0.68)), stoneMat);
+    hallPlinth.position.y = 0.08;
+    hallPlinth.castShadow = true;
+    hall.add(hallPlinth);
+
+    const hallWalls = new THREE.Mesh(this._trackGeo(new THREE.BoxGeometry(1.06, 0.34, 0.56)), timberMat);
+    hallWalls.position.y = 0.32;
+    hallWalls.castShadow = true;
+    hall.add(hallWalls);
+
+    const hallRoof = new THREE.Mesh(this._trackGeo(new THREE.ConeGeometry(0.68, 0.48, 4)), roofTurfMat);
+    hallRoof.rotation.y = Math.PI * 0.25;
+    hallRoof.scale.set(1.38, 1.0, 0.78);
+    hallRoof.position.y = 0.68;
+    hallRoof.castShadow = true;
+    hall.add(hallRoof);
+
+    // Crossed dragon-head gable crests
+    [-0.58, 0.58].forEach((gx) => {
+      const crest = new THREE.Mesh(this._trackGeo(new THREE.ConeGeometry(0.06, 0.24, 4)), goldMat);
+      crest.position.set(gx, 0.94, 0);
+      crest.rotation.z = gx < 0 ? 0.35 : -0.35;
+      hall.add(crest);
+    });
+    group.add(hall);
+
+    // 2. Two Cozy Miniature Viking Cottages + Golden Wheat Field Patch
+    [
+      [-0.78, 0.56, 0.42, 0.2],
+      [0.06, 0.56, 0.66, -0.15],
+    ].forEach(([hx, hy, hz, rot]) => {
+      const cottage = new THREE.Group();
+      cottage.position.set(hx, hy, hz);
+      cottage.rotation.y = rot;
+      const base = new THREE.Mesh(this._trackGeo(new THREE.BoxGeometry(0.46, 0.24, 0.36)), timberMat);
+      base.position.y = 0.12;
+      base.castShadow = true;
+      cottage.add(base);
+      const roof = new THREE.Mesh(this._trackGeo(new THREE.ConeGeometry(0.36, 0.28, 4)), roofTurfMat);
+      roof.rotation.y = Math.PI * 0.25;
+      roof.scale.set(1.12, 1.0, 0.92);
+      roof.position.y = 0.34;
+      roof.castShadow = true;
+      cottage.add(roof);
+      group.add(cottage);
+    });
+
+    const wheatPatch = new THREE.Mesh(this._trackGeo(new THREE.BoxGeometry(0.56, 0.1, 0.42)), wheatMat);
+    wheatPatch.position.set(0.66, 0.58, 0.52);
+    group.add(wheatPatch);
+
+    // 3. Miniature Turquoise Fjord Cove & Bobbing Viking Drakkar Longship (NE flank)
+    const cove = new THREE.Mesh(this._trackGeo(new THREE.CircleGeometry(0.56, 14)), fjordMat);
+    cove.rotation.x = -Math.PI * 0.5;
+    cove.position.set(0.92, 0.48, -0.45);
+    group.add(cove);
+
+    const miniShip = new THREE.Group();
+    miniShip.position.set(1.04, 0.54, -0.52);
+    miniShip.rotation.y = -0.58;
+    const hull = new THREE.Mesh(this._trackGeo(new THREE.BoxGeometry(0.24, 0.1, 0.72)), timberMat);
+    hull.castShadow = true;
+    miniShip.add(hull);
+    const prow = new THREE.Mesh(this._trackGeo(new THREE.ConeGeometry(0.06, 0.24, 4)), goldMat);
+    prow.position.set(0, 0.14, 0.38);
+    prow.rotation.x = 0.42;
+    miniShip.add(prow);
+    const mast = new THREE.Mesh(this._trackGeo(new THREE.CylinderGeometry(0.015, 0.02, 0.52, 6)), timberMat);
+    mast.position.y = 0.26;
+    miniShip.add(mast);
+    const sailA = new THREE.Mesh(this._trackGeo(new THREE.BoxGeometry(0.14, 0.28, 0.02)), sailRedMat);
+    sailA.position.set(-0.07, 0.3, 0.04);
+    miniShip.add(sailA);
+    const sailB = new THREE.Mesh(this._trackGeo(new THREE.BoxGeometry(0.14, 0.28, 0.02)), sailWhiteMat);
+    sailB.position.set(0.07, 0.3, 0.04);
+    miniShip.add(sailB);
+    group.add(miniShip);
+    this.animatedProps.push({ obj: miniShip, type: 'sway', phase: 11.4 });
+
+    // 4. Snow-Dusted Nordic Pines framing the northern cliff
+    const pineMat = this._trackMat(createMatteFoliageMaterial());
+    const pineGeo = this._trackGeo(
+      createIrregularConiferTierGeo({
+        radiusBottom: 0.18,
+        radiusTop: 0.02,
+        height: 0.58,
+        radialSegments: 7,
+        heightSegments: 2,
+        jaggedness: 0.2,
+        droop: 0.04,
+        seed: 111,
+        baseColor: '#19382a',
+        midColor: '#2c5c40',
+        topColor: '#c4dce0',
+      })
+    );
+    [
+      [-1.12, 0.76, -0.58],
+      [-0.78, 0.8, -0.96],
+      [0.25, 0.78, -0.98],
+      [-1.18, 0.72, 0.14],
+    ].forEach(([px, py, pz], idx) => {
+      const p = new THREE.Mesh(pineGeo, pineMat);
+      p.position.set(px, py, pz);
+      p.rotation.y = idx * 1.2;
+      p.castShadow = true;
+      group.add(p);
+    });
+
+    const hitbox = new THREE.Mesh(
+      this._trackGeo(new THREE.CylinderGeometry(2.15, 2.25, 2.4, 10)),
+      this.mats.hitbox
+    );
+    hitbox.position.y = 1.1;
+    group.add(hitbox);
+
+    const node = {
+      id: 'level11_viking',
+      levelIndex: 10,
+      levelNum: 11,
+      chapter: WORLD_CHAPTERS[1],
+      unlocked: true,
+      isMilestone: false,
+      title: 'Niveau 11 : Ère Viking — Le Village du Fjord (94 blocs)',
+      shortLabel: 'Village Viking',
+      labelText: 'Niveau 11 • Jouable',
+      position: pos,
+      labelAnchor: new THREE.Vector3(pos.x, 2.55, pos.z),
+      focusDistance: 17.5,
+      focusElevation: 42,
+      focusAzimuth: 0.16,
+      group,
+      hitbox,
+      bounceTime: 0,
+    };
+
+    hitbox.userData.interact = { type: 'map-node', node };
+    this.nodes.push(node);
+  }
+
+  /**
+   * Builds all regular "Bientôt" islands using shared InstancedMesh batches
    * (mounds, shoreline foam, stone foundation plinths, timber scaffolding, soft mist, biome props).
    */
   _buildInstancedRegularIslands(entries) {

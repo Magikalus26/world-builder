@@ -2746,6 +2746,191 @@ export function createTextureLibrary(renderer) {
     return museumPack;
   }
 
+  let vikingPack = null;
+  const vikingTextures = [];
+  const vikingMaterials = [];
+
+  function ensureVikingPack() {
+    if (vikingPack) return vikingPack;
+
+    const heatherGrass = buildVikingHeatherGrassPBR(anisotropy);
+    const villagePath = buildVikingVillagePathPBR(anisotropy);
+    const graniteDust = buildVikingGraniteDustPBR(anisotropy);
+    const plowedSoilTerrain = buildVikingPlowedSoilTerrainPBR(anisotropy);
+
+    const timberLogs = buildVikingTimberLogsPBR(anisotropy);
+    const dryStone = buildVikingDryStonePBR(anisotropy);
+    const dragonTrim = buildVikingDragonTrimPBR(anisotropy);
+    const turfShingleRoof = buildVikingTurfShingleRoofPBR(anisotropy);
+    const wheatFarm = buildVikingWheatFarmPBR(anisotropy);
+    const flagstonePath = buildVikingFlagstonePathPBR(anisotropy);
+    const rawGranite = buildVikingRawGranitePBR(anisotropy);
+
+    [heatherGrass, villagePath, graniteDust, plowedSoilTerrain].forEach((b) => {
+      vikingTextures.push(b.albedo, b.normalRough);
+    });
+    [timberLogs, dryStone, dragonTrim, turfShingleRoof, wheatFarm, flagstonePath, rawGranite].forEach((pack) => {
+      if (pack.map) vikingTextures.push(pack.map);
+      if (pack.normalMap) vikingTextures.push(pack.normalMap);
+      if (pack.roughnessMap) vikingTextures.push(pack.roughnessMap);
+    });
+
+    const vikingTerrainSplat = createTerrainSplatMaterial({
+      sand: heatherGrass,         // Biome 0: Nordic mossy grass & purple-rose heather
+      earthPath: villagePath,     // Biome 1: Compacted muddy/cobblestone village paths
+      quarryDust: graniteDust,    // Biome 2: Crushed cold grey granite dust around quarry & workshop
+      oasisGrass: plowedSoilTerrain, // Biome 3: Plowed dark-brown fertile soil for the farm field
+    });
+    vikingTerrainSplat.customProgramCacheKey = () => 'workd-builder-viking-terrain-splat-v1';
+
+    const fjordWaterNormal = waterNormal.clone();
+    fjordWaterNormal.wrapS = THREE.RepeatWrapping;
+    fjordWaterNormal.wrapT = THREE.RepeatWrapping;
+    fjordWaterNormal.repeat.set(4.0, 4.0);
+    fjordWaterNormal.needsUpdate = true;
+    vikingTextures.push(fjordWaterNormal);
+
+    const vMats = {
+      terrainSplat: vikingTerrainSplat,
+      nordicTimber: new THREE.MeshStandardMaterial({
+        map: timberLogs.map,
+        normalMap: timberLogs.normalMap,
+        normalScale: new THREE.Vector2(1.42, 1.42),
+        roughnessMap: timberLogs.roughnessMap,
+        roughness: 0.82,
+        metalness: 0.04,
+      }),
+      darkTimber: new THREE.MeshStandardMaterial({
+        map: timberLogs.map,
+        normalMap: timberLogs.normalMap,
+        normalScale: new THREE.Vector2(1.38, 1.38),
+        roughnessMap: timberLogs.roughnessMap,
+        color: new THREE.Color('#7a6250'),
+        roughness: 0.85,
+        metalness: 0.05,
+      }),
+      vikingStone: new THREE.MeshStandardMaterial({
+        map: dryStone.map,
+        normalMap: dryStone.normalMap,
+        normalScale: new THREE.Vector2(1.52, 1.52),
+        roughnessMap: dryStone.roughnessMap,
+        roughness: 0.88,
+        metalness: 0.05,
+      }),
+      dragonCarvedTrim: new THREE.MeshStandardMaterial({
+        map: dragonTrim.map,
+        normalMap: dragonTrim.normalMap,
+        normalScale: new THREE.Vector2(1.48, 1.48),
+        roughnessMap: dragonTrim.roughnessMap,
+        roughness: 0.72,
+        metalness: 0.14,
+      }),
+      vikingRoof: new THREE.MeshStandardMaterial({
+        map: turfShingleRoof.map,
+        normalMap: turfShingleRoof.normalMap,
+        normalScale: new THREE.Vector2(1.45, 1.45),
+        roughnessMap: turfShingleRoof.roughnessMap,
+        roughness: 0.84,
+        metalness: 0.04,
+      }),
+      vikingRoofWarm: new THREE.MeshStandardMaterial({
+        map: turfShingleRoof.map,
+        normalMap: turfShingleRoof.normalMap,
+        normalScale: new THREE.Vector2(1.42, 1.42),
+        roughnessMap: turfShingleRoof.roughnessMap,
+        color: new THREE.Color('#b8a48c'),
+        roughness: 0.86,
+        metalness: 0.04,
+      }),
+      plowedSoilWheat: new THREE.MeshStandardMaterial({
+        map: wheatFarm.map,
+        normalMap: wheatFarm.normalMap,
+        normalScale: new THREE.Vector2(1.5, 1.5),
+        roughnessMap: wheatFarm.roughnessMap,
+        roughness: 0.92,
+        metalness: 0.02,
+      }),
+      flagstonePath: new THREE.MeshStandardMaterial({
+        map: flagstonePath.map,
+        normalMap: flagstonePath.normalMap,
+        normalScale: new THREE.Vector2(1.38, 1.38),
+        roughnessMap: flagstonePath.roughnessMap,
+        roughness: 0.86,
+        metalness: 0.05,
+      }),
+      rawGranite: new THREE.MeshStandardMaterial({
+        map: rawGranite.map,
+        normalMap: rawGranite.normalMap,
+        normalScale: new THREE.Vector2(1.62, 1.62),
+        roughnessMap: rawGranite.roughnessMap,
+        roughness: 0.92,
+        metalness: 0.06,
+      }),
+      fjordWater: new THREE.MeshStandardMaterial({
+        color: new THREE.Color('#197a8e'),
+        normalMap: fjordWaterNormal,
+        normalScale: new THREE.Vector2(0.46, 0.46),
+        roughness: 0.12,
+        metalness: 0.18,
+        envMapIntensity: 1.45,
+        transparent: true,
+        opacity: 0.92,
+      }),
+      wroughtIron: new THREE.MeshStandardMaterial({
+        color: new THREE.Color('#2d333b'),
+        roughness: 0.36,
+        metalness: 0.86,
+      }),
+      shieldRed: new THREE.MeshStandardMaterial({
+        color: new THREE.Color('#b82a24'),
+        roughness: 0.62,
+        metalness: 0.08,
+      }),
+      shieldBlue: new THREE.MeshStandardMaterial({
+        color: new THREE.Color('#275c8e'),
+        roughness: 0.62,
+        metalness: 0.08,
+      }),
+      shieldGold: new THREE.MeshStandardMaterial({
+        color: new THREE.Color('#e2b13c'),
+        roughness: 0.36,
+        metalness: 0.72,
+      }),
+      sailStripeWhite: new THREE.MeshStandardMaterial({
+        color: new THREE.Color('#f2ebd8'),
+        roughness: 0.84,
+        metalness: 0.02,
+        side: THREE.DoubleSide,
+      }),
+      sailStripeRed: new THREE.MeshStandardMaterial({
+        color: new THREE.Color('#b63026'),
+        roughness: 0.8,
+        metalness: 0.02,
+        side: THREE.DoubleSide,
+      }),
+      goldWheat: new THREE.MeshStandardMaterial({
+        color: new THREE.Color('#e6bc4a'),
+        roughness: 0.84,
+        metalness: 0.02,
+      }),
+      snowCap: new THREE.MeshStandardMaterial({
+        color: new THREE.Color('#ebf4fa'),
+        roughness: 0.88,
+        metalness: 0.02,
+      }),
+      fireGlow: new THREE.MeshStandardMaterial({
+        color: new THREE.Color('#fff2bc'),
+        emissive: new THREE.Color('#ff841a'),
+        emissiveIntensity: 1.75,
+        roughness: 0.25,
+      }),
+    };
+
+    Object.values(vMats).forEach((m) => vikingMaterials.push(m));
+    vikingPack = { materials: vMats };
+    return vikingPack;
+  }
+
   return {
     maps: {
       blueprint: blueprintMap,
@@ -2763,6 +2948,7 @@ export function createTextureLibrary(renderer) {
     ensureModernPack,
     ensureMedievalPack,
     ensureMuseumPack,
+    ensureVikingPack,
     dispose() {
       textures.forEach((t) => t.dispose());
       Object.values(materials).forEach((m) => m.dispose());
@@ -2782,6 +2968,8 @@ export function createTextureLibrary(renderer) {
       medievalMaterials.forEach((m) => m.dispose());
       museumTextures.forEach((t) => t.dispose());
       museumMaterials.forEach((m) => m.dispose());
+      vikingTextures.forEach((t) => t.dispose());
+      vikingMaterials.forEach((m) => m.dispose());
       materialFactory.dispose();
     },
   };
@@ -7063,6 +7251,645 @@ function buildMuseumRawMarbleRockPBR(anisotropy) {
     map: wrapTexture(albedoCanvas, { isColor: true, anisotropy }),
     normalMap: wrapTexture(normalCanvas, { isColor: false, anisotropy }),
     roughnessMap: wrapTexture(roughCanvas, { isColor: false, anisotropy }),
+  };
+}
+
+/* ============================================================================
+ * LEVEL 11 (VIKING ERA — LE VILLAGE VIKING DU FJORD) — 512x512 NORDIC PBR MAPS
+ * ========================================================================== */
+
+/** Viking Biome 0: Nordic Mossy Grass & Purple-Rose Heather (512x512) */
+function buildVikingHeatherGrassPBR(anisotropy) {
+  const size = 512;
+  const albedoCanvas = makeCanvas(size);
+  const ctx = albedoCanvas.getContext('2d');
+  const img = ctx.createImageData(size, size);
+  const data = img.data;
+  const height = new Float32Array(size * size);
+  const rough = new Float32Array(size * size);
+  const aniso = Math.min(4, anisotropy || 4);
+
+  for (let y = 0; y < size; y++) {
+    const v = y / size;
+    for (let x = 0; x < size; x++) {
+      const u = x / size;
+      const i = y * size + x;
+      const macro = tileFBM(u, v, 5, 3, 10103);
+      const moss = tileFBM(u, v, 11, 3, 10133);
+      const blades = tileFBM(u * 2.4, v * 2.4, 24, 2, 10151);
+      const micro = hash2i(x, y, 10169);
+
+      // Cool Nordic highland sage-emerald grass blended with olive-pine moss
+      let r = lerp(56, 98, macro) + (moss - 0.5) * 18 + (blades - 0.5) * 14;
+      let g = lerp(88, 134, macro) + (moss - 0.5) * 20 + (blades - 0.5) * 18;
+      let b = lerp(54, 82, macro) + (blades - 0.5) * 10;
+
+      // Scattered Nordic highland heather patches (muted violet-rose blooms)
+      const heatherPatch = smoothstep(0.64, 0.86, tileFBM(u, v, 7, 3, 10181));
+      const flCell = tileWorley(u, v, 22, 10193);
+      if (heatherPatch > 0.15 && flCell.f1 < 0.14 && flCell.id > 0.58) {
+        const bloom = (1.0 - smoothstep(0.04, 0.14, flCell.f1)) * heatherPatch;
+        r = lerp(r, 152, bloom * 0.72);
+        g = lerp(g, 92, bloom * 0.72);
+        b = lerp(b, 138, bloom * 0.72);
+      }
+
+      height[i] = clamp01(0.46 + (blades - 0.5) * 0.34 + (macro - 0.5) * 0.16);
+      rough[i] = clamp01(0.89 + (0.5 - blades) * 0.08 + (micro - 0.5) * 0.04);
+
+      const idx = i * 4;
+      data[idx] = Math.min(255, Math.max(0, Math.round(r + (micro - 0.5) * 8)));
+      data[idx + 1] = Math.min(255, Math.max(0, Math.round(g + (micro - 0.5) * 8)));
+      data[idx + 2] = Math.min(255, Math.max(0, Math.round(b + (micro - 0.5) * 6)));
+      data[idx + 3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  const normalRoughCanvas = buildSobelNormalCanvas(height, size, 2.4, rough);
+  return {
+    albedo: wrapTexture(albedoCanvas, { isColor: true, anisotropy: aniso }),
+    normalRough: wrapTexture(normalRoughCanvas, { isColor: false, anisotropy: aniso }),
+  };
+}
+
+/** Viking Biome 1: Compacted Muddy & Cobblestone Village Paths (512x512) */
+function buildVikingVillagePathPBR(anisotropy) {
+  const size = 512;
+  const albedoCanvas = makeCanvas(size);
+  const ctx = albedoCanvas.getContext('2d');
+  const img = ctx.createImageData(size, size);
+  const data = img.data;
+  const height = new Float32Array(size * size);
+  const rough = new Float32Array(size * size);
+  const aniso = Math.min(4, anisotropy || 4);
+
+  for (let y = 0; y < size; y++) {
+    const v = y / size;
+    for (let x = 0; x < size; x++) {
+      const u = x / size;
+      const i = y * size + x;
+      const cobble = tileWorley(u, v, 13, 10211);
+      const mud = tileFBM(u, v, 6, 3, 10223);
+      const grain = hash2i(x, y, 10243);
+
+      const isMortar = 1.0 - smoothstep(0.03, 0.13, cobble.edge);
+      const stoneMask = smoothstep(0.32, 0.62, cobble.id) * (1.0 - isMortar);
+
+      // Damp compacted dark-brown village earth with inset grey Nordic river cobbles
+      let r = lerp(96, 126, mud) + (grain - 0.5) * 14;
+      let g = lerp(80, 106, mud) + (grain - 0.5) * 12;
+      let b = lerp(64, 86, mud) + (grain - 0.5) * 10;
+
+      const sr = lerp(118, 152, cobble.id) + (grain - 0.5) * 12;
+      const sg = lerp(120, 154, cobble.id) + (grain - 0.5) * 12;
+      const sb = lerp(124, 158, cobble.id) + (grain - 0.5) * 12;
+
+      r = lerp(r, sr, stoneMask * 0.78);
+      g = lerp(g, sg, stoneMask * 0.78);
+      b = lerp(b, sb, stoneMask * 0.78);
+
+      height[i] = clamp01(0.38 + stoneMask * 0.34 - isMortar * 0.14 + (grain - 0.5) * 0.08);
+      rough[i] = clamp01(0.86 - stoneMask * 0.14 + isMortar * 0.08);
+
+      const idx = i * 4;
+      data[idx] = Math.min(255, Math.max(0, Math.round(r)));
+      data[idx + 1] = Math.min(255, Math.max(0, Math.round(g)));
+      data[idx + 2] = Math.min(255, Math.max(0, Math.round(b)));
+      data[idx + 3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  const normalRoughCanvas = buildSobelNormalCanvas(height, size, 2.8, rough);
+  return {
+    albedo: wrapTexture(albedoCanvas, { isColor: true, anisotropy: aniso }),
+    normalRough: wrapTexture(normalRoughCanvas, { isColor: false, anisotropy: aniso }),
+  };
+}
+
+/** Viking Biome 2: Crushed Cold Grey Fjord Granite Quarry Dust (512x512) */
+function buildVikingGraniteDustPBR(anisotropy) {
+  const size = 512;
+  const albedoCanvas = makeCanvas(size);
+  const ctx = albedoCanvas.getContext('2d');
+  const img = ctx.createImageData(size, size);
+  const data = img.data;
+  const height = new Float32Array(size * size);
+  const rough = new Float32Array(size * size);
+  const aniso = Math.min(4, anisotropy || 4);
+
+  for (let y = 0; y < size; y++) {
+    const v = y / size;
+    for (let x = 0; x < size; x++) {
+      const u = x / size;
+      const i = y * size + x;
+      const dust = tileFBM(u, v, 8, 3, 10259);
+      const chips = tileWorley(u, v, 20, 10271);
+      const grit = hash2i(x, y, 10289);
+
+      const chipMask = 1.0 - smoothstep(0.06, 0.24, chips.f1);
+      const lum = lerp(112, 152, dust) + chipMask * 18 + (grit - 0.5) * 16;
+
+      height[i] = clamp01(0.42 + chipMask * 0.32 + (dust - 0.5) * 0.2);
+      rough[i] = clamp01(0.9 - chipMask * 0.08 + (grit - 0.5) * 0.04);
+
+      const idx = i * 4;
+      data[idx] = Math.min(255, Math.max(0, Math.round(lum * 0.94)));
+      data[idx + 1] = Math.min(255, Math.max(0, Math.round(lum * 0.97)));
+      data[idx + 2] = Math.min(255, Math.max(0, Math.round(lum * 1.03)));
+      data[idx + 3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  const normalRoughCanvas = buildSobelNormalCanvas(height, size, 2.7, rough);
+  return {
+    albedo: wrapTexture(albedoCanvas, { isColor: true, anisotropy: aniso }),
+    normalRough: wrapTexture(normalRoughCanvas, { isColor: false, anisotropy: aniso }),
+  };
+}
+
+/** Viking Biome 3: Plowed Dark-Brown Fertile Farm Soil Terrain (512x512) */
+function buildVikingPlowedSoilTerrainPBR(anisotropy) {
+  const size = 512;
+  const albedoCanvas = makeCanvas(size);
+  const ctx = albedoCanvas.getContext('2d');
+  const img = ctx.createImageData(size, size);
+  const data = img.data;
+  const height = new Float32Array(size * size);
+  const rough = new Float32Array(size * size);
+  const aniso = Math.min(4, anisotropy || 4);
+
+  for (let y = 0; y < size; y++) {
+    const v = y / size;
+    for (let x = 0; x < size; x++) {
+      const u = x / size;
+      const i = y * size + x;
+      const soil = tileFBM(u, v, 10, 3, 10301);
+      const clods = tileWorley(u, v, 24, 10313);
+      const micro = hash2i(x, y, 10331);
+      // Crisp parallel plowed soil ridges
+      const furrow = Math.sin(v * Math.PI * 16 + (soil - 0.5) * 1.1) * 0.5 + 0.5;
+
+      const r = lerp(62, 104, furrow * 0.72 + soil * 0.28) + (micro - 0.5) * 12;
+      const g = lerp(42, 72, furrow * 0.72 + soil * 0.28) + (micro - 0.5) * 10;
+      const b = lerp(26, 46, furrow * 0.72 + soil * 0.28) + (micro - 0.5) * 8;
+
+      height[i] = clamp01(0.28 + furrow * 0.48 + (1.0 - clods.f1) * 0.14);
+      rough[i] = clamp01(0.94 - furrow * 0.06);
+
+      const idx = i * 4;
+      data[idx] = Math.min(255, Math.max(0, Math.round(r)));
+      data[idx + 1] = Math.min(255, Math.max(0, Math.round(g)));
+      data[idx + 2] = Math.min(255, Math.max(0, Math.round(b)));
+      data[idx + 3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  const normalRoughCanvas = buildSobelNormalCanvas(height, size, 3.1, rough);
+  return {
+    albedo: wrapTexture(albedoCanvas, { isColor: true, anisotropy: aniso }),
+    normalRough: wrapTexture(normalRoughCanvas, { isColor: false, anisotropy: aniso }),
+  };
+}
+
+/** 512x512 Dark Carved Nordic Timber Logs & Planks PBR (Albedo + Normal + Roughness) */
+function buildVikingTimberLogsPBR(anisotropy) {
+  const size = 512;
+  const albedoCanvas = makeCanvas(size);
+  const roughCanvas = makeCanvas(size);
+  const ctx = albedoCanvas.getContext('2d');
+  const rCtx = roughCanvas.getContext('2d');
+  const img = ctx.createImageData(size, size);
+  const rImg = rCtx.createImageData(size, size);
+  const height = new Float32Array(size * size);
+  const aniso = Math.min(4, anisotropy || 4);
+
+  const logs = 4;
+  for (let y = 0; y < size; y++) {
+    const v = y / size;
+    const logIdx = Math.floor(v * logs);
+    const lv = (v * logs) % 1;
+    const cylinderProfile = Math.sin(lv * Math.PI); // Rounded log cross-section
+    const seam = 1.0 - smoothstep(0.0, 0.11, Math.min(lv, 1.0 - lv));
+
+    for (let x = 0; x < size; x++) {
+      const u = x / size;
+      const i = y * size + x;
+      const tone = hash2i(logIdx + 7, 19, 10357);
+      const grain = tileFBM(u * 0.9, v * 7.5 + logIdx * 0.37, 12, 3, 10369);
+      const ringWave = Math.sin((v * 26 + grain * 4.2) * Math.PI) * 0.5 + 0.5;
+      const micro = hash2i(x, y, 10391);
+
+      // Rich oiled dark pine / weathered spruce Nordic timber logs
+      let r = lerp(84, 124, tone * 0.45 + ringWave * 0.35 + cylinderProfile * 0.2) + (micro - 0.5) * 10;
+      let g = lerp(56, 86, tone * 0.45 + ringWave * 0.35 + cylinderProfile * 0.2) + (micro - 0.5) * 8;
+      let b = lerp(36, 56, tone * 0.45 + ringWave * 0.35 + cylinderProfile * 0.2) + (micro - 0.5) * 7;
+
+      // Dark moss/tar chinking groove between stacked timber logs
+      r = lerp(r, 34, seam * 0.85);
+      g = lerp(g, 26, seam * 0.85);
+      b = lerp(b, 18, seam * 0.85);
+
+      // Subtle vertical corner dovetail notch line near edges
+      const notch = 1.0 - smoothstep(0.0, 0.032, Math.abs(u - 0.08)) + (1.0 - smoothstep(0.0, 0.032, Math.abs(u - 0.92)));
+      const notchClamped = clamp01(notch);
+      r = lerp(r, 42, notchClamped * 0.55);
+      g = lerp(g, 30, notchClamped * 0.55);
+      b = lerp(b, 20, notchClamped * 0.55);
+
+      height[i] = clamp01(0.18 + cylinderProfile * 0.58 + (ringWave - 0.5) * 0.14 - seam * 0.35 - notchClamped * 0.18);
+
+      const idx = i * 4;
+      img.data[idx] = Math.min(255, Math.max(0, Math.round(r)));
+      img.data[idx + 1] = Math.min(255, Math.max(0, Math.round(g)));
+      img.data[idx + 2] = Math.min(255, Math.max(0, Math.round(b)));
+      img.data[idx + 3] = 255;
+
+      const rvByte = Math.round(clamp01(0.76 + seam * 0.2 + (0.5 - ringWave) * 0.1) * 255);
+      rImg.data[idx] = rvByte;
+      rImg.data[idx + 1] = rvByte;
+      rImg.data[idx + 2] = rvByte;
+      rImg.data[idx + 3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  rCtx.putImageData(rImg, 0, 0);
+  const normalCanvas = buildSobelNormalCanvas(height, size, 3.4);
+  return {
+    map: wrapTexture(albedoCanvas, { isColor: true, anisotropy: aniso }),
+    normalMap: wrapTexture(normalCanvas, { isColor: false, anisotropy: aniso }),
+    roughnessMap: wrapTexture(roughCanvas, { isColor: false, anisotropy: aniso }),
+  };
+}
+
+/** 512x512 Viking Dry-Stone Foundation Masonry PBR (Albedo + Normal + Roughness) */
+function buildVikingDryStonePBR(anisotropy) {
+  const size = 512;
+  const albedoCanvas = makeCanvas(size);
+  const roughCanvas = makeCanvas(size);
+  const ctx = albedoCanvas.getContext('2d');
+  const rCtx = roughCanvas.getContext('2d');
+  const img = ctx.createImageData(size, size);
+  const rImg = rCtx.createImageData(size, size);
+  const height = new Float32Array(size * size);
+  const aniso = Math.min(4, anisotropy || 4);
+
+  for (let y = 0; y < size; y++) {
+    const v = y / size;
+    for (let x = 0; x < size; x++) {
+      const u = x / size;
+      const i = y * size + x;
+      // Stretched horizontal Nordic fieldstone dry-walling via Worley cells
+      const vor = tileWorley(u * 1.0, v * 1.6, 6, 10427);
+      const grain = tileFBM(u, v, 16, 3, 10433);
+      const moss = smoothstep(0.58, 0.84, tileFBM(u, v, 9, 3, 10453));
+      const micro = hash2i(x, y, 10459);
+
+      const crevice = 1.0 - smoothstep(0.025, 0.095, vor.edge);
+      const bevel = smoothstep(0.07, 0.18, vor.edge);
+
+      // Cold slate-blue & weathered basalt Nordic dry-stones
+      let r = lerp(104, 152, vor.id) + (grain - 0.5) * 24 + (micro - 0.5) * 10;
+      let g = lerp(108, 156, vor.id) + (grain - 0.5) * 22 + (micro - 0.5) * 10;
+      let b = lerp(112, 162, vor.id) + (grain - 0.5) * 22 + (micro - 0.5) * 10;
+
+      // Earthy green moss tucked into dry-stone crevices
+      const mossMix = moss * (0.24 + crevice * 0.58);
+      r = lerp(r, 72, mossMix);
+      g = lerp(g, 102, mossMix);
+      b = lerp(b, 58, mossMix);
+
+      // Deep dark dry-stone shadow joint
+      r = lerp(r, 42, crevice * 0.82);
+      g = lerp(g, 44, crevice * 0.82);
+      b = lerp(b, 46, crevice * 0.82);
+
+      height[i] = clamp01(0.2 + bevel * 0.58 + (grain - 0.5) * 0.18 - crevice * 0.25);
+
+      const idx = i * 4;
+      img.data[idx] = Math.min(255, Math.max(0, Math.round(r)));
+      img.data[idx + 1] = Math.min(255, Math.max(0, Math.round(g)));
+      img.data[idx + 2] = Math.min(255, Math.max(0, Math.round(b)));
+      img.data[idx + 3] = 255;
+
+      const rvByte = Math.round(clamp01(0.84 + crevice * 0.14 + (0.5 - grain) * 0.08) * 255);
+      rImg.data[idx] = rvByte;
+      rImg.data[idx + 1] = rvByte;
+      rImg.data[idx + 2] = rvByte;
+      rImg.data[idx + 3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  rCtx.putImageData(rImg, 0, 0);
+  const normalCanvas = buildSobelNormalCanvas(height, size, 3.6);
+  return {
+    map: wrapTexture(albedoCanvas, { isColor: true, anisotropy: aniso }),
+    normalMap: wrapTexture(normalCanvas, { isColor: false, anisotropy: aniso }),
+    roughnessMap: wrapTexture(roughCanvas, { isColor: false, anisotropy: aniso }),
+  };
+}
+
+/** 512x512 Dragon-Carved Ridge Beams & Shield Trim PBR (Albedo + Normal + Roughness) */
+function buildVikingDragonTrimPBR(anisotropy) {
+  const size = 512;
+  const albedoCanvas = makeCanvas(size);
+  const roughCanvas = makeCanvas(size);
+  const ctx = albedoCanvas.getContext('2d');
+  const rCtx = roughCanvas.getContext('2d');
+  const img = ctx.createImageData(size, size);
+  const rImg = rCtx.createImageData(size, size);
+  const height = new Float32Array(size * size);
+  const aniso = Math.min(4, anisotropy || 4);
+
+  for (let y = 0; y < size; y++) {
+    const v = y / size;
+    for (let x = 0; x < size; x++) {
+      const u = x / size;
+      const i = y * size + x;
+      const grain = tileFBM(u * 1.2, v * 6.0, 10, 3, 10477);
+      const micro = hash2i(x, y, 10487);
+
+      // Interlaced Nordic knotwork carving band across the middle
+      const waveA = Math.abs(Math.sin(u * Math.PI * 6) * 0.18 + 0.5 - v);
+      const waveB = Math.abs(-Math.sin(u * Math.PI * 6) * 0.18 + 0.5 - v);
+      const knot = Math.max(1.0 - smoothstep(0.022, 0.055, waveA), 1.0 - smoothstep(0.022, 0.055, waveB));
+      const borderBand = Math.max(
+        1.0 - smoothstep(0.015, 0.04, Math.abs(v - 0.14)),
+        1.0 - smoothstep(0.015, 0.04, Math.abs(v - 0.86))
+      );
+      const carvedGold = clamp01(Math.max(knot, borderBand * 0.85));
+
+      // Dark smoked-oak Nordic ridge timber base
+      let r = lerp(58, 86, grain) + (micro - 0.5) * 9;
+      let g = lerp(38, 58, grain) + (micro - 0.5) * 8;
+      let b = lerp(24, 38, grain) + (micro - 0.5) * 6;
+
+      // Burnished gold-ochre carved Nordic dragon knotwork inlay
+      r = lerp(r, 204, carvedGold * 0.84);
+      g = lerp(g, 152, carvedGold * 0.84);
+      b = lerp(b, 62, carvedGold * 0.84);
+
+      height[i] = clamp01(0.42 + (grain - 0.5) * 0.14 + carvedGold * 0.42);
+
+      const idx = i * 4;
+      img.data[idx] = Math.min(255, Math.max(0, Math.round(r)));
+      img.data[idx + 1] = Math.min(255, Math.max(0, Math.round(g)));
+      img.data[idx + 2] = Math.min(255, Math.max(0, Math.round(b)));
+      img.data[idx + 3] = 255;
+
+      const rvByte = Math.round(clamp01(0.78 - carvedGold * 0.34 + (micro - 0.5) * 0.06) * 255);
+      rImg.data[idx] = rvByte;
+      rImg.data[idx + 1] = rvByte;
+      rImg.data[idx + 2] = rvByte;
+      rImg.data[idx + 3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  rCtx.putImageData(rImg, 0, 0);
+  const normalCanvas = buildSobelNormalCanvas(height, size, 3.6);
+  return {
+    map: wrapTexture(albedoCanvas, { isColor: true, anisotropy: aniso }),
+    normalMap: wrapTexture(normalCanvas, { isColor: false, anisotropy: aniso }),
+    roughnessMap: wrapTexture(roughCanvas, { isColor: false, anisotropy: aniso }),
+  };
+}
+
+/** 512x512 Turf-and-Shingle Pitched Viking Roof PBR (Albedo + Normal + Roughness) */
+function buildVikingTurfShingleRoofPBR(anisotropy) {
+  const size = 512;
+  const albedoCanvas = makeCanvas(size);
+  const roughCanvas = makeCanvas(size);
+  const ctx = albedoCanvas.getContext('2d');
+  const rCtx = roughCanvas.getContext('2d');
+  const img = ctx.createImageData(size, size);
+  const rImg = rCtx.createImageData(size, size);
+  const height = new Float32Array(size * size);
+  const aniso = Math.min(4, anisotropy || 4);
+
+  const rows = 8;
+  const cols = 7;
+
+  for (let y = 0; y < size; y++) {
+    const v = y / size;
+    const row = Math.floor(v * rows);
+    const rv = (v * rows) % 1;
+    const stagger = (row % 2) * 0.5;
+    for (let x = 0; x < size; x++) {
+      const u = x / size;
+      const i = y * size + x;
+      const uStag = (u * cols + stagger) % cols;
+      const col = Math.floor(uStag);
+      const cu = uStag % 1;
+
+      const shingleTone = hash2i(col + 13, row + 29, 10501);
+      const woodGrain = tileFBM(u * 4.0, v * 10.0, 10, 2, 10513);
+      const turfNoise = tileFBM(u, v, 6, 3, 10529);
+      const micro = hash2i(x, y, 10559);
+
+      // Pointed stave-church / Viking diamond-tip wood shingles
+      const tipDist = rv + Math.abs(cu - 0.5) * 0.42;
+      const edgeShadow = 1.0 - smoothstep(0.0, 0.14, Math.abs(tipDist - 0.94));
+      const sideSeam = 1.0 - smoothstep(0.0, 0.06, Math.min(cu, 1.0 - cu));
+
+      // Dark tarred Nordic pine shingle base
+      let r = lerp(52, 82, shingleTone) + (woodGrain - 0.5) * 18 + (micro - 0.5) * 9;
+      let g = lerp(46, 70, shingleTone) + (woodGrain - 0.5) * 16 + (micro - 0.5) * 8;
+      let b = lerp(40, 62, shingleTone) + (woodGrain - 0.5) * 14 + (micro - 0.5) * 8;
+
+      // Lush Nordic sod/moss turf patches carpeting ~42% of the pitched Viking roof
+      const turfMask = smoothstep(0.46, 0.72, turfNoise);
+      r = lerp(r, lerp(64, 96, woodGrain), turfMask * 0.76);
+      g = lerp(g, lerp(102, 138, woodGrain), turfMask * 0.76);
+      b = lerp(b, lerp(52, 74, woodGrain), turfMask * 0.76);
+
+      const seam = Math.max(edgeShadow, sideSeam * 0.7);
+      r *= 1.0 - seam * 0.48;
+      g *= 1.0 - seam * 0.48;
+      b *= 1.0 - seam * 0.48;
+
+      height[i] = clamp01(0.32 + (1.0 - rv) * 0.36 + turfMask * 0.18 - seam * 0.3);
+
+      const idx = i * 4;
+      img.data[idx] = Math.min(255, Math.max(0, Math.round(r)));
+      img.data[idx + 1] = Math.min(255, Math.max(0, Math.round(g)));
+      img.data[idx + 2] = Math.min(255, Math.max(0, Math.round(b)));
+      img.data[idx + 3] = 255;
+
+      const rvByte = Math.round(clamp01(0.76 + turfMask * 0.16 + seam * 0.12) * 255);
+      rImg.data[idx] = rvByte;
+      rImg.data[idx + 1] = rvByte;
+      rImg.data[idx + 2] = rvByte;
+      rImg.data[idx + 3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  rCtx.putImageData(rImg, 0, 0);
+  const normalCanvas = buildSobelNormalCanvas(height, size, 3.4);
+  return {
+    map: wrapTexture(albedoCanvas, { isColor: true, anisotropy: aniso }),
+    normalMap: wrapTexture(normalCanvas, { isColor: false, anisotropy: aniso }),
+    roughnessMap: wrapTexture(roughCanvas, { isColor: false, anisotropy: aniso }),
+  };
+}
+
+/** 512x512 Golden Wheat / Plowed Soil Farm Plot Block PBR (Albedo + Normal + Roughness) */
+function buildVikingWheatFarmPBR(anisotropy) {
+  const size = 512;
+  const albedoCanvas = makeCanvas(size);
+  const roughCanvas = makeCanvas(size);
+  const ctx = albedoCanvas.getContext('2d');
+  const rCtx = roughCanvas.getContext('2d');
+  const img = ctx.createImageData(size, size);
+  const rImg = rCtx.createImageData(size, size);
+  const height = new Float32Array(size * size);
+  const aniso = Math.min(4, anisotropy || 4);
+
+  for (let y = 0; y < size; y++) {
+    const v = y / size;
+    for (let x = 0; x < size; x++) {
+      const u = x / size;
+      const i = y * size + x;
+      const soil = tileFBM(u, v, 10, 3, 10601);
+      const straw = tileFBM(u * 2.5, v * 5.0, 18, 2, 10613);
+      const micro = hash2i(x, y, 10627);
+
+      const furrow = Math.sin(v * Math.PI * 10 + (soil - 0.5) * 0.8) * 0.5 + 0.5;
+      // Rich dark fertile loam furrows + golden wheat straw along the ridge crests
+      let r = lerp(64, 108, furrow * 0.7 + soil * 0.3) + (micro - 0.5) * 10;
+      let g = lerp(44, 76, furrow * 0.7 + soil * 0.3) + (micro - 0.5) * 8;
+      let b = lerp(26, 46, furrow * 0.7 + soil * 0.3) + (micro - 0.5) * 6;
+
+      const wheatCrest = smoothstep(0.62, 0.92, furrow) * smoothstep(0.38, 0.76, straw);
+      r = lerp(r, 224, wheatCrest * 0.85);
+      g = lerp(g, 182, wheatCrest * 0.85);
+      b = lerp(b, 74, wheatCrest * 0.85);
+
+      height[i] = clamp01(0.24 + furrow * 0.52 + wheatCrest * 0.22);
+
+      const idx = i * 4;
+      img.data[idx] = Math.min(255, Math.max(0, Math.round(r)));
+      img.data[idx + 1] = Math.min(255, Math.max(0, Math.round(g)));
+      img.data[idx + 2] = Math.min(255, Math.max(0, Math.round(b)));
+      img.data[idx + 3] = 255;
+
+      const rvByte = Math.round(clamp01(0.92 - wheatCrest * 0.14) * 255);
+      rImg.data[idx] = rvByte;
+      rImg.data[idx + 1] = rvByte;
+      rImg.data[idx + 2] = rvByte;
+      rImg.data[idx + 3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  rCtx.putImageData(rImg, 0, 0);
+  const normalCanvas = buildSobelNormalCanvas(height, size, 3.2);
+  return {
+    map: wrapTexture(albedoCanvas, { isColor: true, anisotropy: aniso }),
+    normalMap: wrapTexture(normalCanvas, { isColor: false, anisotropy: aniso }),
+    roughnessMap: wrapTexture(roughCanvas, { isColor: false, anisotropy: aniso }),
+  };
+}
+
+/** 512x512 Nordic Flagstone Walkway PBR (Albedo + Normal + Roughness) */
+function buildVikingFlagstonePathPBR(anisotropy) {
+  const size = 512;
+  const albedoCanvas = makeCanvas(size);
+  const roughCanvas = makeCanvas(size);
+  const ctx = albedoCanvas.getContext('2d');
+  const rCtx = roughCanvas.getContext('2d');
+  const img = ctx.createImageData(size, size);
+  const rImg = rCtx.createImageData(size, size);
+  const height = new Float32Array(size * size);
+  const aniso = Math.min(4, anisotropy || 4);
+
+  for (let y = 0; y < size; y++) {
+    const v = y / size;
+    for (let x = 0; x < size; x++) {
+      const u = x / size;
+      const i = y * size + x;
+      const slab = tileWorley(u, v, 5, 10651);
+      const grain = tileFBM(u, v, 12, 3, 10663);
+      const micro = hash2i(x, y, 10687);
+
+      const joint = 1.0 - smoothstep(0.03, 0.11, slab.edge);
+      let r = lerp(124, 168, slab.id) + (grain - 0.5) * 18 + (micro - 0.5) * 10;
+      let g = lerp(126, 170, slab.id) + (grain - 0.5) * 18 + (micro - 0.5) * 10;
+      let b = lerp(128, 172, slab.id) + (grain - 0.5) * 18 + (micro - 0.5) * 10;
+
+      // Mossy earth seam between flagstones
+      r = lerp(r, 64, joint * 0.82);
+      g = lerp(g, 76, joint * 0.82);
+      b = lerp(b, 52, joint * 0.82);
+
+      height[i] = clamp01(0.66 - joint * 0.44 + (grain - 0.5) * 0.14);
+
+      const idx = i * 4;
+      img.data[idx] = Math.min(255, Math.max(0, Math.round(r)));
+      img.data[idx + 1] = Math.min(255, Math.max(0, Math.round(g)));
+      img.data[idx + 2] = Math.min(255, Math.max(0, Math.round(b)));
+      img.data[idx + 3] = 255;
+
+      const rvByte = Math.round(clamp01(0.8 + joint * 0.16) * 255);
+      rImg.data[idx] = rvByte;
+      rImg.data[idx + 1] = rvByte;
+      rImg.data[idx + 2] = rvByte;
+      rImg.data[idx + 3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  rCtx.putImageData(rImg, 0, 0);
+  const normalCanvas = buildSobelNormalCanvas(height, size, 3.1);
+  return {
+    map: wrapTexture(albedoCanvas, { isColor: true, anisotropy: aniso }),
+    normalMap: wrapTexture(normalCanvas, { isColor: false, anisotropy: aniso }),
+    roughnessMap: wrapTexture(roughCanvas, { isColor: false, anisotropy: aniso }),
+  };
+}
+
+/** 512x512 Raw Fjord Granite & Slate Quarry Rock PBR (Albedo + Normal + Roughness) */
+function buildVikingRawGranitePBR(anisotropy) {
+  const size = 512;
+  const albedoCanvas = makeCanvas(size);
+  const roughCanvas = makeCanvas(size);
+  const ctx = albedoCanvas.getContext('2d');
+  const rCtx = roughCanvas.getContext('2d');
+  const img = ctx.createImageData(size, size);
+  const rImg = rCtx.createImageData(size, size);
+  const height = new Float32Array(size * size);
+  const aniso = Math.min(4, anisotropy || 4);
+
+  for (let y = 0; y < size; y++) {
+    const v = y / size;
+    for (let x = 0; x < size; x++) {
+      const u = x / size;
+      const i = y * size + x;
+      const vor = tileWorley(u, v, 8, 10709);
+      const strata = tileFBM(u * 1.6, v * 3.0, 9, 3, 10723);
+      const micro = hash2i(x, y, 10739);
+
+      const crack = 1.0 - smoothstep(0.02, 0.09, vor.edge);
+      const lum = lerp(84, 144, vor.id * 0.45 + strata * 0.55) - crack * 46 + (micro - 0.5) * 16;
+
+      height[i] = clamp01(0.62 - crack * 0.46 + (strata - 0.5) * 0.28);
+
+      const idx = i * 4;
+      img.data[idx] = Math.min(255, Math.max(0, Math.round(lum * 0.92)));
+      img.data[idx + 1] = Math.min(255, Math.max(0, Math.round(lum * 0.97)));
+      img.data[idx + 2] = Math.min(255, Math.max(0, Math.round(lum * 1.06)));
+      img.data[idx + 3] = 255;
+
+      const rvByte = Math.round(clamp01(0.86 + crack * 0.12) * 255);
+      rImg.data[idx] = rvByte;
+      rImg.data[idx + 1] = rvByte;
+      rImg.data[idx + 2] = rvByte;
+      rImg.data[idx + 3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  rCtx.putImageData(rImg, 0, 0);
+  const normalCanvas = buildSobelNormalCanvas(height, size, 4.0);
+  return {
+    map: wrapTexture(albedoCanvas, { isColor: true, anisotropy: aniso }),
+    normalMap: wrapTexture(normalCanvas, { isColor: false, anisotropy: aniso }),
+    roughnessMap: wrapTexture(roughCanvas, { isColor: false, anisotropy: aniso }),
   };
 }
 

@@ -184,6 +184,25 @@ export const BIOME_ATMOSPHERES = {
     particleStyle: 'dust',
     particleCount: 34,
   },
+  viking: {
+    id: 'viking',
+    skyTop: '#3e78a8',
+    skyHorizon: '#cfe2ed',
+    skyBottom: '#8ea8a6',
+    fogColor: '#c9dde8',
+    fogNear: 52,
+    fogFar: 118,
+    sunColor: '#fff1d0',
+    sunIntensity: 2.14,
+    hemiSky: '#e8f5ff',
+    hemiGround: '#4a5c4e',
+    hemiIntensity: 0.92,
+    rimColor: '#7ce0d6',
+    rimIntensity: 0.58,
+    particleColor: '#d9f8ff',
+    particleStyle: 'dust',
+    particleCount: 40,
+  },
   worldmap: {
     id: 'worldmap',
     skyTop: '#67add6',
@@ -234,6 +253,7 @@ export function resolveBiomeConfig(levelIdOrTheme = 'egypt', overrides = null) {
     else if (s.includes('penitentiary') || s.includes('prison') || s.includes('1800')) key = 'penitentiary';
     else if (s.includes('coal') || s.includes('mine') || s.includes('charbon')) key = 'coalmine';
     else if (s.includes('modern') || s.includes('villa') || s.includes('contemp')) key = 'modern';
+    else if (s.includes('viking') || s.includes('fjord') || s.includes('nordic') || s.includes('drakkar')) key = 'viking';
     else if (s.includes('castle') || s.includes('chateau') || s.includes('medieval') || s.includes('village')) key = 'medieval';
     else if (s.includes('museum') || s.includes('musee') || s.includes('beaux')) key = 'museum';
     else if (s.includes('worldmap')) key = 'worldmap';

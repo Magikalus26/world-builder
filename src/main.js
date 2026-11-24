@@ -35,6 +35,7 @@ import { Level7Modern } from './levels/level7_modern.js';
 import { Level8Castle } from './levels/level8_castle.js';
 import { Level9Museum } from './levels/level9_museum.js';
 import { Level10Village } from './levels/level10_village.js';
+import { Level11Viking } from './levels/level11_viking.js';
 import { RoguelikeLevel, generateRoguelikeConfig } from './levels/roguelike_level.js';
 
 const LEVEL_REGISTRY = [
@@ -48,6 +49,7 @@ const LEVEL_REGISTRY = [
   Level8Castle,
   Level9Museum,
   Level10Village,
+  Level11Viking,
 ];
 
 class WorkdBuilderApp {
@@ -832,7 +834,7 @@ class WorkdBuilderApp {
         this._setActiveChapterUI(chIdx, true);
       }
     } else if ((this.mode === 'level' || this.mode === 'roguelike') && this.currentLevel) {
-      if (this.currentLevel.cityConfig) {
+      if (this.currentLevel.cityConfig || this.currentLevel.tierSpec) {
         this._syncSunLightToTarget(this.cameraController.target.x, this.cameraController.target.z);
       }
       this.currentLevel.update(dt, this.elapsed);

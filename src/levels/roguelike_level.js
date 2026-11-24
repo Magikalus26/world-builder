@@ -922,6 +922,112 @@ export const ROGUELIKE_THEMES = [
       },
     ],
   },
+  {
+    id: 'viking',
+    levelNum: 11,
+    shortName: 'Village Viking',
+    title: 'Niveau 11 : Village Viking — Fjord du Nord',
+    biomeLabel: 'Bois Sculpté, Granit du Fjord & Toits en Bardeaux',
+    skyColor: '#c9dde8',
+    terrainTint: '#8da88e',
+    stoneTint: '#a6917a',
+    accentColor: '#3db8c8',
+    rewardRangeLabel: '+35 à +55 Éclats',
+    structures: [
+      {
+        id: 'viking_jarl_longhouse',
+        name: 'La Grande Salle du Jarl',
+        subtitle: 'Mjødhall en rondins sculptés, boucliers peints & faîtage drakkar',
+        // 15 + 9 + 6 + 2 = 32 blocks
+        layers: [
+          { cells: makeRectCells(5, 3) },
+          {
+            cells: [
+              [-2, -1], [-1, -1], [0, -1], [1, -1], [2, -1],
+              [-2, 1], [0, 1], [2, 1], [0, 0],
+            ],
+          },
+          { cells: makeRectCells(3, 2) },
+          { cells: [[-0.5, 0], [0.5, 0]] },
+        ],
+      },
+      {
+        id: 'viking_three_houses_hamlet',
+        name: 'Le Hameau des 3 Maisons Vikings',
+        subtitle: 'Trois maisons nordiques en pierre & bois autour du foyer central',
+        // 14 + 12 + 10 = 36 blocks
+        layers: [
+          {
+            cells: [
+              [-2, -1], [-1, -1], [-2, 0], [-1, 0],
+              [1, -1], [2, -1], [1, 0], [2, 0],
+              [-1, 1.5], [0, 1.5], [1, 1.5], [-1, 2.5], [0, 2.5], [1, 2.5],
+            ],
+          },
+          {
+            cells: [
+              [-2, -1], [-1, -1], [-2, 0], [-1, 0],
+              [1, -1], [2, -1], [1, 0], [2, 0],
+              [-1, 1.5], [1, 1.5], [-1, 2.5], [1, 2.5],
+            ],
+          },
+          {
+            cells: [
+              [-2, -0.5], [-1, -0.5], [1, -0.5], [2, -0.5],
+              [-1, 1.5], [0, 1.5], [1, 1.5], [-1, 2.5], [0, 2.5], [1, 2.5],
+            ],
+          },
+        ],
+      },
+      {
+        id: 'viking_watchtower_palisade',
+        name: 'La Tour de Guet & Palissade Nordique',
+        subtitle: 'Fortin en rondins, rempart défensif & vigie du fjord',
+        // 12 + 6 + 4 + 4 = 26 blocks
+        layers: [
+          { cells: makeRingCells(4, 4, false) },
+          {
+            cells: [
+              [-0.5, -0.5], [0.5, -0.5], [-0.5, 0.5], [0.5, 0.5],
+              [-1.5, 0], [1.5, 0],
+            ],
+          },
+          { cells: makeRectCells(2, 2) },
+          { cells: makeRectCells(2, 2) },
+        ],
+      },
+      {
+        id: 'viking_drakkar_shipyard',
+        name: 'Le Chantier Naval & Quai du Drakkar',
+        subtitle: 'Jetée en granit du fjord & hangar à bateaux couvert en bois',
+        // 12 + 8 + 8 + 2 = 30 blocks
+        layers: [
+          { cells: makeRectCells(4, 3) },
+          {
+            cells: [
+              [-1.5, -1], [-0.5, -1], [0.5, -1], [1.5, -1],
+              [-1.5, 1], [-0.5, 1], [0.5, 1], [1.5, 1],
+            ],
+          },
+          { cells: makeRectCells(4, 2) },
+          { cells: [[-0.5, 0], [0.5, 0]] },
+        ],
+      },
+      {
+        id: 'viking_odin_stavkirke',
+        name: "Le Temple d'Odin en Bois Sculpté (Stavkirke)",
+        subtitle: 'Sanctuaire nordique à toits pentus superposés & dragons sculptés',
+        // 16 + 9 + 4 + 4 + 1 = 34 blocks
+        layers: [
+          { cells: makeRectCells(4, 4) },
+          { cells: makeRectCells(3, 3) },
+          { cells: makeRectCells(2, 2) },
+          { cells: makeRectCells(2, 2) },
+          { cells: [[0, 0]], isCapstone: true },
+        ],
+      },
+    ],
+  },
 ];
 
 /** 4 randomized gameplay run modifiers */

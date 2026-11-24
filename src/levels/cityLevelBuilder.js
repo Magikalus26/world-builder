@@ -26,6 +26,86 @@ export const CITY_BRICK_D = 0.72;
 export const CITY_SLAB_H = 0.16;
 
 /* ============================================================================
+ * 10-LEVEL TIER SCALING ARCHITECTURE (Levels 1–100)
+ * Establishes progressive board dimensions, terrain resolution, and settlement
+ * complexity across every 10-level tier while preserving locked 60 FPS on
+ * iPhone 16e Safari (390x844, DPR <= 2):
+ *  - Tier 0 (Levels  1–10): Single Monuments (+ Lv10 Starter Milestone) — 128x128
+ *  - Tier 1 (Levels 11–20): Compact Multi-Building Villages             — 160x160
+ *  - Tier 2 (Levels 21–30): Fortified Multi-District Towns              — 192x192
+ *  - Tier 3 (Levels 31–40): Regional Citadels & Harbors                 — 192x192
+ *  - Tier 4+ (Levels 41–100): Grand Imperial Cities & Capitals          — 208x208
+ * ========================================================================== */
+export const LEVEL_TIER_SCALING = [
+  {
+    tier: 0,
+    minLevel: 1,
+    maxLevel: 10,
+    label: 'Monuments Fondateurs',
+    terrainSegments: 128,
+    boardWidth: 21.5,
+    boardDepth: 20.5,
+    targetBuildingCount: 1,
+    targetBlockRange: [30, 60],
+  },
+  {
+    tier: 1,
+    minLevel: 11,
+    maxLevel: 20,
+    label: 'Villages Multi-Bâtiments',
+    terrainSegments: 160,
+    boardWidth: 34.0,
+    boardDepth: 32.0,
+    targetBuildingCount: 4,
+    targetBlockRange: [84, 112],
+  },
+  {
+    tier: 2,
+    minLevel: 21,
+    maxLevel: 30,
+    label: 'Bourgs Fortifiés',
+    terrainSegments: 192,
+    boardWidth: 42.0,
+    boardDepth: 40.0,
+    targetBuildingCount: 6,
+    targetBlockRange: [120, 165],
+  },
+  {
+    tier: 3,
+    minLevel: 31,
+    maxLevel: 40,
+    label: 'Cités Régionales',
+    terrainSegments: 192,
+    boardWidth: 48.0,
+    boardDepth: 46.0,
+    targetBuildingCount: 8,
+    targetBlockRange: [165, 225],
+  },
+  {
+    tier: 4,
+    minLevel: 41,
+    maxLevel: 100,
+    label: 'Grandes Métropoles Impériales',
+    terrainSegments: 208,
+    boardWidth: 54.0,
+    boardDepth: 52.0,
+    targetBuildingCount: 10,
+    targetBlockRange: [220, 320],
+  },
+];
+
+export function getLevelTierSpec(levelNum = 1) {
+  const n = Math.max(1, Math.floor(Number(levelNum) || 1));
+  for (let i = 0; i < LEVEL_TIER_SCALING.length; i++) {
+    const spec = LEVEL_TIER_SCALING[i];
+    if (n >= spec.minLevel && n <= spec.maxLevel) {
+      return { ...spec, levelNum: n };
+    }
+  }
+  return { ...LEVEL_TIER_SCALING[LEVEL_TIER_SCALING.length - 1], levelNum: n };
+}
+
+/* ============================================================================
  * PARAMETRIC BLUEPRINT GENERATORS (Reusable for Levels 10, 20, 30, 40...)
  * ========================================================================== */
 
