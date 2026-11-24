@@ -5,6 +5,12 @@
  * in localStorage under "workd_builder_save".
  */
 
+import {
+  BLUEPRINT_SKIN_CATALOG,
+  DEFAULT_BLUEPRINT_SKIN,
+  getBlueprintSkinById,
+} from './blueprintSkins.js';
+
 const SAVE_KEY = 'workd_builder_save';
 
 export const RARITY_META = {
@@ -219,6 +225,8 @@ function createDefaultSave() {
       royal_gold_stone: false,
       pyramidion_aura: false,
     },
+    unlockedBlueprintSkins: [DEFAULT_BLUEPRINT_SKIN],
+    equippedBlueprintSkin: DEFAULT_BLUEPRINT_SKIN,
     furniture: [], // Array of unlocked furniture IDs (e.g. ['item_01'])
     decorations: {}, // Map of levelKey -> [{ uid, itemId, x, z, rotY }]
     completedLevels: {}, // Map of levelId -> true for first-completion rewards
@@ -251,6 +259,21 @@ export class SaveManager {
         ? Array.from(new Set(parsed.furniture.filter((id) => validFurnitureIds.has(id))))
         : [];
 
+      const validSkinIds = new Set(BLUEPRINT_SKIN_CATALOG.map((s) => s.id));
+      const unlockedBlueprintSkins = Array.isArray(parsed.unlockedBlueprintSkins)
+        ? Array.from(
+            new Set([
+              DEFAULT_BLUEPRINT_SKIN,
+              ...parsed.unlockedBlueprintSkins.filter((id) => validSkinIds.has(id)),
+            ])
+          )
+        : [DEFAULT_BLUEPRINT_SKIN];
+      const equippedBlueprintSkin =
+        typeof parsed.equippedBlueprintSkin === 'string' &&
+        unlockedBlueprintSkins.includes(parsed.equippedBlueprintSkin)
+          ? parsed.equippedBlueprintSkin
+          : DEFAULT_BLUEPRINT_SKIN;
+
       const decorations =
         parsed.decorations && typeof parsed.decorations === 'object' && !Array.isArray(parsed.decorations)
           ? parsed.decorations
@@ -273,6 +296,8 @@ export class SaveManager {
             ? Math.max(0, Math.floor(parsed.tokens))
             : fallback.tokens,
         upgrades: { ...fallback.upgrades, ...(parsed.upgrades || {}) },
+        unlockedBlueprintSkins,
+        equippedBlueprintSkin,
         furniture,
         decorations,
         completedLevels,
@@ -358,6 +383,43 @@ export class SaveManager {
     this.data.upgrades[id] = true;
     this._persist();
     return { ok: true, item, coins: this.data.coins };
+  }
+
+  /* ---- Blueprint Ghost Block Skins (Gold Coins) ---- */
+  getUnlockedBlueprintSkins() {
+    return Array.isArray(this.data.unlockedBlueprintSkins)
+      ? this.data.unlockedBlueprintSkins.slice()
+      : [DEFAULT_BLUEPRINT_SKIN];
+  }
+
+  hasBlueprintSkin(skinId) {
+    return this.getUnlockedBlueprintSkins().includes(skinId);
+  }
+
+  getEquippedBlueprintSkin() {
+    return this.data.equippedBlueprintSkin || DEFAULT_BLUEPRINT_SKIN;
+  }
+
+  purchaseBlueprintSkin(skinId) {
+    const skin = getBlueprintSkinById(skinId);
+    if (!skin || skin.id !== skinId) return { ok: false, reason: 'invalid' };
+    if (this.hasBlueprintSkin(skinId)) {
+      return this.equipBlueprintSkin(skinId);
+    }
+    if (this.data.coins < skin.price) return { ok: false, reason: 'funds' };
+
+    this.data.coins -= skin.price;
+    this.data.unlockedBlueprintSkins.push(skinId);
+    this.data.equippedBlueprintSkin = skinId;
+    this._persist();
+    return { ok: true, skin, skinId, coins: this.data.coins };
+  }
+
+  equipBlueprintSkin(skinId) {
+    if (!this.hasBlueprintSkin(skinId)) return { ok: false, reason: 'locked' };
+    this.data.equippedBlueprintSkin = skinId;
+    this._persist();
+    return { ok: true, skinId };
   }
 
   /* ---- Furniture Inventory & Daily Deals (Roguelike Éclats) ---- */

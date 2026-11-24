@@ -14,6 +14,7 @@ import {
   RARITY_META,
   SHOP_CATALOG,
 } from './saveManager.js';
+import { BLUEPRINT_SKIN_CATALOG } from './blueprintSkins.js';
 import {
   createFurniture3D,
   updateFurniture3D,
@@ -93,10 +94,11 @@ function buildChestMarkup(tier) {
 }
 
 export class ShopController {
-  constructor({ audio, save, onBalanceChange }) {
+  constructor({ audio, save, onBalanceChange, onBlueprintSkinChange }) {
     this.audio = audio;
     this.save = save;
     this.onBalanceChange = onBalanceChange;
+    this.onBlueprintSkinChange = onBlueprintSkinChange;
 
     this.activeTab = 'meubles'; // 'meubles' | 'ameliorations' | 'tresors'
     this.lootTimers = [];
@@ -602,21 +604,180 @@ export class ShopController {
   }
 
   /* ============================================================================
-   * TAB 3: TRÉSORS • BIENTÔT (Upcoming Gold Coin Vault)
+   * TAB 3: SKINS & TRÉSORS (Blueprint Ghost Block Skins for Gold Coins)
    * ========================================================================== */
-  _renderTresorsSoonTab() {
-    const wrap = document.createElement('div');
-    wrap.className = 'tresors-soon-panel';
-    wrap.innerHTML = `
-      <div class="tresors-soon-emblem">🏺✨👑</div>
-      <h3 class="tresors-soon-title">Trésors des Civilisations</h3>
-      <p class="tresors-soon-desc">
-        Conservez vos <strong>Pièces d'Or</strong> ! Reliques de Rome, lanternes célestes de Chine
-        et statues monumentales arrivent très bientôt dans le Coffre des Trésors.
-      </p>
-      <div class="tresors-soon-pill">⏳ Ouverture prochaine</div>
+  _buildSkinCubePreviewSvg(skin) {
+    const gradId = `skinGrad_${skin.id}`;
+    const c = skin.colors;
+    const isPrism = skin.id === 'prism_rgb';
+    const hasSparkles = skin.sparkle >= 0.4;
+    return `
+      <svg class="skin-cube-svg${isPrism ? ' skin-cube-svg--prism' : ''}" viewBox="0 0 64 64" aria-hidden="true">
+        <defs>
+          <linearGradient id="${gradId}" x1="0%" y1="0%" x2="100%" y2="100%">
+            <stop offset="0%" stop-color="${c[0]}" />
+            <stop offset="35%" stop-color="${c[1]}" />
+            <stop offset="70%" stop-color="${c[2]}" />
+            <stop offset="100%" stop-color="${c[3]}" />
+          </linearGradient>
+        </defs>
+        <!-- Translucent inner glass facets -->
+        <polygon points="32,8 54,20 32,32 10,20" fill="${c[0]}" fill-opacity="0.16" />
+        <polygon points="10,20 32,32 32,56 10,44" fill="${c[1]}" fill-opacity="0.12" />
+        <polygon points="54,20 32,32 32,56 54,44" fill="${c[3]}" fill-opacity="0.14" />
+        <!-- Back subtle wireframe edges -->
+        <g stroke="url(#${gradId})" stroke-width="1.3" stroke-opacity="0.38" fill="none" stroke-linecap="round">
+          <line x1="32" y1="8" x2="32" y2="32" stroke-dasharray="3 3" />
+          <line x1="10" y1="44" x2="32" y2="32" stroke-dasharray="3 3" />
+          <line x1="54" y1="44" x2="32" y2="32" stroke-dasharray="3 3" />
+        </g>
+        <!-- Crisp glowing 3D cube outer & front edges -->
+        <g stroke="url(#${gradId})" stroke-width="2.7" fill="none" stroke-linejoin="round" stroke-linecap="round">
+          <polygon points="32,8 54,20 54,44 32,56 10,44 10,20" />
+          <polyline points="10,20 32,32 54,20" />
+          <line x1="32" y1="32" x2="32" y2="56" />
+        </g>
+        <!-- Animated energy flow overlay -->
+        <polygon
+          class="skin-cube-edge-flow"
+          points="32,8 54,20 54,44 32,56 10,44 10,20"
+          stroke="#ffffff"
+          stroke-opacity="0.62"
+          stroke-width="1.4"
+          fill="none"
+          stroke-linejoin="round"
+        />
+        ${
+          hasSparkles
+            ? `<g class="skin-cube-spark" fill="#fff6c4">
+                 <circle cx="32" cy="8" r="2.2" />
+                 <circle cx="54" cy="20" r="1.8" />
+                 <circle cx="10" cy="44" r="1.8" />
+                 <circle cx="32" cy="32" r="2.0" />
+               </g>`
+            : ''
+        }
+      </svg>
     `;
-    this.contentEl.appendChild(wrap);
+  }
+
+  _renderTresorsSoonTab() {
+    const coins = this.save.getCoins();
+    const equippedId = this.save.getEquippedBlueprintSkin();
+    const unlockedCount = this.save.getUnlockedBlueprintSkins().length;
+
+    const goldCoinSvg = `
+      <svg class="skin-coin-svg" viewBox="0 0 24 24" aria-hidden="true">
+        <circle cx="12" cy="12" r="10.2" fill="#d99422" stroke="#ffea9c" stroke-width="1.5"/>
+        <circle cx="12" cy="12" r="7.4" fill="#f7c84c" stroke="#9e6212" stroke-width="1.1"/>
+        <path d="M12 7.2L15.6 12L12 16.8L8.4 12Z" fill="#ffe999" stroke="#a66812" stroke-width="0.9"/>
+      </svg>
+    `;
+
+    const section = document.createElement('section');
+    section.className = 'skins-section-tablet';
+    section.innerHTML = `
+      <div class="skins-section-head">
+        <h2 class="skins-section-title">
+          <span>✨</span>
+          <span>Skins de Blocs Fantômes</span>
+        </h2>
+        <span class="skins-section-sub">${unlockedCount} / ${BLUEPRINT_SKIN_CATALOG.length} débloqués</span>
+      </div>
+    `;
+
+    const list = document.createElement('div');
+    list.className = 'blueprint-skins-list';
+
+    BLUEPRINT_SKIN_CATALOG.forEach((skin) => {
+      const owned = this.save.hasBlueprintSkin(skin.id);
+      const equipped = equippedId === skin.id;
+      const canAfford = coins >= skin.price;
+      const rarity = RARITY_META[skin.rarity] || RARITY_META.commun;
+
+      const card = document.createElement('div');
+      card.className = `blueprint-skin-card${equipped ? ' is-equipped' : ''}${owned ? ' is-owned' : ''}`;
+      card.dataset.blueprintSkinCard = skin.id;
+      card.style.setProperty('--skin-gradient', skin.previewGradient);
+      card.style.setProperty('--skin-glow', skin.glowColor);
+
+      const preview = document.createElement('div');
+      preview.className = 'skin-cube-preview';
+      preview.innerHTML = this._buildSkinCubePreviewSvg(skin);
+
+      const info = document.createElement('div');
+      info.className = 'skin-card-info';
+      info.innerHTML = `
+        <div class="skin-card-title-row">
+          <span class="skin-card-name">${skin.name}</span>
+          <span class="rarity-badge rarity-badge--${skin.rarity}" style="--rarity-color:${rarity.color}">${rarity.label}</span>
+        </div>
+        <div class="skin-card-desc">${skin.subtitle}</div>
+        <div class="skin-swatch-bar" aria-hidden="true"></div>
+      `;
+
+      const actionBtn = document.createElement('button');
+      actionBtn.type = 'button';
+      actionBtn.dataset.blueprintSkinId = skin.id;
+
+      if (equipped) {
+        actionBtn.className = 'skin-action-btn is-equipped';
+        actionBtn.disabled = true;
+        actionBtn.textContent = 'Équipé ✓';
+      } else if (owned) {
+        actionBtn.className = 'skin-action-btn is-equip';
+        actionBtn.textContent = 'Équiper';
+        actionBtn.addEventListener('click', () => {
+          this.audio.unlock();
+          const res = this.save.equipBlueprintSkin(skin.id);
+          if (res.ok) {
+            this.audio.playChiselPing(3);
+            this.audio.playTabBounce();
+            triggerTactileBounce(card);
+            if (this.onBlueprintSkinChange) this.onBlueprintSkinChange(skin.id);
+            this.render();
+          }
+        });
+      } else {
+        actionBtn.className = 'skin-action-btn skin-action-btn--buy';
+        actionBtn.disabled = !canAfford;
+        actionBtn.innerHTML = `<span class="skin-buy-label">Acheter</span><span class="skin-buy-price">${goldCoinSvg}<span>${skin.price} Or</span></span>`;
+        actionBtn.addEventListener('click', () => {
+          this.audio.unlock();
+          const res = this.save.purchaseBlueprintSkin(skin.id);
+          if (res.ok) {
+            this.audio.playCoinClink();
+            this.audio.playChiselPing(3);
+            triggerTactileBounce(card);
+            if (this.onBlueprintSkinChange) this.onBlueprintSkinChange(skin.id);
+            this.refreshBalances();
+            this.render();
+          } else {
+            this.audio.playMapTap(true);
+          }
+        });
+      }
+
+      card.appendChild(preview);
+      card.appendChild(info);
+      card.appendChild(actionBtn);
+      list.appendChild(card);
+    });
+
+    section.appendChild(list);
+    this.contentEl.appendChild(section);
+
+    // Subtle upcoming relics teaser banner below the Skins section
+    const vault = document.createElement('div');
+    vault.className = 'tresors-soon-panel';
+    vault.innerHTML = `
+      <div class="tresors-soon-emblem">🏺✨👑</div>
+      <h3 class="tresors-soon-title">Reliques &amp; Trésors des Civilisations</h3>
+      <p class="tresors-soon-desc">
+        Vos skins de blocs fantômes s'appliquent instantanément sur tous les niveaux et runs Roguelike !
+      </p>
+    `;
+    this.contentEl.appendChild(vault);
   }
 
   /* ============================================================================

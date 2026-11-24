@@ -1925,48 +1925,298 @@ body {
   z-index: 1;
 }
 
-/* Trésors • Bientôt Tab */
-.tresors-soon-panel {
-  padding: 28px 16px;
+/* Skins & Trésors Tab — Blueprint Ghost Block Skins */
+.skins-section-tablet {
   border-radius: 18px;
-  background: rgba(24, 13, 5, 0.56);
-  border: 1.5px dashed rgba(246, 208, 128, 0.45);
+  padding: 11px 10px 12px;
+  background: linear-gradient(180deg, rgba(64, 37, 16, 0.78) 0%, rgba(36, 19, 8, 0.88) 100%);
+  border: 2px solid rgba(226, 178, 92, 0.52);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 232, 172, 0.25),
+    0 6px 16px rgba(16, 7, 2, 0.42);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.skins-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 0 2px;
+}
+
+.skins-section-title {
+  margin: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #ffe69c;
+  font-size: 14.5px;
+  font-weight: 900;
+  text-shadow: 0 2px 4px rgba(20, 8, 2, 0.65);
+}
+
+.skins-section-sub {
+  font-size: 10.5px;
+  font-weight: 800;
+  color: #f4d59a;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: rgba(24, 12, 4, 0.55);
+  border: 1px solid rgba(236, 188, 98, 0.36);
+  white-space: nowrap;
+}
+
+.blueprint-skins-list {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
+.blueprint-skin-card {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 10px;
+  border-radius: 15px;
+  background: linear-gradient(180deg, rgba(46, 26, 11, 0.86) 0%, rgba(28, 15, 6, 0.92) 100%);
+  border: 1.5px solid rgba(226, 182, 104, 0.36);
+  box-shadow:
+    0 4px 10px rgba(14, 6, 2, 0.38),
+    inset 0 1px 0 rgba(255, 232, 180, 0.16);
+  transition: transform 0.16s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.blueprint-skin-card.is-equipped {
+  border-color: rgba(255, 224, 110, 0.88);
+  background: linear-gradient(180deg, rgba(58, 42, 16, 0.92) 0%, rgba(30, 24, 10, 0.95) 100%);
+  box-shadow:
+    0 0 14px var(--skin-glow, rgba(255, 212, 82, 0.4)),
+    inset 0 1px 0 rgba(255, 246, 200, 0.34);
+}
+
+.skin-cube-preview {
+  position: relative;
+  flex: 0 0 58px;
+  width: 58px;
+  height: 58px;
+  border-radius: 13px;
+  background: radial-gradient(circle at 50% 42%, rgba(24, 34, 52, 0.96) 0%, rgba(11, 14, 22, 0.98) 100%);
+  border: 1.5px solid rgba(240, 202, 120, 0.42);
+  box-shadow:
+    inset 0 0 12px var(--skin-glow, rgba(40, 220, 255, 0.32)),
+    0 3px 8px rgba(8, 4, 2, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.skin-cube-svg {
+  width: 48px;
+  height: 48px;
+  filter: drop-shadow(0 0 5px var(--skin-glow, rgba(40, 220, 255, 0.72)));
+  animation: skinCubeFloat 3.2s ease-in-out infinite;
+}
+
+.skin-cube-svg--prism {
+  animation: skinCubeFloat 3.0s ease-in-out infinite, skinPrismHue 4.2s linear infinite;
+}
+
+.skin-cube-edge-flow {
+  stroke-dasharray: 28 8;
+  animation: skinEdgeFlow 2.6s linear infinite;
+}
+
+.skin-cube-spark {
+  animation: skinSparklePulse 1.8s ease-in-out infinite;
+  transform-origin: center;
+}
+
+@keyframes skinCubeFloat {
+  0%, 100% {
+    transform: translateY(0px) scale(1);
+  }
+  50% {
+    transform: translateY(-2.5px) scale(1.04);
+  }
+}
+
+@keyframes skinPrismHue {
+  0% {
+    filter: hue-rotate(0deg) drop-shadow(0 0 6px rgba(0, 229, 255, 0.85));
+  }
+  50% {
+    filter: hue-rotate(42deg) drop-shadow(0 0 8px rgba(184, 77, 255, 0.88));
+  }
+  100% {
+    filter: hue-rotate(0deg) drop-shadow(0 0 6px rgba(46, 255, 139, 0.85));
+  }
+}
+
+@keyframes skinEdgeFlow {
+  from {
+    stroke-dashoffset: 0;
+  }
+  to {
+    stroke-dashoffset: -72;
+  }
+}
+
+@keyframes skinSparklePulse {
+  0%, 100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.skin-card-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.skin-card-title-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+
+.skin-card-name {
+  color: #fff6e0;
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1.2;
+}
+
+.skin-card-desc {
+  color: rgba(246, 230, 198, 0.8);
+  font-size: 11px;
+  line-height: 1.28;
+}
+
+.skin-swatch-bar {
+  margin-top: 3px;
+  width: 66px;
+  height: 5px;
+  border-radius: 999px;
+  background: var(--skin-gradient);
+  box-shadow: 0 0 7px var(--skin-glow, rgba(255, 255, 255, 0.35));
+}
+
+.skin-action-btn {
+  flex: 0 0 auto;
+  appearance: none;
+  -webkit-appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-width: 88px;
+  padding: 8px 11px;
+  border-radius: 999px;
+  border: 1.5px solid rgba(255, 244, 204, 0.78);
+  background: linear-gradient(180deg, var(--btn-gold-top) 0%, var(--btn-gold-bottom) 100%);
+  color: var(--btn-text);
+  font-family: var(--font-ui);
+  font-size: 11.5px;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+  cursor: pointer;
+  touch-action: manipulation;
+  box-shadow: 0 3px 7px rgba(18, 8, 2, 0.42);
+  transition: transform 0.12s ease, opacity 0.15s ease, filter 0.15s ease;
+}
+
+.skin-action-btn:active:not(:disabled) {
+  transform: scale(0.94);
+}
+
+.skin-action-btn:disabled:not(.is-equipped) {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.skin-action-btn.is-equip {
+  background: linear-gradient(180deg, #62e3ff 0%, #1c9ec4 100%);
+  border-color: #d6fbff;
+  color: #092431;
+}
+
+.skin-action-btn.is-equipped {
+  background: linear-gradient(180deg, #69c95d 0%, #3d8e38 100%);
+  border-color: #c8f9be;
+  color: #f6fff4;
+  cursor: default;
+}
+
+.skin-action-btn--buy {
+  flex-direction: column;
+  gap: 1px;
+  padding: 6px 11px;
+  min-width: 86px;
+}
+
+.skin-buy-label {
+  font-size: 10.5px;
+  font-weight: 900;
+  letter-spacing: 0.02em;
+  line-height: 1.05;
+}
+
+.skin-buy-price {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 11px;
+  font-weight: 900;
+  line-height: 1.05;
+}
+
+.skin-coin-svg {
+  width: 13px;
+  height: 13px;
+  flex: 0 0 auto;
+}
+
+.tresors-soon-panel {
+  padding: 14px 14px;
+  border-radius: 15px;
+  background: rgba(24, 13, 5, 0.5);
+  border: 1.5px dashed rgba(246, 208, 128, 0.34);
   text-align: center;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 10px;
+  gap: 5px;
 }
 
 .tresors-soon-emblem {
-  font-size: 34px;
-  letter-spacing: 6px;
+  font-size: 22px;
+  letter-spacing: 5px;
 }
 
 .tresors-soon-title {
   margin: 0;
   color: #ffe28e;
-  font-size: 17px;
+  font-size: 13.5px;
   font-weight: 800;
 }
 
 .tresors-soon-desc {
   margin: 0;
-  color: rgba(252, 238, 208, 0.84);
-  font-size: 13px;
-  line-height: 1.45;
+  color: rgba(252, 238, 208, 0.78);
+  font-size: 11.5px;
+  line-height: 1.38;
   max-width: 280px;
-}
-
-.tresors-soon-pill {
-  margin-top: 4px;
-  padding: 7px 16px;
-  border-radius: 999px;
-  background: rgba(246, 200, 92, 0.16);
-  border: 1px solid rgba(255, 218, 118, 0.58);
-  color: #ffe28e;
-  font-size: 12px;
-  font-weight: 800;
 }
 
 /* ============================================================================

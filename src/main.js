@@ -119,6 +119,11 @@ class WorkdBuilderApp {
         if (this.mainMenu) this.mainMenu.refreshBalances();
         if (this.decorationSystem) this.decorationSystem.renderDock();
       },
+      onBlueprintSkinChange: (skinId) => {
+        if (this.currentLevel && typeof this.currentLevel.setBlueprintSkin === 'function') {
+          this.currentLevel.setBlueprintSkin(skinId);
+        }
+      },
     });
 
     this.roguelikeLobby = new RoguelikeLobbyController({
@@ -602,6 +607,7 @@ class WorkdBuilderApp {
       textures: this.textures,
       audio: this.audio,
       upgrades: this.save.getUpgrades(),
+      blueprintSkinId: this.save.getEquippedBlueprintSkin(),
       onProgress: (count, total) => {
         this._updateHUD(count, total, LevelClass.meta.hudLabel, true);
       },
@@ -669,6 +675,7 @@ class WorkdBuilderApp {
       textures: this.textures,
       audio: this.audio,
       upgrades: this.save.getUpgrades(),
+      blueprintSkinId: this.save.getEquippedBlueprintSkin(),
       runConfig: cfg,
       onProgress: (count, total) => {
         this._updateHUD(count, total, cfg.themeShortName || 'Roguelike', true);

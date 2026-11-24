@@ -1451,7 +1451,7 @@ export class Level9Museum extends Level1Pyramid {
       const ghostMesh = new THREE.Mesh(gGeo, this.mats.ghostNormal);
       ghostMesh.renderOrder = 5;
       const ghostLines = new THREE.LineSegments(eGeo, this.mats.ghostLineNormal);
-      ghostLines.renderOrder = 5;
+      ghostLines.renderOrder = 6;
       ghostGroup.add(ghostMesh);
       ghostGroup.add(ghostLines);
       ghostGroup.visible = cell.layer === 0;

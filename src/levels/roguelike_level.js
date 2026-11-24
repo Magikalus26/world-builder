@@ -1036,7 +1036,16 @@ export class RoguelikeLevel extends Level1Pyramid {
     totalGoal: 30,
   };
 
-  constructor({ scene, textures, audio, onProgress, onComplete, upgrades = {}, runConfig = null }) {
+  constructor({
+    scene,
+    textures,
+    audio,
+    onProgress,
+    onComplete,
+    upgrades = {},
+    runConfig = null,
+    blueprintSkinId = null,
+  }) {
     const cfg = runConfig || generateRoguelikeConfig();
     super({
       scene,
@@ -1046,6 +1055,7 @@ export class RoguelikeLevel extends Level1Pyramid {
       onComplete,
       upgrades,
       runConfig: cfg,
+      blueprintSkinId,
     });
     this.roguelikeConfig = cfg;
   }

@@ -1132,7 +1132,7 @@ export class Level4Maya extends Level1Pyramid {
         const ghostMesh = new THREE.Mesh(gGeo, this.mats.ghostNormal);
         ghostMesh.renderOrder = 5;
         const ghostLines = new THREE.LineSegments(gEdges, this.mats.ghostLineNormal);
-        ghostLines.renderOrder = 5;
+        ghostLines.renderOrder = 6;
         ghostGroup.add(ghostMesh);
         ghostGroup.add(ghostLines);
         ghostGroup.visible = layer === 0;

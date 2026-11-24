@@ -16,6 +16,12 @@
 
 import * as THREE from 'three';
 import {
+  DEFAULT_BLUEPRINT_SKIN,
+  createBlueprintSkinMaterialSet,
+  applyBlueprintSkinToMaterials,
+  updateBlueprintSkinUniforms,
+} from '../blueprintSkins.js';
+import {
   ConnectedMasonryCache,
   createConnectedMasonryGeometry,
   NEIGHBOR_PX,
@@ -307,7 +313,16 @@ export class Level1Pyramid {
     totalGoal: 55,
   };
 
-  constructor({ scene, textures, audio, onProgress, onComplete, upgrades = {}, runConfig = null }) {
+  constructor({
+    scene,
+    textures,
+    audio,
+    onProgress,
+    onComplete,
+    upgrades = {},
+    runConfig = null,
+    blueprintSkinId = null,
+  }) {
     this.scene = scene;
     this.textures = textures;
     this.audio = audio;
@@ -315,6 +330,7 @@ export class Level1Pyramid {
     this.onComplete = onComplete;
     this.upgrades = upgrades || {};
     this.runConfig = runConfig || null;
+    this.equippedBlueprintSkin = blueprintSkinId || DEFAULT_BLUEPRINT_SKIN;
 
     // Layout mirroring & gameplay parameters (extensible for Roguelike runs & Shop upgrades)
     this.mirrorX = (this.runConfig && this.runConfig.mirrorX) || 1;
@@ -506,65 +522,15 @@ export class Level1Pyramid {
       particleCube: this._trackGeo(new THREE.DodecahedronGeometry(0.11, 0)),
     };
 
-    // Standardized ultra-crisp frosted ice-blue glass ghost placement materials (via MaterialFactory)
-    const frosted =
-      this.textures && this.textures.materialFactory
-        ? this.textures.materialFactory.createFrostedGhostMaterials()
-        : null;
+    // Customizable Blueprint Ghost Block Skin GPU ShaderMaterials (classic_cyan, prism_rgb, solar_gold, jade_emerald, ruby_ember)
+    const blueprintMats = createBlueprintSkinMaterialSet(this.equippedBlueprintSkin);
 
     this.mats = {
-      ghostNormal: this._trackMat(
-        frosted
-          ? frosted.ghostNormal
-          : new THREE.MeshStandardMaterial({
-              map: this.textures.maps.blueprint,
-              color: 0x28dcff,
-              emissive: 0x00b4f0,
-              emissiveIntensity: 0.6,
-              transparent: true,
-              opacity: 0.35,
-              depthWrite: false,
-              polygonOffset: true,
-              polygonOffsetFactor: 2,
-              polygonOffsetUnits: 2,
-            })
-      ),
-      ghostHighlight: this._trackMat(
-        frosted
-          ? frosted.ghostHighlight
-          : new THREE.MeshStandardMaterial({
-              map: this.textures.maps.blueprint,
-              color: 0x7eff7a,
-              emissive: 0xffd52e,
-              emissiveIntensity: 0.95,
-              transparent: true,
-              opacity: 0.7,
-              depthWrite: false,
-              polygonOffset: true,
-              polygonOffsetFactor: 2,
-              polygonOffsetUnits: 2,
-            })
-      ),
-      ghostLineNormal: this._trackMat(
-        frosted
-          ? frosted.ghostLineNormal
-          : new THREE.LineBasicMaterial({
-              color: 0x3ce6ff,
-              transparent: true,
-              opacity: 0.95,
-              depthWrite: false,
-            })
-      ),
-      ghostLineHighlight: this._trackMat(
-        frosted
-          ? frosted.ghostLineHighlight
-          : new THREE.LineBasicMaterial({
-              color: 0xffe44d,
-              transparent: true,
-              opacity: 1.0,
-              depthWrite: false,
-            })
-      ),
+      blueprintSkinId: blueprintMats.skinId,
+      ghostNormal: this._trackMat(blueprintMats.ghostNormal),
+      ghostHighlight: this._trackMat(blueprintMats.ghostHighlight),
+      ghostLineNormal: this._trackMat(blueprintMats.ghostLineNormal),
+      ghostLineHighlight: this._trackMat(blueprintMats.ghostLineHighlight),
       slotIdle: this._trackMat(
         new THREE.MeshBasicMaterial({
           color: 0x8f6b3e,
@@ -1729,7 +1695,7 @@ export class Level1Pyramid {
           isCapstone ? this.geos.ghostCapstoneEdges : this.geos.ghostBoxEdges,
           this.mats.ghostLineNormal
         );
-        ghostLines.renderOrder = 5;
+        ghostLines.renderOrder = 6;
         ghostGroup.add(ghostMesh);
         ghostGroup.add(ghostLines);
         ghostGroup.visible = layer === 0;
@@ -2036,6 +2002,17 @@ export class Level1Pyramid {
         obj.material = plinthMat;
       }
     });
+  }
+
+  /**
+   * Immediately hot-swaps the equipped Blueprint Ghost Block skin across all active ghost slots
+   * (zero geometry rebuilds, works seamlessly across Levels 1–9 and Roguelike).
+   */
+  setBlueprintSkin(skinId) {
+    this.equippedBlueprintSkin = skinId || DEFAULT_BLUEPRINT_SKIN;
+    if (this.mats) {
+      applyBlueprintSkinToMaterials(this.mats, this.equippedBlueprintSkin);
+    }
   }
 
   /* ============================================================================
@@ -2816,12 +2793,9 @@ export class Level1Pyramid {
       }
     }
 
-    // 5. Standardized frosted-glass luminous pulse on active ghost slots & optional Pyramidion Aura ring
-    if (this.textures && this.textures.materialFactory) {
-      this.textures.materialFactory.updateFrostedGhostPulse(this.mats, elapsed);
-    } else if (this.mats.ghostNormal) {
-      this.mats.ghostNormal.opacity = 0.35 + Math.sin(elapsed * 2.8) * 0.04;
-    }
+    // 5. Animated Blueprint Ghost Block Skin shaders (RGB Prism, Solar Gold, Jade, Ruby, Classic Cyan)
+    const isDraggingFinished = this.blocks.some((b) => b.isDragging && b.kind !== 'raw');
+    updateBlueprintSkinUniforms(this.mats, elapsed, { isDraggingFinished });
     if (this.auraRingMesh) {
       const auraS = 1 + Math.sin(elapsed * 2.5) * 0.025;
       this.auraRingMesh.scale.setScalar(auraS);

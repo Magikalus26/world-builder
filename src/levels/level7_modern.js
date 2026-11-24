@@ -1107,7 +1107,7 @@ export class Level7Modern extends Level1Pyramid {
         isSlab ? slabRoofEdges : this.geos.ghostBoxEdges,
         this.mats.ghostLineNormal
       );
-      ghostLines.renderOrder = 5;
+      ghostLines.renderOrder = 6;
       ghostGroup.add(ghostMesh, ghostLines);
       ghostGroup.visible = layer === 0;
       siteGroup.add(ghostGroup);
