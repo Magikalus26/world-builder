@@ -1,26 +1,37 @@
 /**
- * Workd Builder — Dedicated Soft Solar & Atmospheric Lighting Shader System (`src/solarLighting.js`)
+ * Workd Builder — Dedicated Soft Solar, Cast Shadows & Volumetric Sunbeams System (`src/solarLighting.js`)
  *
- * Centralized, zero-bloat lighting & custom GLSL sky/sun-halo module applied across ALL levels
- * (Levels 1–13, Roguelike runs, 3D World Map, Main Menu, and future Levels 14–100), tuned for
- * silky-smooth, soft visual rendering at a locked 60 FPS on iPhone 16e Safari (390x844, DPR <= 2).
+ * Centralized, zero-bloat lighting, real-time soft shadow, volumetric god-ray sunbeam, and custom
+ * GLSL sky/sun-halo module applied across ALL levels (Levels 1–13, Roguelike runs, 3D World Map,
+ * Main Menu, and future Levels 14–100), engineered for locked 60 FPS and low GPU heat on
+ * iPhone 16e Safari (390x844, devicePixelRatio capped at 2).
  *
  * Features:
  *  - Soft Hemisphere + Directional Sunlight + Rim Fill rig with 1024x1024 PCFSoftShadowMap
- *  - Per-biome ACESFilmicToneMapping exposure calibration (prevents blown-out highlights)
+ *    (bias = -0.0005, normalBias = 0.02) and tightly fitted per-board orthographic shadow frustum
+ *  - Automatic solid-mesh shadow traversal (`applyShadowFlagsToObject`) enabling cast/receive on
+ *    solid geometry while keeping castShadow = false on ghosts, water planes, sunbeams & particles
+ *  - Lightweight volumetric sunbeams / god rays (`createSunBeams`) via 1 single-draw-call
+ *    InstancedMesh of 6 tapered shafts with smooth Fresnel edge/vertical falloff & dust shimmer
  *  - Custom GLSL Sky Dome & Mie-style Horizon Sun-Glow ShaderMaterial (BackSide, depthWrite: false)
  *  - Biome-tinted exponential distance fog (THREE.FogExp2) calibrated to diorama scale
- *  - Lightweight InstancedMesh floating sun-beam dust / pollen / mist motes (<= 40 particles, 1 draw call)
+ *  - Lightweight InstancedMesh floating sunbeam dust motes (<= 35 particles, 1 draw call)
  *  - Extensible preset registry (`SOLAR_LIGHTING_PRESETS` + `registerSolarPreset`) for Levels 14–100
  */
 
 import * as THREE from 'three';
 
-const MAX_MOTE_COUNT = 40;
+const MAX_MOTE_COUNT = 35;
+const SUNBEAM_SHAFT_COUNT = 6;
+const UP_AXIS = new THREE.Vector3(0, 1, 0);
+
+/** Active solar handle updated by `updateSolarLighting(deltaTime, ...)` */
+let _activeSolarHandle = null;
+let _internalElapsed = 0;
 
 /**
  * Distinct per-level solar angles, atmospheric sky gradients, hemisphere ground bounce,
- * soft shadow warmth, FogExp2 haze, and floating sun-beam mote presets.
+ * soft shadow calibration, volumetric sunbeam tint/opacity, FogExp2 haze, and <= 35 motes.
  */
 export const SOLAR_LIGHTING_PRESETS = {
   // Niveau 1 — Égypte (Pyramide)
@@ -40,16 +51,19 @@ export const SOLAR_LIGHTING_PRESETS = {
     nadirColor: '#d9a86c',
     hazeIntensity: 0.62,
     sunHaloPower: 9.0,
+    beamColor: '#ffe296',
+    beamOpacity: 0.13,
+    beamCount: 6,
     fogColor: '#eed5a4',
     fogDensity: 0.0068,
     exposure: 1.07,
     envIntensity: 0.56,
     moteColor: '#ffe5a8',
     moteStyle: 'dust',
-    moteCount: 36,
+    moteCount: 34,
     moteSize: 0.2,
     moteOpacity: 0.44,
-    shadowBounds: 16.5,
+    shadowBounds: 20.0,
   },
 
   // Niveau 2 — Rome (Domus)
@@ -69,16 +83,19 @@ export const SOLAR_LIGHTING_PRESETS = {
     nadirColor: '#c9b89e',
     hazeIntensity: 0.48,
     sunHaloPower: 11.5,
+    beamColor: '#fff0c4',
+    beamOpacity: 0.11,
+    beamCount: 6,
     fogColor: '#dceaf2',
     fogDensity: 0.0062,
     exposure: 1.08,
     envIntensity: 0.6,
     moteColor: '#fff2cc',
     moteStyle: 'dust',
-    moteCount: 34,
+    moteCount: 32,
     moteSize: 0.19,
     moteOpacity: 0.4,
-    shadowBounds: 16.5,
+    shadowBounds: 20.0,
   },
 
   // Niveau 3 — Japon (Minka)
@@ -98,16 +115,19 @@ export const SOLAR_LIGHTING_PRESETS = {
     nadirColor: '#b5ccb8',
     hazeIntensity: 0.58,
     sunHaloPower: 8.5,
+    beamColor: '#ffd6e2',
+    beamOpacity: 0.125,
+    beamCount: 6,
     fogColor: '#eadce2',
     fogDensity: 0.0066,
     exposure: 1.07,
     envIntensity: 0.58,
     moteColor: '#ffc6d8',
     moteStyle: 'petal',
-    moteCount: 40,
-    moteSize: 0.26,
+    moteCount: 35,
+    moteSize: 0.25,
     moteOpacity: 0.56,
-    shadowBounds: 16.5,
+    shadowBounds: 20.0,
   },
 
   // Niveau 4 — Maya (Kukulcán)
@@ -127,16 +147,19 @@ export const SOLAR_LIGHTING_PRESETS = {
     nadirColor: '#7eb294',
     hazeIntensity: 0.56,
     sunHaloPower: 10.0,
+    beamColor: '#ccffda',
+    beamOpacity: 0.13,
+    beamCount: 6,
     fogColor: '#cce6db',
     fogDensity: 0.0068,
     exposure: 1.08,
     envIntensity: 0.58,
     moteColor: '#a6ffda',
     moteStyle: 'firefly',
-    moteCount: 38,
-    moteSize: 0.24,
+    moteCount: 34,
+    moteSize: 0.23,
     moteOpacity: 0.62,
-    shadowBounds: 16.5,
+    shadowBounds: 20.0,
   },
 
   // Niveau 5 — Pénitencier 1800
@@ -156,16 +179,19 @@ export const SOLAR_LIGHTING_PRESETS = {
     nadirColor: '#bd966a',
     hazeIntensity: 0.66,
     sunHaloPower: 7.5,
+    beamColor: '#ffd294',
+    beamOpacity: 0.13,
+    beamCount: 6,
     fogColor: '#e2d1b7',
     fogDensity: 0.0074,
     exposure: 1.06,
     envIntensity: 0.54,
     moteColor: '#f5d6a6',
     moteStyle: 'dust',
-    moteCount: 38,
+    moteCount: 34,
     moteSize: 0.21,
     moteOpacity: 0.46,
-    shadowBounds: 16.5,
+    shadowBounds: 20.5,
   },
 
   // Niveau 6 — Mine de Charbon
@@ -185,16 +211,19 @@ export const SOLAR_LIGHTING_PRESETS = {
     nadirColor: '#8d98a1',
     hazeIntensity: 0.72,
     sunHaloPower: 6.8,
+    beamColor: '#ffc978',
+    beamOpacity: 0.145,
+    beamCount: 6,
     fogColor: '#c9d5dd',
     fogDensity: 0.0076,
     exposure: 1.07,
     envIntensity: 0.58,
     moteColor: '#ffda9e',
     moteStyle: 'steam',
-    moteCount: 38,
-    moteSize: 0.25,
+    moteCount: 34,
+    moteSize: 0.24,
     moteOpacity: 0.42,
-    shadowBounds: 17.5,
+    shadowBounds: 21.0,
   },
 
   // Niveau 7 — Villa Moderne
@@ -214,16 +243,19 @@ export const SOLAR_LIGHTING_PRESETS = {
     nadirColor: '#c2dfcc',
     hazeIntensity: 0.36,
     sunHaloPower: 14.0,
+    beamColor: '#eef8ff',
+    beamOpacity: 0.09,
+    beamCount: 5,
     fogColor: '#e3f1fa',
     fogDensity: 0.0052,
     exposure: 1.1,
     envIntensity: 0.76,
     moteColor: '#ffffff',
     moteStyle: 'glint',
-    moteCount: 28,
+    moteCount: 26,
     moteSize: 0.18,
     moteOpacity: 0.36,
-    shadowBounds: 17.5,
+    shadowBounds: 21.0,
   },
 
   // Niveau 8 — Château Fort
@@ -243,16 +275,19 @@ export const SOLAR_LIGHTING_PRESETS = {
     nadirColor: '#a8be9a',
     hazeIntensity: 0.52,
     sunHaloPower: 10.5,
+    beamColor: '#ffefc0',
+    beamOpacity: 0.115,
+    beamCount: 6,
     fogColor: '#d7e3ee',
     fogDensity: 0.0062,
     exposure: 1.08,
     envIntensity: 0.6,
     moteColor: '#ffebb3',
     moteStyle: 'dust',
-    moteCount: 34,
+    moteCount: 32,
     moteSize: 0.2,
     moteOpacity: 0.4,
-    shadowBounds: 18.0,
+    shadowBounds: 22.0,
   },
 
   // Niveau 9 — Grand Musée
@@ -272,16 +307,19 @@ export const SOLAR_LIGHTING_PRESETS = {
     nadirColor: '#c9dac4',
     hazeIntensity: 0.44,
     sunHaloPower: 12.0,
+    beamColor: '#fff3ce',
+    beamOpacity: 0.125,
+    beamCount: 6,
     fogColor: '#e4edf5',
     fogDensity: 0.0056,
     exposure: 1.09,
     envIntensity: 0.72,
     moteColor: '#fff2c2',
     moteStyle: 'prism',
-    moteCount: 34,
+    moteCount: 32,
     moteSize: 0.21,
     moteOpacity: 0.46,
-    shadowBounds: 18.0,
+    shadowBounds: 22.0,
   },
 
   // Niveau 10 — Village Médiéval
@@ -301,16 +339,19 @@ export const SOLAR_LIGHTING_PRESETS = {
     nadirColor: '#bfa476',
     hazeIntensity: 0.62,
     sunHaloPower: 7.8,
+    beamColor: '#ffd98c',
+    beamOpacity: 0.135,
+    beamCount: 7,
     fogColor: '#ead5ae',
     fogDensity: 0.005,
     exposure: 1.07,
     envIntensity: 0.58,
     moteColor: '#ffe29c',
     moteStyle: 'pollen',
-    moteCount: 38,
+    moteCount: 35,
     moteSize: 0.22,
     moteOpacity: 0.48,
-    shadowBounds: 21.0,
+    shadowBounds: 25.0,
   },
 
   // Niveau 11 — Village Viking
@@ -330,16 +371,19 @@ export const SOLAR_LIGHTING_PRESETS = {
     nadirColor: '#88a4a6',
     hazeIntensity: 0.58,
     sunHaloPower: 8.2,
+    beamColor: '#dceeff',
+    beamOpacity: 0.115,
+    beamCount: 6,
     fogColor: '#c9dde8',
     fogDensity: 0.0052,
     exposure: 1.08,
     envIntensity: 0.62,
     moteColor: '#dcf8ff',
     moteStyle: 'mist',
-    moteCount: 38,
-    moteSize: 0.24,
+    moteCount: 34,
+    moteSize: 0.23,
     moteOpacity: 0.42,
-    shadowBounds: 21.0,
+    shadowBounds: 26.0,
   },
 
   // Niveau 12 — Village Anglais 1900
@@ -359,16 +403,19 @@ export const SOLAR_LIGHTING_PRESETS = {
     nadirColor: '#bad3b0',
     hazeIntensity: 0.5,
     sunHaloPower: 10.5,
+    beamColor: '#fff2c4',
+    beamOpacity: 0.115,
+    beamCount: 6,
     fogColor: '#dceaf2',
     fogDensity: 0.005,
     exposure: 1.08,
     envIntensity: 0.62,
     moteColor: '#fff6c8',
     moteStyle: 'pollen',
-    moteCount: 36,
+    moteCount: 34,
     moteSize: 0.21,
     moteOpacity: 0.44,
-    shadowBounds: 21.0,
+    shadowBounds: 26.0,
   },
 
   // Niveau 13 — Village sur Pilotis (Lagon & Rivière)
@@ -388,16 +435,19 @@ export const SOLAR_LIGHTING_PRESETS = {
     nadirColor: '#86d4dc',
     hazeIntensity: 0.44,
     sunHaloPower: 12.5,
+    beamColor: '#d4fff8',
+    beamOpacity: 0.105,
+    beamCount: 7,
     fogColor: '#c8ecf4',
     fogDensity: 0.0038,
     exposure: 1.09,
     envIntensity: 0.66,
     moteColor: '#eafffc',
     moteStyle: 'spray',
-    moteCount: 36,
+    moteCount: 34,
     moteSize: 0.22,
     moteOpacity: 0.42,
-    shadowBounds: 23.5,
+    shadowBounds: 30.5,
   },
 
   // 3D World Map Archipelago (Levels 1–100)
@@ -417,16 +467,19 @@ export const SOLAR_LIGHTING_PRESETS = {
     nadirColor: '#9ecdd6',
     hazeIntensity: 0.46,
     sunHaloPower: 11.0,
+    beamColor: '#fff2cc',
+    beamOpacity: 0.075,
+    beamCount: 5,
     fogColor: '#d5e9ec',
     fogDensity: 0.0044,
     exposure: 1.09,
     envIntensity: 0.64,
     moteColor: '#ecfbff',
     moteStyle: 'spray',
-    moteCount: 32,
+    moteCount: 30,
     moteSize: 0.22,
     moteOpacity: 0.38,
-    shadowBounds: 18.0,
+    shadowBounds: 20.0,
   },
 
   // Main Menu Live Diorama Preview
@@ -446,30 +499,33 @@ export const SOLAR_LIGHTING_PRESETS = {
     nadirColor: '#cfa86e',
     hazeIntensity: 0.54,
     sunHaloPower: 9.5,
+    beamColor: '#ffe7ad',
+    beamOpacity: 0.095,
+    beamCount: 5,
     fogColor: '#e6ca96',
     fogDensity: 0.0052,
     exposure: 1.08,
     envIntensity: 0.6,
     moteColor: '#ffebb8',
     moteStyle: 'dust',
-    moteCount: 30,
+    moteCount: 28,
     moteSize: 0.2,
     moteOpacity: 0.4,
-    shadowBounds: 18.0,
+    shadowBounds: 20.0,
   },
 };
 
 /** Chapter-indexed fallback presets for future Levels 14–100 */
 const FUTURE_CHAPTER_PRESETS = [
-  'egypt_golden_noon',           // Ch 1 (1–10)
-  'rome_mediterranean_morning',  // Ch 2 (11–20)
-  'japan_sakura_dawn',           // Ch 3 (21–30)
-  'maya_jungle_zenith',          // Ch 4 (31–40)
-  'viking_nordic_fjord',         // Ch 5 (41–50)
-  'medieval_crisp_morning',      // Ch 6 (51–60)
-  'egypt_golden_noon',           // Ch 7 (61–70, Arabia)
-  'modern_coastal_daylight',     // Ch 8 (71–80, Aegean Greece)
-  'village_warm_harvest',        // Ch 9 (81–90, Indus)
+  'egypt_golden_noon',             // Ch 1 (1–10)
+  'rome_mediterranean_morning',    // Ch 2 (11–20)
+  'japan_sakura_dawn',             // Ch 3 (21–30)
+  'maya_jungle_zenith',            // Ch 4 (31–40)
+  'viking_nordic_fjord',           // Ch 5 (41–50)
+  'medieval_crisp_morning',        // Ch 6 (51–60)
+  'egypt_golden_noon',             // Ch 7 (61–70, Arabia)
+  'modern_coastal_daylight',       // Ch 8 (71–80, Aegean Greece)
+  'village_warm_harvest',          // Ch 9 (81–90, Indus)
   'museum_neoclassical_afternoon', // Ch 10 (91–100, Imperial Capital)
 ];
 
@@ -580,6 +636,107 @@ export function getSolarPreset(levelIdOrPreset, levelNum = null) {
   return SOLAR_LIGHTING_PRESETS[key] || SOLAR_LIGHTING_PRESETS.egypt_golden_noon;
 }
 
+/**
+ * Computes tightly fitted orthographic shadow frustum half-extent matched to the active
+ * level's board radius & terrain tier (128x128 cap ±48, 160x160 cap ±62, 192x192 cap ±74),
+ * maximizing shadow texel density across the playable diorama with zero edge clipping.
+ */
+export function computeTightShadowBounds(level = null, preset = null) {
+  const segs =
+    (level && level.tierSpec && level.tierSpec.terrainSegments) ||
+    (level && level.cityConfig && level.cityConfig.terrainSegments) ||
+    128;
+
+  const tierMax = segs >= 192 ? 74 : segs >= 160 ? 62 : 48;
+  const boardW = (level && level.tierSpec && level.tierSpec.boardWidth) || 0;
+  const boardD = (level && level.tierSpec && level.tierSpec.boardDepth) || 0;
+
+  if (boardW > 0 && boardD > 0) {
+    // Tight diagonal radius + small margin so every corner casts crisp soft shadows
+    const diagRadius = Math.hypot(boardW * 0.5, boardD * 0.5) + 2.2;
+    return Math.min(tierMax, Math.max(18.0, Math.round(diagRadius * 2) / 2));
+  }
+
+  const base = (preset && preset.shadowBounds) || (segs >= 192 ? 31 : segs >= 160 ? 26 : 20);
+  return Math.min(tierMax, base);
+}
+
+/**
+ * Automatically traverses a level or 3D object tree so solid geometry (trees, quarry rocks,
+ * carts, workshop walls, placed blocks, placed furniture) casts and receives soft shadows,
+ * while translucent blueprint ghost outlines, water planes, slot markers, hitboxes, sunbeams,
+ * sky domes, and particles NEVER cast shadows (`castShadow = false`).
+ */
+export function applyShadowFlagsToObject(root) {
+  if (!root || typeof root.traverse !== 'function') return;
+
+  root.traverse((obj) => {
+    if (!obj) return;
+
+    // Non-mesh primitives (LineSegments blueprint outlines, Points particles, Lights, Groups)
+    if (obj.isLineSegments || obj.isLine || obj.isPoints) {
+      obj.castShadow = false;
+      return;
+    }
+    if (!obj.isMesh) return;
+
+    const name = (obj.name || '').toLowerCase();
+    const mat = obj.material;
+    const mats = Array.isArray(mat) ? mat : mat ? [mat] : [];
+
+    // Check whether the mesh is translucent, shader-driven, invisible, or a helper/water/ghost
+    const isNonCasterMat = mats.some(
+      (m) =>
+        !m ||
+        m.visible === false ||
+        m.transparent === true ||
+        m.isShaderMaterial === true ||
+        m.depthWrite === false ||
+        m.blending === THREE.AdditiveBlending
+    );
+    const isHelperName =
+      name.includes('ghost') ||
+      name.includes('water') ||
+      name.includes('brook') ||
+      name.includes('lagoon') ||
+      name.includes('beam') ||
+      name.includes('sky') ||
+      name.includes('mote') ||
+      name.includes('shadow') ||
+      name.includes('marker') ||
+      name.includes('hitbox') ||
+      name.includes('ring') ||
+      name.includes('aura');
+
+    // Terrain plane & plinth skirts receive shadows cleanly without self-shadowing artifacts
+    const isTerrainOrPlinth =
+      name.includes('terrain') ||
+      name.includes('plinth') ||
+      (obj.geometry &&
+        obj.geometry.attributes &&
+        obj.geometry.attributes.aSplat !== undefined);
+
+    if (isTerrainOrPlinth) {
+      obj.castShadow = false;
+      obj.receiveShadow = true;
+      return;
+    }
+
+    if (obj.visible === false || isNonCasterMat || isHelperName) {
+      obj.castShadow = false;
+      // Water planes still softly receive shadows from stilt houses, trees & boardwalks
+      if (name.includes('water') || name.includes('brook') || name.includes('lagoon')) {
+        obj.receiveShadow = true;
+      }
+      return;
+    }
+
+    // Solid 3D diorama meshes (rocks, trees, carts, workshop walls, placed blocks & furniture)
+    obj.castShadow = true;
+    obj.receiveShadow = true;
+  });
+}
+
 /* ============================================================================
  * CUSTOM GLSL SOFT SKY DOME & MIE-STYLE HORIZON SUN-GLOW SHADER
  * ========================================================================== */
@@ -635,6 +792,181 @@ const SKY_FRAGMENT_SHADER = /* glsl */ `
     gl_FragColor = vec4(skyCol, 1.0);
   }
 `;
+
+/* ============================================================================
+ * LIGHTWEIGHT VOLUMETRIC SUNBEAMS / GOD RAYS SHADER (1 DRAW CALL INSTANCED!)
+ * Smooth Fresnel silhouette fade + soft top & ground contact dissolve + shimmer
+ * ========================================================================== */
+const SUNBEAM_VERTEX_SHADER = /* glsl */ `
+  attribute float aPhase;
+  attribute float aIntensity;
+
+  varying vec2 vUv;
+  varying vec3 vViewNormal;
+  varying vec3 vViewDir;
+  varying float vPhase;
+  varying float vIntensity;
+
+  void main() {
+    vUv = uv;
+    vPhase = aPhase;
+    vIntensity = aIntensity;
+
+    mat4 mvMat = modelViewMatrix * instanceMatrix;
+    vec4 mvPos = mvMat * vec4(position, 1.0);
+
+    // Transform normal cleanly into view space for smooth Fresnel edge falloff
+    mat3 normalMat3 = mat3(mvMat);
+    vViewNormal = normalize(normalMat3 * normal);
+    vViewDir = normalize(-mvPos.xyz);
+
+    gl_Position = projectionMatrix * mvPos;
+  }
+`;
+
+const SUNBEAM_FRAGMENT_SHADER = /* glsl */ `
+  uniform vec3 uBeamColor;
+  uniform float uOpacity;
+  uniform float uTime;
+
+  varying vec2 vUv;
+  varying vec3 vViewNormal;
+  varying vec3 vViewDir;
+  varying float vPhase;
+  varying float vIntensity;
+
+  void main() {
+    // 1. Soft Fresnel silhouette falloff (fades cleanly to 0.0 at shaft edges from any angle)
+    float ndotv = abs(dot(normalize(vViewNormal), normalize(vViewDir)));
+    float fresnelEdge = pow(clamp(ndotv, 0.0, 1.0), 1.85);
+
+    // 2. Soft vertical fade at both ground contact (vUv.y = 0) and upper sky fade (vUv.y = 1)
+    float bottomFade = smoothstep(0.0, 0.30, vUv.y);
+    float topFade = smoothstep(1.0, 0.62, vUv.y);
+    float verticalMask = bottomFade * topFade;
+
+    // 3. Subtle animated diagonal dust-shimmer waves drifting inside the sunbeam
+    float waveA = sin(vUv.y * 11.0 - uTime * 0.95 + vPhase);
+    float waveB = cos(vUv.x * 6.28318 * 2.0 + uTime * 0.35 + vPhase * 1.4);
+    float shimmer = 0.80 + 0.14 * waveA + 0.06 * waveB;
+
+    float alpha = uOpacity * vIntensity * fresnelEdge * verticalMask * shimmer;
+    if (alpha < 0.002) discard;
+
+    // Slightly warmer/brighter inner core fading to soft atmospheric beam tint
+    vec3 col = uBeamColor * (0.85 + 0.25 * fresnelEdge);
+    gl_FragColor = vec4(col, alpha);
+  }
+`;
+
+/**
+ * Builds lightweight volumetric sunbeams ("rayons de lumière" / god rays) as a single
+ * InstancedMesh of 5–7 tapered shafts aligned strictly with the active level's sun angle.
+ * Zero screen-space blur cost; 1 draw call at locked 60 FPS on iPhone 16e Safari.
+ */
+export function createSunBeams(scene, preset, { spread = 13.5, mountTo = null } = {}) {
+  const cfg = typeof preset === 'string' ? getSolarPreset(preset) : preset || SOLAR_LIGHTING_PRESETS.egypt_golden_noon;
+  const count = Math.min(7, Math.max(5, cfg.beamCount || SUNBEAM_SHAFT_COUNT));
+
+  const sunDir = new THREE.Vector3(
+    cfg.sunDirection[0],
+    cfg.sunDirection[1],
+    cfg.sunDirection[2]
+  ).normalize();
+
+  // Open-ended tapered cone/cylinder shaft: narrower at sky top, softly widening toward diorama
+  const shaftHeight = 18.5;
+  const geo = new THREE.CylinderGeometry(0.42, 2.35, shaftHeight, 12, 1, true);
+
+  const phases = new Float32Array(count);
+  const intensities = new Float32Array(count);
+  for (let i = 0; i < count; i++) {
+    phases[i] = i * 1.37 + 0.4;
+    intensities[i] = 0.72 + ((i * 37) % 10) * 0.045;
+  }
+  geo.setAttribute('aPhase', new THREE.InstancedBufferAttribute(phases, 1));
+  geo.setAttribute('aIntensity', new THREE.InstancedBufferAttribute(intensities, 1));
+
+  const uniforms = {
+    uBeamColor: { value: new THREE.Color(cfg.beamColor || cfg.sunColor || '#ffe8b0') },
+    uOpacity: { value: typeof cfg.beamOpacity === 'number' ? cfg.beamOpacity : 0.115 },
+    uTime: { value: 0 },
+  };
+
+  const mat = new THREE.ShaderMaterial({
+    vertexShader: SUNBEAM_VERTEX_SHADER,
+    fragmentShader: SUNBEAM_FRAGMENT_SHADER,
+    uniforms,
+    transparent: true,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+    side: THREE.DoubleSide,
+    fog: false,
+    toneMapped: true,
+  });
+
+  const mesh = new THREE.InstancedMesh(geo, mat, count);
+  mesh.name = `SolarSunBeams_${cfg.id}`;
+  mesh.castShadow = false;
+  mesh.receiveShadow = false;
+  mesh.frustumCulled = false;
+  mesh.renderOrder = 4;
+  mesh.raycast = () => {};
+
+  // Align shaft +Y axis directly toward sunDir so shafts stream diagonally in lockstep with shadows
+  const beamQuat = new THREE.Quaternion().setFromUnitVectors(UP_AXIS, sunDir);
+  const dummy = new THREE.Object3D();
+
+  // Curated golden-ratio shaft placement framing focal landmarks & open sky without obscuring HUD
+  const anchors = [
+    [-0.48, -0.35, 1.08],
+    [0.08, -0.22, 1.18],
+    [0.52, -0.4, 0.96],
+    [-0.28, 0.36, 0.92],
+    [0.34, 0.32, 1.04],
+    [0.64, 0.12, 0.88],
+    [-0.62, 0.1, 0.86],
+  ];
+
+  for (let i = 0; i < count; i++) {
+    const [ax, az, sc] = anchors[i % anchors.length];
+    const groundX = ax * spread;
+    const groundZ = az * spread;
+    // Offset shaft center along sunDir by half shaft height so bottom softly touches ground level
+    const center = new THREE.Vector3(groundX, 0.25, groundZ).addScaledVector(
+      sunDir,
+      shaftHeight * 0.44
+    );
+    dummy.position.copy(center);
+    dummy.quaternion.copy(beamQuat);
+    dummy.scale.set(sc, 1.0, sc);
+    dummy.updateMatrix();
+    mesh.setMatrixAt(i, dummy.matrix);
+  }
+  mesh.instanceMatrix.needsUpdate = true;
+
+  const targetParent = mountTo || scene;
+  if (targetParent) {
+    targetParent.add(mesh);
+  }
+
+  return {
+    mesh,
+    geo,
+    mat,
+    uniforms,
+    count,
+    update(elapsed, centerX = 0, centerZ = 0) {
+      uniforms.uTime.value = elapsed;
+      mesh.position.set(centerX, 0, centerZ);
+    },
+    dispose() {
+      if (targetParent) targetParent.remove(mesh);
+      geo.dispose();
+      mat.dispose();
+    },
+  };
+}
 
 let _sharedMoteTex = null;
 function getSoftMoteTexture() {
@@ -692,6 +1024,8 @@ function createSolarSkyDome(preset, sunDirNormalized) {
 
   const mesh = new THREE.Mesh(geo, mat);
   mesh.name = `SolarSkyDome_${preset.id}`;
+  mesh.castShadow = false;
+  mesh.receiveShadow = false;
   mesh.frustumCulled = false;
   mesh.renderOrder = -12;
   mesh.raycast = () => {};
@@ -699,10 +1033,10 @@ function createSolarSkyDome(preset, sunDirNormalized) {
 }
 
 /**
- * Builds lightweight instanced sun-beam dust / pollen / mist motes (<= 40 soft additive quads).
+ * Builds lightweight instanced sun-beam dust / pollen / mist motes (<= 35 soft additive quads).
  */
-function createInstancedSunMotes(preset, spread = 15) {
-  const count = Math.min(MAX_MOTE_COUNT, Math.max(8, preset.moteCount || 34));
+function createInstancedSunMotes(preset, spread = 14) {
+  const count = Math.min(MAX_MOTE_COUNT, Math.max(8, preset.moteCount || 32));
   const geo = new THREE.PlaneGeometry(1, 1);
   const mat = new THREE.MeshBasicMaterial({
     color: new THREE.Color(preset.moteColor || '#ffe8b4'),
@@ -717,20 +1051,22 @@ function createInstancedSunMotes(preset, spread = 15) {
 
   const mesh = new THREE.InstancedMesh(geo, mat, count);
   mesh.name = `SolarSunMotes_${preset.id}`;
+  mesh.castShadow = false;
+  mesh.receiveShadow = false;
   mesh.frustumCulled = false;
-  mesh.renderOrder = 2;
+  mesh.renderOrder = 5;
   mesh.raycast = () => {};
 
   const seeds = new Float32Array(count * 5); // x0, y0, z0, phase, baseScale
-  const baseSize = preset.moteSize || 0.22;
+  const baseSize = preset.moteSize || 0.21;
   const dummy = new THREE.Object3D();
 
   for (let i = 0; i < count; i++) {
     const x0 = (((i * 73.13 + 17.3) % 100) / 100) * spread * 2 - spread;
-    const y0 = 0.9 + (((i * 41.7 + 9.1) % 100) / 100) * 5.6;
+    const y0 = 0.9 + (((i * 41.7 + 9.1) % 100) / 100) * 5.8;
     const z0 = (((i * 29.31 + 53.7) % 100) / 100) * spread * 2 - spread;
     const phase = i * 0.83;
-    const sc = baseSize * (0.72 + ((i * 19) % 10) * 0.065);
+    const sc = baseSize * (0.72 + ((i * 19) % 10) * 0.062);
 
     const o = i * 5;
     seeds[o + 0] = x0;
@@ -750,13 +1086,16 @@ function createInstancedSunMotes(preset, spread = 15) {
 }
 
 /**
- * Configures and mounts the complete Soft Solar & Atmospheric Lighting System for a scene.
+ * Configures and mounts the complete Soft Solar, Cast Shadows & Volumetric Sunbeams System.
+ * Automatically disposes any prior solar rig mounted on the same scene to guarantee zero leaks
+ * or duplicate sky domes / sunbeams when called from both levels and dioramaEnvironment.
  *
  * @param {THREE.Scene} scene - Active Three.js scene
  * @param {THREE.WebGLRenderer|null} renderer - Active renderer (tunes ACESFilmicToneMapping & PCFSoftShadowMap)
  * @param {string|object} levelPresetId - Preset ID, level ID (e.g. 'level13_stilt_village'), or theme ID
  * @param {object} [options]
  * @param {object} [options.lights] - Existing { hemiLight, sunLight, rimLight } rig to calibrate in-place
+ * @param {object} [options.level] - Optional active level instance for tight shadow frustum & mesh traversal
  * @param {number} [options.levelNum] - Optional numeric level index (1..100) for future-level fallback
  * @param {number} [options.shadowBounds] - Optional override for orthographic shadow frustum half-extent
  */
@@ -764,19 +1103,31 @@ export function applyLevelSolarLighting(
   scene,
   renderer,
   levelPresetId = 'egypt_golden_noon',
-  { lights = null, levelNum = null, shadowBounds = null } = {}
+  { lights = null, level = null, levelNum = null, shadowBounds = null } = {}
 ) {
+  // Cleanly dispose any prior solar atmosphere attached to this scene (prevents duplicate beams/skies)
+  if (scene && scene.userData && scene.userData.__solarHandle) {
+    try {
+      scene.userData.__solarHandle.dispose();
+    } catch (_) {
+      // Safe fallback
+    }
+    scene.userData.__solarHandle = null;
+  }
+
   const preset = getSolarPreset(levelPresetId, levelNum);
   const sunDir = new THREE.Vector3(
     preset.sunDirection[0],
     preset.sunDirection[1],
     preset.sunDirection[2]
   ).normalize();
-  const sunDistance = 26.0;
-  const sunOffset = sunDir.clone().multiplyScalar(sunDistance);
-  const bounds = typeof shadowBounds === 'number' ? shadowBounds : preset.shadowBounds || 17.5;
 
-  // 1. Calibrate Renderer Soft Tone Mapping & PCFSoftShadowMap
+  const bounds =
+    typeof shadowBounds === 'number' ? shadowBounds : computeTightShadowBounds(level, preset);
+  const sunDistance = Math.max(28.0, bounds * 1.15);
+  const sunOffset = sunDir.clone().multiplyScalar(sunDistance);
+
+  // 1. Calibrate Renderer Soft Tone Mapping & PCFSoftShadowMap (zero post-processing cost)
   if (renderer) {
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = preset.exposure || 1.08;
@@ -807,7 +1158,7 @@ export function applyLevelSolarLighting(
   if (!rig && scene) {
     ownedLights = true;
     const hemiLight = new THREE.HemisphereLight(preset.hemiSky, preset.hemiGround, preset.hemiIntensity);
-    hemiLight.position.set(0, 24, 0);
+    hemiLight.position.set(0, 26, 0);
     scene.add(hemiLight);
 
     const sunLight = new THREE.DirectionalLight(preset.sunColor, preset.sunIntensity);
@@ -832,13 +1183,14 @@ export function applyLevelSolarLighting(
 
     if (rig.sunLight) {
       const sun = rig.sunLight;
+      sun.castShadow = true;
       sun.color.set(preset.sunColor);
       sun.intensity = preset.sunIntensity;
       sun.position.copy(sunOffset);
       sun.target.position.set(0, 0, 0);
       sun.target.updateMatrixWorld();
 
-      // Crisp yet gentle 1024x1024 PCFSoftShadowMap tuned for locked 60 FPS on iPhone 16e
+      // Tightly fitted 1024x1024 PCFSoftShadowMap (zero shadow acne, zero floating detachment)
       if (sun.shadow) {
         if (sun.shadow.mapSize.x !== 1024 || sun.shadow.mapSize.y !== 1024) {
           sun.shadow.mapSize.set(1024, 1024);
@@ -847,11 +1199,11 @@ export function applyLevelSolarLighting(
             sun.shadow.map = null;
           }
         }
-        sun.shadow.radius = 2.6;
-        sun.shadow.bias = -0.00045;
-        sun.shadow.normalBias = 0.024;
-        sun.shadow.camera.near = 4;
-        sun.shadow.camera.far = 72;
+        sun.shadow.radius = 2.5;
+        sun.shadow.bias = -0.0005;
+        sun.shadow.normalBias = 0.02;
+        sun.shadow.camera.near = 2.5;
+        sun.shadow.camera.far = Math.max(88, bounds * 3.2);
         sun.shadow.camera.left = -bounds;
         sun.shadow.camera.right = bounds;
         sun.shadow.camera.top = bounds;
@@ -863,25 +1215,37 @@ export function applyLevelSolarLighting(
     if (rig.rimLight) {
       rig.rimLight.color.set(preset.rimColor);
       rig.rimLight.intensity = preset.rimIntensity;
-      // Place subtle opposite rim fill across from the sun direction
-      rig.rimLight.position.set(-sunOffset.x * 0.78, Math.max(8, sunOffset.y * 0.52), -sunOffset.z * 0.78);
+      rig.rimLight.position.set(
+        -sunOffset.x * 0.78,
+        Math.max(8, sunOffset.y * 0.52),
+        -sunOffset.z * 0.78
+      );
     }
   }
 
-  // 4. Mount Custom Soft Sky Dome & Horizon Sun-Glow Shader + Instanced Sun-Beam Dust Motes
+  // 4. Automatically configure cast/receive shadow flags on the level's solid geometry
+  if (level && level.root) {
+    applyShadowFlagsToObject(level.root);
+  }
+
+  // 5. Mount Custom Sky Dome + Volumetric Sunbeams (God Rays) + Instanced Sunbeam Motes (<= 35)
   const root = new THREE.Group();
   root.name = `SolarAtmosphere_${preset.id}`;
 
   const sky = createSolarSkyDome(preset, sunDir);
   root.add(sky.mesh);
 
-  const moteSpread =
-    preset.id === 'worldmap_golden_archipelago'
-      ? 18
-      : preset.id === 'lagoon_tropical_sunlight'
-        ? 19
-        : 14.5;
-  const motes = createInstancedSunMotes(preset, moteSpread);
+  const spread =
+    preset.id === 'lagoon_tropical_sunlight'
+      ? 18.0
+      : preset.id === 'worldmap_golden_archipelago'
+        ? 16.5
+        : bounds >= 24
+          ? 15.5
+          : 12.5;
+
+  const sunBeams = createSunBeams(scene, preset, { spread, mountTo: root });
+  const motes = createInstancedSunMotes(preset, spread);
   root.add(motes.mesh);
 
   if (scene) {
@@ -889,25 +1253,34 @@ export function applyLevelSolarLighting(
   }
 
   const _quat = new THREE.Quaternion();
+  let disposed = false;
 
-  return {
+  const handle = {
     presetId: preset.id,
     preset,
     root,
     lights: rig,
     sunDirection: sunDir,
     sunOffset,
+    shadowBounds: bounds,
     skyMesh: sky.mesh,
     skyUniforms: sky.uniforms,
+    sunBeams,
+    sunBeamsMesh: sunBeams.mesh,
+    sunBeamCount: sunBeams.count,
     motesMesh: motes.mesh,
     moteCount: motes.count,
 
     /**
-     * Updates sky dome & instanced sun-beam motes smoothly every frame (zero allocations).
+     * Updates sky dome, volumetric sunbeams & instanced dust motes every frame (zero allocations).
      */
     update(dt, elapsed, centerX = 0, centerZ = 0, camera = null) {
+      if (disposed) return;
+      const t = typeof elapsed === 'number' ? elapsed : (_internalElapsed += dt || 0.016);
+
       sky.mesh.position.set(centerX, 0, centerZ);
-      sky.uniforms.uTime.value = elapsed;
+      sky.uniforms.uTime.value = t;
+      sunBeams.update(t, centerX, centerZ);
       motes.mesh.position.set(centerX, 0, centerZ);
 
       if (camera && camera.quaternion) {
@@ -936,27 +1309,27 @@ export function applyLevelSolarLighting(
         let pz = z0;
 
         if (isPetal) {
-          const fall = (elapsed * 0.48 + phase) % 5.6;
-          px = x0 + Math.sin(elapsed * 0.95 + phase) * 0.95;
+          const fall = (t * 0.48 + phase) % 5.6;
+          px = x0 + Math.sin(t * 0.95 + phase) * 0.95;
           py = 6.2 - fall;
-          pz = z0 + Math.cos(elapsed * 0.8 + phase) * 0.72;
+          pz = z0 + Math.cos(t * 0.8 + phase) * 0.72;
         } else if (isFirefly) {
-          px = x0 + Math.sin(elapsed * 0.65 + phase) * 0.85;
-          py = y0 + Math.sin(elapsed * 1.35 + phase * 1.3) * 0.45;
-          pz = z0 + Math.cos(elapsed * 0.6 + phase) * 0.85;
+          px = x0 + Math.sin(t * 0.65 + phase) * 0.85;
+          py = y0 + Math.sin(t * 1.35 + phase * 1.3) * 0.45;
+          pz = z0 + Math.cos(t * 0.6 + phase) * 0.85;
         } else if (isSteam) {
-          const rise = (elapsed * 0.34 + phase) % 5.4;
-          px = x0 + Math.sin(elapsed * 0.4 + phase) * 0.9;
+          const rise = (t * 0.34 + phase) % 5.4;
+          px = x0 + Math.sin(t * 0.4 + phase) * 0.9;
           py = 0.8 + rise;
-          pz = z0 + Math.cos(elapsed * 0.35 + phase) * 0.8;
+          pz = z0 + Math.cos(t * 0.35 + phase) * 0.8;
         } else {
-          // Gentle sun-beam dust / pollen / sea-spray drift
-          px = x0 + Math.sin(elapsed * 0.32 + phase) * 1.1;
-          py = y0 + Math.sin(elapsed * 0.48 + phase * 1.1) * 0.28;
-          pz = z0 + Math.cos(elapsed * 0.28 + phase) * 0.92;
+          // Gentle sunbeam dust / pollen / sea-spray drift
+          px = x0 + Math.sin(t * 0.32 + phase) * 1.1;
+          py = y0 + Math.sin(t * 0.48 + phase * 1.1) * 0.28;
+          pz = z0 + Math.cos(t * 0.28 + phase) * 0.92;
         }
 
-        const pulse = 0.82 + 0.28 * Math.sin(elapsed * 1.6 + phase * 1.7);
+        const pulse = 0.82 + 0.28 * Math.sin(t * 1.6 + phase * 1.7);
         dummy.position.set(px, py, pz);
         dummy.quaternion.copy(_quat);
         dummy.scale.setScalar(baseScale * pulse);
@@ -967,8 +1340,13 @@ export function applyLevelSolarLighting(
     },
 
     dispose() {
+      if (disposed) return;
+      disposed = true;
       if (scene) {
         scene.remove(root);
+        if (scene.userData && scene.userData.__solarHandle === handle) {
+          scene.userData.__solarHandle = null;
+        }
         if (ownedLights && rig) {
           if (rig.hemiLight) scene.remove(rig.hemiLight);
           if (rig.sunLight) {
@@ -978,10 +1356,34 @@ export function applyLevelSolarLighting(
           if (rig.rimLight) scene.remove(rig.rimLight);
         }
       }
+      if (_activeSolarHandle === handle) {
+        _activeSolarHandle = null;
+      }
       sky.geo.dispose();
       sky.mat.dispose();
+      sunBeams.dispose();
       motes.geo.dispose();
       motes.mat.dispose();
     },
   };
+
+  if (scene) {
+    if (!scene.userData) scene.userData = {};
+    scene.userData.__solarHandle = handle;
+  }
+  _activeSolarHandle = handle;
+  return handle;
+}
+
+/**
+ * Updates the currently active Solar Lighting, Volumetric Sunbeams & Dust Motes each frame.
+ */
+export function updateSolarLighting(deltaTime, elapsed = null, centerX = 0, centerZ = 0, camera = null) {
+  if (!_activeSolarHandle) return;
+  const t = typeof elapsed === 'number' ? elapsed : (_internalElapsed += deltaTime || 0.016);
+  _activeSolarHandle.update(deltaTime, t, centerX, centerZ, camera);
+}
+
+export function getActiveSolarLighting() {
+  return _activeSolarHandle;
 }

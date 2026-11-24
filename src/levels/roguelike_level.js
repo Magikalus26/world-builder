@@ -1358,6 +1358,8 @@ export class RoguelikeLevel extends Level1Pyramid {
 
   constructor({
     scene,
+    renderer = null,
+    lights = null,
     textures,
     audio,
     onProgress,
@@ -1369,6 +1371,8 @@ export class RoguelikeLevel extends Level1Pyramid {
     const cfg = runConfig || generateRoguelikeConfig();
     super({
       scene,
+      renderer,
+      lights,
       textures,
       audio,
       onProgress,

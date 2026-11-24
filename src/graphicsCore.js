@@ -166,15 +166,15 @@ export function createThreePointLightingRig(scene, { shadowBounds = 16.5 } = {})
   sunLight.position.set(-13.5, 18.8, 12.0);
   sunLight.castShadow = true;
   sunLight.shadow.mapSize.set(1024, 1024);
-  sunLight.shadow.radius = 2.6;
-  sunLight.shadow.camera.near = 4;
-  sunLight.shadow.camera.far = 72;
+  sunLight.shadow.radius = 2.5;
+  sunLight.shadow.camera.near = 2.5;
+  sunLight.shadow.camera.far = 88;
   sunLight.shadow.camera.left = -shadowBounds;
   sunLight.shadow.camera.right = shadowBounds;
   sunLight.shadow.camera.top = shadowBounds;
   sunLight.shadow.camera.bottom = -shadowBounds;
-  sunLight.shadow.bias = -0.00045;
-  sunLight.shadow.normalBias = 0.024;
+  sunLight.shadow.bias = -0.0005;
+  sunLight.shadow.normalBias = 0.02;
   scene.add(sunLight);
   scene.add(sunLight.target);
 

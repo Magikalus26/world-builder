@@ -15,7 +15,11 @@ import {
   calibrateShadowCamera,
 } from './graphicsCore.js';
 import { buildDioramaEnvironment } from './dioramaEnvironment.js';
-import { resolveSolarPresetId } from './solarLighting.js';
+import {
+  resolveSolarPresetId,
+  updateSolarLighting,
+  getActiveSolarLighting,
+} from './solarLighting.js';
 import { SoundEngine } from './audio.js';
 import { createTextureLibrary } from './textures.js';
 import { DioramaCameraController } from './camera.js';
@@ -621,6 +625,8 @@ class WorkdBuilderApp {
 
     this.currentLevel = new LevelClass({
       scene: this.scene,
+      renderer: this.renderer,
+      lights: this.lights,
       textures: this.textures,
       audio: this.audio,
       cameraController: this.cameraController,
@@ -633,6 +639,7 @@ class WorkdBuilderApp {
         this._handleLevelComplete(payload);
       },
     });
+    this.solarLighting = this.currentLevel.solarLighting || getActiveSolarLighting();
 
     if (typeof this.currentLevel.getCameraPreset === 'function') {
       this.cameraController.configurePreset(this.currentLevel.getCameraPreset());
@@ -703,6 +710,8 @@ class WorkdBuilderApp {
 
     this.currentLevel = new RoguelikeLevel({
       scene: this.scene,
+      renderer: this.renderer,
+      lights: this.lights,
       textures: this.textures,
       audio: this.audio,
       upgrades: this.save.getUpgrades(),
@@ -716,6 +725,7 @@ class WorkdBuilderApp {
         this._handleLevelComplete(payload);
       },
     });
+    this.solarLighting = this.currentLevel.solarLighting || getActiveSolarLighting();
 
     if (
       this.dioramaEnv &&
@@ -830,15 +840,13 @@ class WorkdBuilderApp {
     this.cameraController.update(dt, this.interaction.isCameraGestureActive());
     this.camera.updateMatrixWorld();
 
-    if (this.dioramaEnv) {
-      this.dioramaEnv.update(
-        dt,
-        this.elapsed,
-        this.cameraController.target.x,
-        this.cameraController.target.z,
-        this.camera
-      );
-    }
+    updateSolarLighting(
+      dt,
+      this.elapsed,
+      this.cameraController.target.x,
+      this.cameraController.target.z,
+      this.camera
+    );
 
     if (this.mode === 'menu' && this.worldMap) {
       this._syncSunLightToTarget(this.cameraController.target.x, this.cameraController.target.z);

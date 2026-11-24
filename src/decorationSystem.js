@@ -13,6 +13,7 @@ import {
   updateFurniture3D,
   disposeFurniture3DInstance,
 } from './furnitureModels.js';
+import { applyShadowFlagsToObject } from './solarLighting.js';
 
 const WATER_LEVEL = -0.14;
 
@@ -488,10 +489,12 @@ export class DecorationSystem {
     // Ground contact shadow blob
     const shadowMesh = new THREE.Mesh(this.shadowGeo, this.textures.materials.shadowBlob);
     shadowMesh.position.y = 0.025;
+    shadowMesh.castShadow = false;
     group.add(shadowMesh);
 
     // Genuine multi-part procedural 3D PBR model grounded cleanly at y = 0
     const model = createFurniture3D(itemId, this.textures);
+    applyShadowFlagsToObject(model);
     group.add(model);
 
     const entry = {

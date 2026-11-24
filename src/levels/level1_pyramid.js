@@ -17,6 +17,11 @@
 import * as THREE from 'three';
 import { createCarvingStageMaterials } from '../textures.js';
 import {
+  applyLevelSolarLighting,
+  applyShadowFlagsToObject,
+  resolveSolarPresetId,
+} from '../solarLighting.js';
+import {
   DEFAULT_BLUEPRINT_SKIN,
   createBlueprintSkinMaterialSet,
   applyBlueprintSkinToMaterials,
@@ -317,6 +322,8 @@ export class Level1Pyramid {
 
   constructor({
     scene,
+    renderer = null,
+    lights = null,
     textures,
     audio,
     onProgress,
@@ -326,6 +333,8 @@ export class Level1Pyramid {
     blueprintSkinId = null,
   }) {
     this.scene = scene;
+    this.renderer = renderer;
+    this.lights = lights;
     this.textures = textures;
     this.audio = audio;
     this.onProgress = onProgress;
@@ -430,6 +439,19 @@ export class Level1Pyramid {
     this._buildPyramidSite();
     this._buildParticlePool();
     this._rebuildHitTargets();
+
+    // Auto-configure real-time soft cast shadows & volumetric sunbeams for this level
+    applyShadowFlagsToObject(this.root);
+    const meta = this.constructor && this.constructor.meta ? this.constructor.meta : {};
+    const solarPresetId =
+      (this.runConfig && (this.runConfig.solarPreset || this.runConfig.themeId)) ||
+      meta.solarPreset ||
+      resolveSolarPresetId(meta.id || 'level1_pyramid');
+    this.solarLighting = applyLevelSolarLighting(this.scene, this.renderer, solarPresetId, {
+      lights: this.lights,
+      level: this,
+      levelNum: (this.runConfig && this.runConfig.levelNum) || null,
+    });
   }
 
   _beforeBuild() {
@@ -2460,6 +2482,7 @@ export class Level1Pyramid {
     }
     if (isPyramidSnap) {
       this._fitPlacedBlock(block, targetSlot);
+      applyShadowFlagsToObject(block.mesh);
     }
 
     if (isPyramidSnap) {
