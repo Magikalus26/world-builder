@@ -812,6 +812,116 @@ export const ROGUELIKE_THEMES = [
       },
     ],
   },
+  {
+    id: 'museum',
+    levelNum: 9,
+    shortName: 'Grand Musée',
+    title: 'Niveau 9 : Le Grand Musée',
+    biomeLabel: 'Calcaire Crème, Marbre Cannelé & Verrière',
+    skyColor: '#deeaf4',
+    terrainTint: '#b8d4a2',
+    stoneTint: '#f0eadc',
+    accentColor: '#4fa8c4',
+    rewardRangeLabel: '+40 à +65 Éclats',
+    structures: [
+      {
+        id: 'museum_grand_colonnade',
+        name: 'Le Grand Musée à Colonnade & Verrière',
+        subtitle: 'Péristyle en marbre blanc, fronton sculpté & grande verrière',
+        // 16 + 10 + 6 + 4 = 36 blocks
+        layers: [
+          { cells: makeRectCells(4, 4) },
+          {
+            cells: [
+              [-1.5, -1.5], [-0.5, -1.5], [0.5, -1.5], [1.5, -1.5],
+              [-1.5, 0], [1.5, 0],
+              [-1.5, 1.5], [-0.5, 1.5], [0.5, 1.5], [1.5, 1.5],
+            ],
+          },
+          { cells: makeRectCells(3, 2) },
+          { cells: makeRectCells(2, 2) },
+        ],
+      },
+      {
+        id: 'museum_beaux_arts_rotunda',
+        name: 'La Rotonde des Beaux-Arts',
+        subtitle: 'Rotonde octogonale en marbre blanc, coupole & portique',
+        // 12 + 10 + 6 + 4 = 32 blocks
+        layers: [
+          {
+            cells: makeRectCells(4, 4).filter(
+              ([x, z]) => !(Math.abs(x) === 1.5 && Math.abs(z) === 1.5)
+            ),
+          },
+          {
+            cells: [
+              [-1, -1], [0, -1], [1, -1],
+              [-1.5, 0], [-0.5, 0], [0.5, 0], [1.5, 0],
+              [-1, 1], [0, 1], [1, 1],
+            ],
+          },
+          { cells: makeRectCells(3, 2) },
+          { cells: makeRectCells(2, 2) },
+        ],
+      },
+      {
+        id: 'museum_sculpture_gallery',
+        name: 'La Galerie des Sculptures',
+        subtitle: 'Longue galerie voûtée en pierre & verrière continue',
+        // 15 + 9 + 4 + 2 = 30 blocks
+        layers: [
+          { cells: makeRectCells(5, 3) },
+          {
+            cells: [
+              [-2, -1], [-1, -1], [0, -1], [1, -1], [2, -1],
+              [-2, 1], [0, 1], [2, 1], [0, 0],
+            ],
+          },
+          { cells: makeRectCells(4, 1) },
+          { cells: [[-0.5, 0], [0.5, 0]] },
+        ],
+      },
+      {
+        id: 'museum_natural_history',
+        name: "Le Pavillon d'Histoire Naturelle",
+        subtitle: 'Deux ailes néoclassiques, tour d’horloge centrale & fronton',
+        // 15 + 10 + 7 + 2 = 34 blocks
+        layers: [
+          { cells: makeRectCells(5, 3) },
+          {
+            cells: [
+              [-2, -1], [-1, -1], [0, -1], [1, -1], [2, -1],
+              [-2, 1], [-1, 1], [0, 1], [1, 1], [2, 1],
+            ],
+          },
+          {
+            cells: [
+              [-2, 0], [-1, 0], [0, 0], [1, 0], [2, 0],
+              [0, -1], [0, 1],
+            ],
+          },
+          { cells: [[0, -0.5], [0, 0.5]] },
+        ],
+      },
+      {
+        id: 'museum_orangerie_statues',
+        name: "L'Orangerie & Jardin des Statues",
+        subtitle: 'Pavillon vitré en arcades de calcaire crème & ferronnerie',
+        // 12 + 8 + 6 + 2 = 28 blocks
+        layers: [
+          { cells: makeRectCells(4, 3) },
+          {
+            cells: [
+              [-1.5, -1], [-0.5, -1], [0.5, -1], [1.5, -1],
+              [-1.5, 1], [-0.5, 1], [0.5, 1], [1.5, 1],
+            ],
+          },
+          { cells: makeRectCells(3, 2) },
+          { cells: [[-0.5, 0], [0.5, 0]] },
+        ],
+      },
+    ],
+  },
 ];
 
 /** 4 randomized gameplay run modifiers */

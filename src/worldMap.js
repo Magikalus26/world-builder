@@ -206,7 +206,7 @@ function computeAll100LevelCoords() {
     [3.2, 70.6],  // 6: Mine de Charbon (Playable)
     [-2.0, 68.8], // 7: Villa Moderne (Playable)
     [-7.1, 67.2], // 8: Château Fort Médiéval (Playable)
-    [-4.2, 64.0], // 9
+    [-5.1, 62.5], // 9: Grand Musée National (Playable)
     [0.6, 63.6],  // 10: Milestone City (Cité de Thèbes)
   ];
   for (let i = 0; i < 10; i++) {
@@ -727,7 +727,7 @@ export class WorldMapScene {
    *    - Levels 10, 20, ..., 100: Grand 2.2x Village / City Milestone Islands
    * ========================================================================== */
   _buildAll100Nodes() {
-    // 1. Build the 8 full 3D Playable Hero Islands (Levels 1–8)
+    // 1. Build the 9 full 3D Playable Hero Islands (Levels 1–9)
     this._buildHeroEgyptIsland(this.levelCoords[0]);
     this._buildHeroRomeIsland(this.levelCoords[1]);
     this._buildHeroJapanIsland(this.levelCoords[2]);
@@ -736,12 +736,13 @@ export class WorldMapScene {
     this._buildHeroCoalMineIsland(this.levelCoords[5]);
     this._buildHeroModernVillaIsland(this.levelCoords[6]);
     this._buildHeroMedievalCastleIsland(this.levelCoords[7]);
+    this._buildHeroMuseumIsland(this.levelCoords[8]);
 
-    // 2. Collect regular "Bientôt" nodes (82) and Milestone Village/City nodes (10)
+    // 2. Collect regular "Bientôt" nodes (81) and Milestone Village/City nodes (10)
     const regularEntries = [];
     const milestoneEntries = [];
 
-    for (let i = 8; i < 100; i++) {
+    for (let i = 9; i < 100; i++) {
       const levelNum = i + 1;
       const chapterIdx = Math.floor(i / 10);
       const chapter = WORLD_CHAPTERS[chapterIdx];
@@ -2060,6 +2061,217 @@ export class WorldMapScene {
       focusDistance: 17.8,
       focusElevation: 42,
       focusAzimuth: 0.16,
+      group,
+      hitbox,
+      bounceTime: 0,
+    };
+
+    hitbox.userData.interact = { type: 'map-node', node };
+    this.nodes.push(node);
+  }
+
+  /**
+   * Level 9 — Classical Cultural Era: "Le Grand Musée National"
+   * Miniature 3D manicured royal park island with serene turquoise reflecting pool & marble curb,
+   * cream-limestone colonnaded museum, sweeping front stairs, fluted white marble portico,
+   * triangular classical pediment, blue-grey wing roofs, glowing glass Verrière dome & cypresses.
+   */
+  _buildHeroMuseumIsland(coord) {
+    const pos = new THREE.Vector3(coord.x, 0, coord.z);
+    const group = new THREE.Group();
+    group.position.copy(pos);
+    this.root.add(group);
+
+    this._addShoreFoamRing(group, 2.38, 2.18, 10.8);
+    this._addUnlockedGoldRing(group, 'level9_museum', 2.48, 2.28, 10.8);
+
+    const lawnMat = this._trackMat(
+      new THREE.MeshStandardMaterial({ color: '#639b4a', roughness: 0.88, metalness: 0.0 })
+    );
+    const limestoneMat = this._trackMat(
+      new THREE.MeshStandardMaterial({ color: '#efe8d8', roughness: 0.68, metalness: 0.04 })
+    );
+    const marbleMat = this._trackMat(
+      new THREE.MeshStandardMaterial({ color: '#faf8f2', roughness: 0.42, metalness: 0.06 })
+    );
+    const slateMat = this._trackMat(
+      new THREE.MeshStandardMaterial({ color: '#58718c', roughness: 0.52, metalness: 0.2 })
+    );
+    const glassMat = this._trackMat(
+      new THREE.MeshStandardMaterial({
+        color: '#8de2f7',
+        roughness: 0.14,
+        metalness: 0.25,
+        transparent: true,
+        opacity: 0.84,
+      })
+    );
+    const poolMat = this._trackMat(
+      new THREE.MeshStandardMaterial({ color: '#32b6c9', roughness: 0.12, metalness: 0.12 })
+    );
+    const brassMat = this._trackMat(
+      new THREE.MeshStandardMaterial({ color: '#dfb44d', roughness: 0.3, metalness: 0.85 })
+    );
+
+    const island = new THREE.Mesh(
+      this._trackGeo(createIslandMoundGeometry(2.3, 2.1, 0.72, 15.1)),
+      lawnMat
+    );
+    island.castShadow = true;
+    island.receiveShadow = true;
+    group.add(island);
+
+    // Miniature Turquoise Reflecting Pool with White Carrara Marble Curb
+    const poolCurb = new THREE.Mesh(
+      this._trackGeo(new THREE.BoxGeometry(0.92, 0.1, 0.52)),
+      marbleMat
+    );
+    poolCurb.position.set(0.18, 0.74, 0.86);
+    group.add(poolCurb);
+
+    const poolWater = new THREE.Mesh(
+      this._trackGeo(new THREE.BoxGeometry(0.8, 0.09, 0.4)),
+      poolMat
+    );
+    poolWater.position.set(0.18, 0.755, 0.86);
+    group.add(poolWater);
+
+    // Miniature Neoclassical Grand Museum Monument
+    const museum = new THREE.Group();
+    museum.position.set(-0.04, 0.72, -0.14);
+    museum.rotation.y = 0.14;
+
+    // Podium base & monumental front staircase
+    const podium = new THREE.Mesh(
+      this._trackGeo(new THREE.BoxGeometry(1.76, 0.2, 1.18)),
+      limestoneMat
+    );
+    podium.position.y = 0.1;
+    podium.castShadow = true;
+    podium.receiveShadow = true;
+    museum.add(podium);
+
+    const stairs = new THREE.Mesh(
+      this._trackGeo(new THREE.BoxGeometry(0.76, 0.14, 0.28)),
+      marbleMat
+    );
+    stairs.position.set(0, 0.07, 0.66);
+    museum.add(stairs);
+
+    // Twin side exhibition wings + central main museum body
+    const body = new THREE.Mesh(
+      this._trackGeo(new THREE.BoxGeometry(1.62, 0.5, 0.92)),
+      limestoneMat
+    );
+    body.position.set(0, 0.45, -0.06);
+    body.castShadow = true;
+    museum.add(body);
+
+    // 4 Fluted White Marble Portico Columns across the front
+    const colGeo = this._trackGeo(new THREE.CylinderGeometry(0.055, 0.062, 0.48, 8));
+    [-0.36, -0.12, 0.12, 0.36].forEach((cx) => {
+      const col = new THREE.Mesh(colGeo, marbleMat);
+      col.position.set(cx, 0.44, 0.48);
+      col.castShadow = true;
+      museum.add(col);
+    });
+
+    // Carved Entablature & Triangular Classical Pediment ("Fronton")
+    const entablature = new THREE.Mesh(
+      this._trackGeo(new THREE.BoxGeometry(1.72, 0.1, 1.06)),
+      limestoneMat
+    );
+    entablature.position.set(0, 0.74, 0.0);
+    museum.add(entablature);
+
+    const pediment = new THREE.Mesh(
+      this._trackGeo(new THREE.ConeGeometry(0.56, 0.3, 4)),
+      marbleMat
+    );
+    pediment.rotation.y = Math.PI / 4;
+    pediment.scale.set(1.2, 1, 0.36);
+    pediment.position.set(0, 0.92, 0.42);
+    pediment.castShadow = true;
+    museum.add(pediment);
+
+    // Sloped Beaux-Arts Slate Side Wing Roofs
+    const wingRoofGeo = this._trackGeo(new THREE.BoxGeometry(0.46, 0.18, 0.92));
+    [-0.58, 0.58].forEach((wx) => {
+      const wr = new THREE.Mesh(wingRoofGeo, slateMat);
+      wr.position.set(wx, 0.86, -0.06);
+      wr.castShadow = true;
+      museum.add(wr);
+    });
+
+    // Glowing Translucent Central Glass-and-Iron Verrière Dome & Brass Finial
+    const dome = new THREE.Mesh(
+      this._trackGeo(new THREE.SphereGeometry(0.42, 12, 8, 0, Math.PI * 2, 0, Math.PI * 0.5)),
+      glassMat
+    );
+    dome.position.set(0, 0.82, -0.08);
+    museum.add(dome);
+
+    const finial = new THREE.Mesh(
+      this._trackGeo(new THREE.CylinderGeometry(0.015, 0.035, 0.24, 6)),
+      brassMat
+    );
+    finial.position.set(0, 1.32, -0.08);
+    museum.add(finial);
+
+    group.add(museum);
+
+    // Sculpted Trimmed Park Cypresses framing the Museum Esplanade
+    const museumFoliageMat = this._trackMat(createMatteFoliageMaterial());
+    const cypressGeo = this._trackGeo(
+      createIrregularConiferTierGeo({
+        radiusBottom: 0.15,
+        radiusTop: 0.025,
+        height: 0.74,
+        radialSegments: 8,
+        heightSegments: 3,
+        jaggedness: 0.15,
+        droop: 0.02,
+        seed: 99,
+        baseColor: '#1e462a',
+        midColor: '#366f3e',
+        topColor: '#72b056',
+      })
+    );
+    [
+      [-1.36, 0.84, -0.45],
+      [-1.18, 0.82, 0.62],
+      [1.36, 0.84, -0.45],
+      [1.22, 0.82, 0.58],
+    ].forEach(([px, py, pz], idx) => {
+      const cy = new THREE.Mesh(cypressGeo, museumFoliageMat);
+      cy.position.set(px, py, pz);
+      cy.rotation.y = idx * 1.1;
+      cy.castShadow = true;
+      group.add(cy);
+    });
+
+    const hitbox = new THREE.Mesh(
+      this._trackGeo(new THREE.CylinderGeometry(2.45, 2.55, 2.45, 10)),
+      this.mats.hitbox
+    );
+    hitbox.position.y = 1.12;
+    group.add(hitbox);
+
+    const node = {
+      id: 'level9_museum',
+      levelIndex: 8,
+      levelNum: 9,
+      chapter: WORLD_CHAPTERS[0],
+      unlocked: true,
+      isMilestone: false,
+      title: 'Niveau 9 : Le Grand Musée National (58 blocs)',
+      shortLabel: 'Grand Musée',
+      labelText: 'Niveau 9 • Jouable',
+      position: pos,
+      labelAnchor: new THREE.Vector3(pos.x, 2.65, pos.z),
+      focusDistance: 17.8,
+      focusElevation: 42,
+      focusAzimuth: -0.18,
       group,
       hitbox,
       bounceTime: 0,

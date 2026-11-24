@@ -165,6 +165,25 @@ export const BIOME_ATMOSPHERES = {
     particleStyle: 'dust',
     particleCount: 38,
   },
+  museum: {
+    id: 'museum',
+    skyTop: '#5496d9',
+    skyHorizon: '#e5eff9',
+    skyBottom: '#c7dcc1',
+    fogColor: '#deeaf4',
+    fogNear: 48,
+    fogFar: 102,
+    sunColor: '#fff6e0',
+    sunIntensity: 2.18,
+    hemiSky: '#f8fcff',
+    hemiGround: '#759462',
+    hemiIntensity: 0.94,
+    rimColor: '#a2dcf4',
+    rimIntensity: 0.54,
+    particleColor: '#fff0b8',
+    particleStyle: 'dust',
+    particleCount: 34,
+  },
   worldmap: {
     id: 'worldmap',
     skyTop: '#67add6',
@@ -216,6 +235,7 @@ export function resolveBiomeConfig(levelIdOrTheme = 'egypt', overrides = null) {
     else if (s.includes('coal') || s.includes('mine') || s.includes('charbon')) key = 'coalmine';
     else if (s.includes('modern') || s.includes('villa') || s.includes('contemp')) key = 'modern';
     else if (s.includes('castle') || s.includes('chateau') || s.includes('medieval')) key = 'medieval';
+    else if (s.includes('museum') || s.includes('musee') || s.includes('beaux')) key = 'museum';
     else if (s.includes('worldmap')) key = 'worldmap';
     else if (s.includes('menu')) key = 'menu';
     else if (BIOME_ATMOSPHERES[s]) key = s;

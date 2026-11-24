@@ -2571,6 +2571,181 @@ export function createTextureLibrary(renderer) {
     return medievalPack;
   }
 
+  let museumPack = null;
+  const museumTextures = [];
+  const museumMaterials = [];
+
+  function ensureMuseumPack() {
+    if (museumPack) return museumPack;
+
+    const parkLawn = buildMuseumParkLawnPBR(anisotropy);
+    const flagstonePlaza = buildMuseumFlagstonePlazaPBR(anisotropy);
+    const marbleDust = buildMuseumMarbleDustPBR(anisotropy);
+    const poolBank = buildMuseumPoolBankPBR(anisotropy);
+
+    const museumLimestone = buildMuseumLimestoneAshlarPBR(anisotropy);
+    const archedWindow = buildMuseumArchedWindowPBR(anisotropy);
+    const flutedMarble = buildMuseumFlutedMarblePBR(anisotropy);
+    const pedimentFrieze = buildMuseumPedimentFriezePBR(anisotropy);
+    const verriereGlass = buildMuseumVerriereGlassPBR(anisotropy);
+    const wingSlate = buildMuseumSlateRoofPBR(anisotropy);
+    const rawMarble = buildMuseumRawMarbleRockPBR(anisotropy);
+    const oakWood = buildMedievalOakTimberPBR(anisotropy);
+
+    [parkLawn, flagstonePlaza, marbleDust, poolBank].forEach((b) => {
+      museumTextures.push(b.albedo, b.normalRough);
+    });
+    [museumLimestone, archedWindow, flutedMarble, pedimentFrieze, verriereGlass, wingSlate, rawMarble, oakWood].forEach(
+      (pack) => {
+        if (pack.map) museumTextures.push(pack.map);
+        if (pack.normalMap) museumTextures.push(pack.normalMap);
+        if (pack.roughnessMap) museumTextures.push(pack.roughnessMap);
+      }
+    );
+
+    const museumTerrainSplat = createTerrainSplatMaterial({
+      sand: parkLawn,          // Biome 0: Manicured Royal Park Lawn, Boxwood & Flowerbeds
+      earthPath: flagstonePlaza, // Biome 1: Smooth Cream Flagstone Promenade & Gravel Esplanade
+      quarryDust: marbleDust,  // Biome 2: Crushed White Carrara Marble & Cream Limestone Dust
+      oasisGrass: poolBank,    // Biome 3: Reflecting Pool Bank Moss & Pale Marble Gravel
+    });
+    museumTerrainSplat.customProgramCacheKey = () => 'workd-builder-museum-terrain-splat-v1';
+
+    const poolWaterNormal = waterNormal.clone();
+    poolWaterNormal.wrapS = THREE.RepeatWrapping;
+    poolWaterNormal.wrapT = THREE.RepeatWrapping;
+    poolWaterNormal.repeat.set(2.8, 2.8);
+    poolWaterNormal.needsUpdate = true;
+    museumTextures.push(poolWaterNormal);
+
+    const gMats = {
+      terrainSplat: museumTerrainSplat,
+      museumLimestone: new THREE.MeshStandardMaterial({
+        map: museumLimestone.map,
+        normalMap: museumLimestone.normalMap,
+        normalScale: new THREE.Vector2(1.22, 1.22),
+        roughnessMap: museumLimestone.roughnessMap,
+        roughness: 0.72,
+        metalness: 0.04,
+      }),
+      podiumStone: new THREE.MeshStandardMaterial({
+        map: museumLimestone.map,
+        normalMap: museumLimestone.normalMap,
+        normalScale: new THREE.Vector2(1.3, 1.3),
+        roughnessMap: museumLimestone.roughnessMap,
+        color: new THREE.Color('#e6dfd0'),
+        roughness: 0.76,
+        metalness: 0.04,
+      }),
+      galleryArchedWindow: new THREE.MeshStandardMaterial({
+        map: archedWindow.map,
+        normalMap: archedWindow.normalMap,
+        normalScale: new THREE.Vector2(1.42, 1.42),
+        roughnessMap: archedWindow.roughnessMap,
+        roughness: 0.62,
+        metalness: 0.14,
+      }),
+      flutedMarble: new THREE.MeshStandardMaterial({
+        map: flutedMarble.map,
+        normalMap: flutedMarble.normalMap,
+        normalScale: new THREE.Vector2(1.38, 1.38),
+        roughnessMap: flutedMarble.roughnessMap,
+        roughness: 0.42,
+        metalness: 0.06,
+        envMapIntensity: 1.15,
+      }),
+      pedimentFrieze: new THREE.MeshStandardMaterial({
+        map: pedimentFrieze.map,
+        normalMap: pedimentFrieze.normalMap,
+        normalScale: new THREE.Vector2(1.5, 1.5),
+        roughnessMap: pedimentFrieze.roughnessMap,
+        roughness: 0.68,
+        metalness: 0.06,
+      }),
+      verriereGlass: new THREE.MeshStandardMaterial({
+        map: verriereGlass.map,
+        normalMap: verriereGlass.normalMap,
+        normalScale: new THREE.Vector2(1.2, 1.2),
+        roughnessMap: verriereGlass.roughnessMap,
+        roughness: 0.16,
+        metalness: 0.28,
+        envMapIntensity: 1.55,
+        transparent: true,
+        opacity: 0.82,
+        side: THREE.DoubleSide,
+      }),
+      wingSlateRoof: new THREE.MeshStandardMaterial({
+        map: wingSlate.map,
+        normalMap: wingSlate.normalMap,
+        normalScale: new THREE.Vector2(1.36, 1.36),
+        roughnessMap: wingSlate.roughnessMap,
+        roughness: 0.52,
+        metalness: 0.22,
+      }),
+      rawMarbleRock: new THREE.MeshStandardMaterial({
+        map: rawMarble.map,
+        normalMap: rawMarble.normalMap,
+        normalScale: new THREE.Vector2(1.55, 1.55),
+        roughnessMap: rawMarble.roughnessMap,
+        roughness: 0.86,
+        metalness: 0.03,
+      }),
+      oakCartWood: new THREE.MeshStandardMaterial({
+        map: oakWood.map,
+        normalMap: oakWood.normalMap,
+        normalScale: new THREE.Vector2(1.15, 1.15),
+        roughnessMap: oakWood.roughnessMap,
+        roughness: 0.78,
+        metalness: 0.05,
+      }),
+      brassMetal: new THREE.MeshStandardMaterial({
+        color: new THREE.Color('#deb34c'),
+        roughness: 0.28,
+        metalness: 0.88,
+        envMapIntensity: 1.35,
+      }),
+      wroughtIron: new THREE.MeshStandardMaterial({
+        color: new THREE.Color('#272d34'),
+        roughness: 0.36,
+        metalness: 0.86,
+      }),
+      reflectingWater: new THREE.MeshStandardMaterial({
+        color: new THREE.Color('#34b4c6'),
+        normalMap: poolWaterNormal,
+        normalScale: new THREE.Vector2(0.36, 0.36),
+        roughness: 0.1,
+        metalness: 0.14,
+        envMapIntensity: 1.45,
+        transparent: true,
+        opacity: 0.9,
+      }),
+      lampGlow: new THREE.MeshStandardMaterial({
+        color: new THREE.Color('#fff7d6'),
+        emissive: new THREE.Color('#ffd068'),
+        emissiveIntensity: 1.5,
+        roughness: 0.25,
+      }),
+      interiorGalleryGlow: new THREE.MeshStandardMaterial({
+        color: new THREE.Color('#f7e8c6'),
+        emissive: new THREE.Color('#ffe09e'),
+        emissiveIntensity: 0.32,
+        roughness: 0.62,
+        polygonOffset: true,
+        polygonOffsetFactor: -1,
+        polygonOffsetUnits: -1,
+      }),
+      boxwoodHedge: new THREE.MeshStandardMaterial({
+        color: new THREE.Color('#3f7836'),
+        roughness: 0.9,
+        metalness: 0.0,
+      }),
+    };
+
+    Object.values(gMats).forEach((m) => museumMaterials.push(m));
+    museumPack = { materials: gMats };
+    return museumPack;
+  }
+
   return {
     maps: {
       blueprint: blueprintMap,
@@ -2587,6 +2762,7 @@ export function createTextureLibrary(renderer) {
     ensureCoalMinePack,
     ensureModernPack,
     ensureMedievalPack,
+    ensureMuseumPack,
     dispose() {
       textures.forEach((t) => t.dispose());
       Object.values(materials).forEach((m) => m.dispose());
@@ -2604,6 +2780,8 @@ export function createTextureLibrary(renderer) {
       modernMaterials.forEach((m) => m.dispose());
       medievalTextures.forEach((t) => t.dispose());
       medievalMaterials.forEach((m) => m.dispose());
+      museumTextures.forEach((t) => t.dispose());
+      museumMaterials.forEach((m) => m.dispose());
       materialFactory.dispose();
     },
   };
@@ -6233,6 +6411,654 @@ function buildMedievalOakTimberPBR(anisotropy) {
   ctx.putImageData(img, 0, 0);
   rCtx.putImageData(rImg, 0, 0);
   const normalCanvas = buildSobelNormalCanvas(height, size, 2.8);
+  return {
+    map: wrapTexture(albedoCanvas, { isColor: true, anisotropy }),
+    normalMap: wrapTexture(normalCanvas, { isColor: false, anisotropy }),
+    roughnessMap: wrapTexture(roughCanvas, { isColor: false, anisotropy }),
+  };
+}
+
+/* ============================================================================
+ * LEVEL 9 (CLASSICAL CULTURAL ERA — LE GRAND MUSÉE NATIONAL) — 512x512 PBR PACK
+ * ========================================================================== */
+
+/** Museum Biome 0: Manicured Royal Park Lawn, Boxwood Green & Floral Park Borders (512x512) */
+function buildMuseumParkLawnPBR(anisotropy) {
+  const size = 512;
+  const albedoCanvas = makeCanvas(size);
+  const ctx = albedoCanvas.getContext('2d');
+  const img = ctx.createImageData(size, size);
+  const data = img.data;
+  const height = new Float32Array(size * size);
+  const rough = new Float32Array(size * size);
+
+  for (let y = 0; y < size; y++) {
+    const v = y / size;
+    for (let x = 0; x < size; x++) {
+      const u = x / size;
+      const i = y * size + x;
+      const macro = tileFBM(u, v, 5, 3, 9103);
+      const blades = tileFBM(u * 2.5, v * 2.5, 24, 2, 9127);
+      const mowStripe = Math.sin(u * Math.PI * 6) * 0.5 + 0.5;
+      const micro = hash2i(x, y, 9151);
+
+      let r = lerp(78, 114, macro) + (mowStripe - 0.5) * 14 + (blades - 0.5) * 14;
+      let g = lerp(128, 170, macro) + (mowStripe - 0.5) * 16 + (blades - 0.5) * 18;
+      let b = lerp(56, 82, macro) + (blades - 0.5) * 8;
+
+      // Subtle garden blossom specks
+      const fl = tileWorley(u, v, 22, 9173);
+      if (fl.f1 < 0.075 && fl.id > 0.87) {
+        const bloom = 1.0 - smoothstep(0.025, 0.075, fl.f1);
+        const isRose = fl.id > 0.94;
+        r = lerp(r, isRose ? 242 : 250, bloom * 0.72);
+        g = lerp(g, isRose ? 156 : 244, bloom * 0.72);
+        b = lerp(b, isRose ? 174 : 216, bloom * 0.72);
+      }
+
+      height[i] = clamp01(0.46 + (blades - 0.5) * 0.3 + (macro - 0.5) * 0.1);
+      rough[i] = clamp01(0.88 + (0.5 - blades) * 0.08);
+
+      const idx = i * 4;
+      data[idx] = Math.min(255, Math.max(0, Math.round(r + (micro - 0.5) * 6)));
+      data[idx + 1] = Math.min(255, Math.max(0, Math.round(g + (micro - 0.5) * 6)));
+      data[idx + 2] = Math.min(255, Math.max(0, Math.round(b + (micro - 0.5) * 6)));
+      data[idx + 3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  const normalRoughCanvas = buildSobelNormalCanvas(height, size, 2.0, rough);
+  return {
+    albedo: wrapTexture(albedoCanvas, { isColor: true, anisotropy }),
+    normalRough: wrapTexture(normalRoughCanvas, { isColor: false, anisotropy }),
+  };
+}
+
+/** Museum Biome 1: Smooth Cream Flagstone Promenade & Gravel Esplanade (512x512) */
+function buildMuseumFlagstonePlazaPBR(anisotropy) {
+  const size = 512;
+  const albedoCanvas = makeCanvas(size);
+  const ctx = albedoCanvas.getContext('2d');
+  const img = ctx.createImageData(size, size);
+  const data = img.data;
+  const height = new Float32Array(size * size);
+  const rough = new Float32Array(size * size);
+
+  const tiles = 6;
+  for (let y = 0; y < size; y++) {
+    const v = y / size;
+    const row = Math.floor(v * tiles);
+    const rv = (v * tiles) % 1;
+    const stag = (row % 2) * 0.5;
+    for (let x = 0; x < size; x++) {
+      const u = x / size;
+      const i = y * size + x;
+      const uS = (u * tiles + stag) % tiles;
+      const col = Math.floor(uS);
+      const cu = uS % 1;
+
+      const tone = hash2i(col + 11, row + 23, 9203);
+      const grain = tileFBM(u, v, 14, 3, 9221);
+      const micro = hash2i(x, y, 9241);
+
+      const minJ = Math.min(Math.min(rv, 1 - rv), Math.min(cu, 1 - cu));
+      const isJoint = 1.0 - smoothstep(0.02, 0.052, minJ);
+
+      let r = lerp(208, 230, tone) + (grain - 0.5) * 16 + (micro - 0.5) * 8;
+      let g = lerp(200, 222, tone) + (grain - 0.5) * 16 + (micro - 0.5) * 8;
+      let b = lerp(184, 206, tone) + (grain - 0.5) * 14 + (micro - 0.5) * 8;
+
+      r = lerp(r, 152, isJoint * 0.72);
+      g = lerp(g, 146, isJoint * 0.72);
+      b = lerp(b, 134, isJoint * 0.72);
+
+      height[i] = clamp01(0.68 - isJoint * 0.44 + (grain - 0.5) * 0.1);
+      rough[i] = clamp01(0.76 + isJoint * 0.18 + (0.5 - grain) * 0.08);
+
+      const idx = i * 4;
+      data[idx] = Math.min(255, Math.max(0, Math.round(r)));
+      data[idx + 1] = Math.min(255, Math.max(0, Math.round(g)));
+      data[idx + 2] = Math.min(255, Math.max(0, Math.round(b)));
+      data[idx + 3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  const normalRoughCanvas = buildSobelNormalCanvas(height, size, 2.4, rough);
+  return {
+    albedo: wrapTexture(albedoCanvas, { isColor: true, anisotropy }),
+    normalRough: wrapTexture(normalRoughCanvas, { isColor: false, anisotropy }),
+  };
+}
+
+/** Museum Biome 2: Crushed White Carrara Marble & Cream Limestone Quarry Dust (512x512) */
+function buildMuseumMarbleDustPBR(anisotropy) {
+  const size = 512;
+  const albedoCanvas = makeCanvas(size);
+  const ctx = albedoCanvas.getContext('2d');
+  const img = ctx.createImageData(size, size);
+  const data = img.data;
+  const height = new Float32Array(size * size);
+  const rough = new Float32Array(size * size);
+
+  for (let y = 0; y < size; y++) {
+    const v = y / size;
+    for (let x = 0; x < size; x++) {
+      const u = x / size;
+      const i = y * size + x;
+      const dust = tileFBM(u, v, 8, 3, 9311);
+      const chips = tileWorley(u, v, 24, 9323);
+      const micro = hash2i(x, y, 9341);
+
+      const chipBump = smoothstep(0.05, 0.18, chips.edge);
+      const lum = lerp(206, 242, dust) + (chipBump - 0.5) * 18 + (micro - 0.5) * 10;
+
+      height[i] = clamp01(0.48 + chipBump * 0.22 + (dust - 0.5) * 0.16);
+      rough[i] = clamp01(0.86 + (0.5 - dust) * 0.08);
+
+      const idx = i * 4;
+      data[idx] = Math.min(255, Math.max(0, Math.round(lum * 1.0)));
+      data[idx + 1] = Math.min(255, Math.max(0, Math.round(lum * 0.99)));
+      data[idx + 2] = Math.min(255, Math.max(0, Math.round(lum * 0.95)));
+      data[idx + 3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  const normalRoughCanvas = buildSobelNormalCanvas(height, size, 2.3, rough);
+  return {
+    albedo: wrapTexture(albedoCanvas, { isColor: true, anisotropy }),
+    normalRough: wrapTexture(normalRoughCanvas, { isColor: false, anisotropy }),
+  };
+}
+
+/** Museum Biome 3: Reflecting Pool Bank Moss & Pale Marble Gravel Border (512x512) */
+function buildMuseumPoolBankPBR(anisotropy) {
+  const size = 512;
+  const albedoCanvas = makeCanvas(size);
+  const ctx = albedoCanvas.getContext('2d');
+  const img = ctx.createImageData(size, size);
+  const data = img.data;
+  const height = new Float32Array(size * size);
+  const rough = new Float32Array(size * size);
+
+  for (let y = 0; y < size; y++) {
+    const v = y / size;
+    for (let x = 0; x < size; x++) {
+      const u = x / size;
+      const i = y * size + x;
+      const grav = tileWorley(u, v, 20, 9403);
+      const tone = tileFBM(u, v, 8, 3, 9419);
+      const micro = hash2i(x, y, 9437);
+
+      const isStone = smoothstep(0.04, 0.18, grav.edge);
+      const lum = lerp(176, 218, tone * 0.6 + grav.id * 0.4) * (0.86 + isStone * 0.16);
+
+      height[i] = clamp01(0.45 + isStone * 0.28 + (tone - 0.5) * 0.14);
+      rough[i] = clamp01(0.74 - isStone * 0.12 + (micro - 0.5) * 0.08);
+
+      const idx = i * 4;
+      data[idx] = Math.min(255, Math.max(0, Math.round(lum * 0.98 + (micro - 0.5) * 8)));
+      data[idx + 1] = Math.min(255, Math.max(0, Math.round(lum * 0.99 + (micro - 0.5) * 8)));
+      data[idx + 2] = Math.min(255, Math.max(0, Math.round(lum * 0.93 + (micro - 0.5) * 8)));
+      data[idx + 3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  const normalRoughCanvas = buildSobelNormalCanvas(height, size, 2.4, rough);
+  return {
+    albedo: wrapTexture(albedoCanvas, { isColor: true, anisotropy }),
+    normalRough: wrapTexture(normalRoughCanvas, { isColor: false, anisotropy }),
+  };
+}
+
+/** 512x512 Smooth Cream Museum Limestone Ashlar PBR (Albedo + Normal + Roughness) */
+function buildMuseumLimestoneAshlarPBR(anisotropy) {
+  const size = 512;
+  const albedoCanvas = makeCanvas(size);
+  const roughCanvas = makeCanvas(size);
+  const ctx = albedoCanvas.getContext('2d');
+  const rCtx = roughCanvas.getContext('2d');
+  const img = ctx.createImageData(size, size);
+  const rImg = rCtx.createImageData(size, size);
+  const height = new Float32Array(size * size);
+
+  const rows = 4;
+  const cols = 3;
+
+  for (let y = 0; y < size; y++) {
+    const v = y / size;
+    const row = Math.floor(v * rows);
+    const rv = (v * rows) % 1;
+    const stag = (row % 2) * 0.5;
+    for (let x = 0; x < size; x++) {
+      const u = x / size;
+      const i = y * size + x;
+      const uS = (u * cols + stag) % cols;
+      const col = Math.floor(uS);
+      const cu = uS % 1;
+
+      const blockTone = hash2i(col + 13, row + 29, 9511);
+      const stoneGrain = tileFBM(u, v, 14, 3, 9521);
+      const micro = hash2i(x, y, 9539);
+
+      const minJ = Math.min(Math.min(rv, 1 - rv), Math.min(cu, 1 - cu) * (rows / cols));
+      const isMortar = 1.0 - smoothstep(0.018, 0.044, minJ);
+      const bevel = smoothstep(0.04, 0.1, minJ);
+
+      // Refined Parisian/Beaux-Arts pale cream Lutetian limestone
+      let r = lerp(224, 242, blockTone) + (stoneGrain - 0.5) * 14 + (micro - 0.5) * 6;
+      let g = lerp(214, 232, blockTone) + (stoneGrain - 0.5) * 14 + (micro - 0.5) * 6;
+      let b = lerp(194, 212, blockTone) + (stoneGrain - 0.5) * 12 + (micro - 0.5) * 6;
+
+      r = lerp(r, 174, isMortar * 0.72);
+      g = lerp(g, 166, isMortar * 0.72);
+      b = lerp(b, 150, isMortar * 0.72);
+
+      height[i] = clamp01(0.32 + bevel * 0.46 + (stoneGrain - 0.5) * 0.12 - isMortar * 0.24);
+
+      const idx = i * 4;
+      img.data[idx] = Math.min(255, Math.max(0, Math.round(r)));
+      img.data[idx + 1] = Math.min(255, Math.max(0, Math.round(g)));
+      img.data[idx + 2] = Math.min(255, Math.max(0, Math.round(b)));
+      img.data[idx + 3] = 255;
+
+      const rvByte = Math.round(clamp01(0.68 + isMortar * 0.2 + (0.5 - stoneGrain) * 0.08) * 255);
+      rImg.data[idx] = rvByte;
+      rImg.data[idx + 1] = rvByte;
+      rImg.data[idx + 2] = rvByte;
+      rImg.data[idx + 3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  rCtx.putImageData(rImg, 0, 0);
+  const normalCanvas = buildSobelNormalCanvas(height, size, 2.6);
+  return {
+    map: wrapTexture(albedoCanvas, { isColor: true, anisotropy }),
+    normalMap: wrapTexture(normalCanvas, { isColor: false, anisotropy }),
+    roughnessMap: wrapTexture(roughCanvas, { isColor: false, anisotropy }),
+  };
+}
+
+/** 512x512 Museum Gallery Wall with Tall Classical Arched Window PBR */
+function buildMuseumArchedWindowPBR(anisotropy) {
+  const size = 512;
+  const albedoCanvas = makeCanvas(size);
+  const roughCanvas = makeCanvas(size);
+  const ctx = albedoCanvas.getContext('2d');
+  const rCtx = roughCanvas.getContext('2d');
+  const img = ctx.createImageData(size, size);
+  const rImg = rCtx.createImageData(size, size);
+  const height = new Float32Array(size * size);
+
+  for (let y = 0; y < size; y++) {
+    const v = y / size;
+    for (let x = 0; x < size; x++) {
+      const u = x / size;
+      const i = y * size + x;
+      const stoneGrain = tileFBM(u, v, 12, 3, 9601);
+      const micro = hash2i(x, y, 9619);
+
+      // Tall neoclassical arched window centered in the dressed limestone bay
+      const archCenterY = 0.34;
+      const halfW = 0.28;
+      const dx = Math.abs(u - 0.5);
+      const inRect = dx < halfW && v >= archCenterY && v <= 0.88;
+      const inArch = v < archCenterY && Math.hypot((u - 0.5) / halfW, (v - archCenterY) / 0.22) < 1.0;
+      const inWindow = inRect || inArch;
+
+      const inFrame =
+        !inWindow &&
+        ((dx < halfW + 0.06 && v >= archCenterY && v <= 0.92) ||
+          (v < archCenterY && Math.hypot((u - 0.5) / (halfW + 0.06), (v - archCenterY) / 0.27) < 1.0));
+
+      let r, g, b, h, roughVal;
+
+      if (!inWindow) {
+        const lum = (inFrame ? 236 : 226) + (stoneGrain - 0.5) * 16 + (micro - 0.5) * 6;
+        r = lum * 1.0;
+        g = lum * 0.96;
+        b = lum * 0.87;
+        h = inFrame ? 0.84 : 0.66;
+        roughVal = 0.72;
+      } else {
+        // Warm sunlit gallery interior glow behind sleek sky-tinted bronze-mullioned glass
+        const glow = clamp01(1.0 - Math.hypot((u - 0.5) * 1.6, (v - 0.58) * 1.4));
+        r = lerp(126, 224, glow * 0.75);
+        g = lerp(164, 216, glow * 0.72);
+        b = lerp(188, 178, glow * 0.65);
+        h = 0.16;
+        roughVal = 0.18;
+
+        // Crisp dark bronze classical window mullions & arch radial muntins
+        const vBar = Math.abs(u - 0.5) < 0.018 || Math.abs(dx - 0.14) < 0.013;
+        const hBar = Math.abs(v - archCenterY) < 0.018 || Math.abs(v - 0.61) < 0.015;
+        if (vBar || hBar) {
+          r = 46;
+          g = 48;
+          b = 52;
+          h = 0.56;
+          roughVal = 0.36;
+        }
+      }
+
+      height[i] = clamp01(h);
+      const idx = i * 4;
+      img.data[idx] = Math.min(255, Math.max(0, Math.round(r)));
+      img.data[idx + 1] = Math.min(255, Math.max(0, Math.round(g)));
+      img.data[idx + 2] = Math.min(255, Math.max(0, Math.round(b)));
+      img.data[idx + 3] = 255;
+
+      const rvByte = Math.round(roughVal * 255);
+      rImg.data[idx] = rvByte;
+      rImg.data[idx + 1] = rvByte;
+      rImg.data[idx + 2] = rvByte;
+      rImg.data[idx + 3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  rCtx.putImageData(rImg, 0, 0);
+  const normalCanvas = buildSobelNormalCanvas(height, size, 3.2);
+  return {
+    map: wrapTexture(albedoCanvas, { isColor: true, anisotropy }),
+    normalMap: wrapTexture(normalCanvas, { isColor: false, anisotropy }),
+    roughnessMap: wrapTexture(roughCanvas, { isColor: false, anisotropy }),
+  };
+}
+
+/** 512x512 Fluted White Carrara Marble Colonnade Columns PBR */
+function buildMuseumFlutedMarblePBR(anisotropy) {
+  const size = 512;
+  const albedoCanvas = makeCanvas(size);
+  const roughCanvas = makeCanvas(size);
+  const ctx = albedoCanvas.getContext('2d');
+  const rCtx = roughCanvas.getContext('2d');
+  const img = ctx.createImageData(size, size);
+  const rImg = rCtx.createImageData(size, size);
+  const height = new Float32Array(size * size);
+
+  for (let y = 0; y < size; y++) {
+    const v = y / size;
+    for (let x = 0; x < size; x++) {
+      const u = x / size;
+      const i = y * size + x;
+      // 14 crisp vertical classical marble flutes + delicate Carrara grey veining
+      const fluteWave = Math.cos(u * 14 * Math.PI * 2);
+      const flute = clamp01(0.5 + fluteWave * 0.5);
+      const veinWarp = tileFBM(u, v, 5, 3, 9719);
+      const vein = smoothstep(0.68, 0.92, Math.abs(Math.sin((u * 3.5 + v * 2.2 + veinWarp * 2.8) * Math.PI)));
+      const micro = hash2i(x, y, 9733);
+
+      const lum = lerp(224, 250, flute * 0.72 + 0.28) - (1 - vein) * 18 + (micro - 0.5) * 5;
+
+      height[i] = clamp01(0.22 + flute * 0.68 + (veinWarp - 0.5) * 0.06);
+
+      const idx = i * 4;
+      img.data[idx] = Math.min(255, Math.max(0, Math.round(lum * 1.0)));
+      img.data[idx + 1] = Math.min(255, Math.max(0, Math.round(lum * 0.99)));
+      img.data[idx + 2] = Math.min(255, Math.max(0, Math.round(lum * 0.97)));
+      img.data[idx + 3] = 255;
+
+      const rvByte = Math.round(clamp01(0.36 + (1 - flute) * 0.16) * 255);
+      rImg.data[idx] = rvByte;
+      rImg.data[idx + 1] = rvByte;
+      rImg.data[idx + 2] = rvByte;
+      rImg.data[idx + 3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  rCtx.putImageData(rImg, 0, 0);
+  const normalCanvas = buildSobelNormalCanvas(height, size, 3.6);
+  return {
+    map: wrapTexture(albedoCanvas, { isColor: true, anisotropy }),
+    normalMap: wrapTexture(normalCanvas, { isColor: false, anisotropy }),
+    roughnessMap: wrapTexture(roughCanvas, { isColor: false, anisotropy }),
+  };
+}
+
+/** 512x512 Carved Classical Pediment Frieze & Cornice Relief PBR */
+function buildMuseumPedimentFriezePBR(anisotropy) {
+  const size = 512;
+  const albedoCanvas = makeCanvas(size);
+  const roughCanvas = makeCanvas(size);
+  const ctx = albedoCanvas.getContext('2d');
+  const rCtx = roughCanvas.getContext('2d');
+  const img = ctx.createImageData(size, size);
+  const rImg = rCtx.createImageData(size, size);
+  const height = new Float32Array(size * size);
+
+  for (let y = 0; y < size; y++) {
+    const v = y / size;
+    for (let x = 0; x < size; x++) {
+      const u = x / size;
+      const i = y * size + x;
+      const grain = tileFBM(u, v, 14, 3, 9803);
+      const micro = hash2i(x, y, 9817);
+
+      // Classical 3-band entablature: upper dentil cornice, central carved triglyph/metope frieze, lower architrave
+      let relief = 0.55;
+      let goldAccent = 0;
+      if (v < 0.18) {
+        // Upper cornice dentils
+        const dentil = Math.sin(u * 20 * Math.PI * 2) > 0 ? 0.88 : 0.34;
+        relief = v < 0.08 ? 0.92 : dentil;
+      } else if (v > 0.24 && v < 0.72) {
+        // Triglyphs & sculpted medallion metopes
+        const cellU = (u * 4) % 1;
+        if (cellU < 0.28) {
+          const groove = Math.sin((cellU / 0.28) * 3 * Math.PI * 2) * 0.5 + 0.5;
+          relief = 0.38 + groove * 0.5;
+        } else {
+          // Classical laurel rosette medallion in the metope center
+          const md = Math.hypot((cellU - 0.64) * 2.2, (v - 0.48) * 2.6);
+          const ring = smoothstep(0.18, 0.26, md) * (1.0 - smoothstep(0.32, 0.42, md));
+          const boss = 1.0 - smoothstep(0.08, 0.16, md);
+          relief = 0.42 + (ring + boss) * 0.46;
+          goldAccent = (ring + boss) * 0.55;
+        }
+      } else if (v >= 0.72 && v < 0.80) {
+        relief = 0.84;
+      }
+
+      let r = lerp(196, 242, relief) + (grain - 0.5) * 14 + (micro - 0.5) * 6;
+      let g = lerp(188, 232, relief) + (grain - 0.5) * 14 + (micro - 0.5) * 6;
+      let b = lerp(170, 212, relief) + (grain - 0.5) * 12 + (micro - 0.5) * 6;
+
+      if (goldAccent > 0.05) {
+        r = lerp(r, 228, goldAccent * 0.55);
+        g = lerp(g, 192, goldAccent * 0.55);
+        b = lerp(b, 98, goldAccent * 0.55);
+      }
+
+      height[i] = clamp01(relief + (grain - 0.5) * 0.08);
+
+      const idx = i * 4;
+      img.data[idx] = Math.min(255, Math.max(0, Math.round(r)));
+      img.data[idx + 1] = Math.min(255, Math.max(0, Math.round(g)));
+      img.data[idx + 2] = Math.min(255, Math.max(0, Math.round(b)));
+      img.data[idx + 3] = 255;
+
+      const rvByte = Math.round(clamp01(0.7 - goldAccent * 0.32) * 255);
+      rImg.data[idx] = rvByte;
+      rImg.data[idx + 1] = rvByte;
+      rImg.data[idx + 2] = rvByte;
+      rImg.data[idx + 3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  rCtx.putImageData(rImg, 0, 0);
+  const normalCanvas = buildSobelNormalCanvas(height, size, 3.6);
+  return {
+    map: wrapTexture(albedoCanvas, { isColor: true, anisotropy }),
+    normalMap: wrapTexture(normalCanvas, { isColor: false, anisotropy }),
+    roughnessMap: wrapTexture(roughCanvas, { isColor: false, anisotropy }),
+  };
+}
+
+/** 512x512 Tinted Glass & Wrought-Iron Skylight Roof (Verrière) PBR */
+function buildMuseumVerriereGlassPBR(anisotropy) {
+  const size = 512;
+  const albedoCanvas = makeCanvas(size);
+  const roughCanvas = makeCanvas(size);
+  const ctx = albedoCanvas.getContext('2d');
+  const rCtx = roughCanvas.getContext('2d');
+  const img = ctx.createImageData(size, size);
+  const rImg = rCtx.createImageData(size, size);
+  const height = new Float32Array(size * size);
+
+  for (let y = 0; y < size; y++) {
+    const v = y / size;
+    for (let x = 0; x < size; x++) {
+      const u = x / size;
+      const i = y * size + x;
+      const sheen = tileFBM(u, v, 6, 2, 9901);
+
+      // Beaux-Arts wrought-iron structural skylight ribs framing luminous sky-tinted glass panes
+      const ribU = ((u * 4) % 1);
+      const ribV = ((v * 3) % 1);
+      const isMajorRib = ribU < 0.055 || ribU > 0.945 || ribV < 0.048 || ribV > 0.952;
+      const isMinorRib = Math.abs(ribU - 0.5) < 0.018;
+
+      let r, g, b, h, roughVal;
+      if (isMajorRib || isMinorRib) {
+        r = 46;
+        g = 56;
+        b = 66;
+        h = isMajorRib ? 0.92 : 0.72;
+        roughVal = 0.38;
+      } else {
+        // Luminous sunlit pale-aqua & golden sky reflection on classical Verrière glass
+        const diagGlow = smoothstep(0.15, 0.85, (u + v) * 0.5 + (sheen - 0.5) * 0.2);
+        r = lerp(152, 224, diagGlow);
+        g = lerp(214, 244, diagGlow);
+        b = lerp(234, 250, diagGlow);
+        h = 0.22;
+        roughVal = 0.12;
+      }
+
+      height[i] = h;
+      const idx = i * 4;
+      img.data[idx] = Math.min(255, Math.max(0, Math.round(r)));
+      img.data[idx + 1] = Math.min(255, Math.max(0, Math.round(g)));
+      img.data[idx + 2] = Math.min(255, Math.max(0, Math.round(b)));
+      img.data[idx + 3] = 255;
+
+      const rvByte = Math.round(roughVal * 255);
+      rImg.data[idx] = rvByte;
+      rImg.data[idx + 1] = rvByte;
+      rImg.data[idx + 2] = rvByte;
+      rImg.data[idx + 3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  rCtx.putImageData(rImg, 0, 0);
+  const normalCanvas = buildSobelNormalCanvas(height, size, 3.2);
+  return {
+    map: wrapTexture(albedoCanvas, { isColor: true, anisotropy }),
+    normalMap: wrapTexture(normalCanvas, { isColor: false, anisotropy }),
+    roughnessMap: wrapTexture(roughCanvas, { isColor: false, anisotropy }),
+  };
+}
+
+/** 512x512 Beaux-Arts Blue-Grey Museum Wing Slate Roof PBR */
+function buildMuseumSlateRoofPBR(anisotropy) {
+  const size = 512;
+  const albedoCanvas = makeCanvas(size);
+  const roughCanvas = makeCanvas(size);
+  const ctx = albedoCanvas.getContext('2d');
+  const rCtx = roughCanvas.getContext('2d');
+  const img = ctx.createImageData(size, size);
+  const rImg = rCtx.createImageData(size, size);
+  const height = new Float32Array(size * size);
+
+  const rows = 8;
+  const cols = 6;
+  for (let y = 0; y < size; y++) {
+    const v = y / size;
+    const row = Math.floor(v * rows);
+    const rv = (v * rows) % 1;
+    const stag = (row % 2) * 0.5;
+    for (let x = 0; x < size; x++) {
+      const u = x / size;
+      const i = y * size + x;
+      const uS = (u * cols + stag) % cols;
+      const col = Math.floor(uS);
+      const cu = uS % 1;
+
+      const tone = hash2i(col + 17, row + 31, 9941);
+      const grain = tileFBM(u, v, 14, 2, 9949);
+      const lip = smoothstep(0.84, 0.96, rv);
+      const seam = cu < 0.04 || cu > 0.96 ? 1.0 : 0.0;
+      const dark = Math.max(lip * 0.45, seam * 0.35);
+
+      let r = (lerp(72, 98, tone) + (grain - 0.5) * 12) * (1 - dark);
+      let g = (lerp(90, 118, tone) + (grain - 0.5) * 14) * (1 - dark);
+      let b = (lerp(112, 144, tone) + (grain - 0.5) * 16) * (1 - dark);
+
+      height[i] = clamp01(0.32 + rv * 0.54 - lip * 0.42 - seam * 0.22);
+
+      const idx = i * 4;
+      img.data[idx] = Math.min(255, Math.max(0, Math.round(r)));
+      img.data[idx + 1] = Math.min(255, Math.max(0, Math.round(g)));
+      img.data[idx + 2] = Math.min(255, Math.max(0, Math.round(b)));
+      img.data[idx + 3] = 255;
+
+      const rvByte = Math.round(clamp01(0.48 + dark * 0.28) * 255);
+      rImg.data[idx] = rvByte;
+      rImg.data[idx + 1] = rvByte;
+      rImg.data[idx + 2] = rvByte;
+      rImg.data[idx + 3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  rCtx.putImageData(rImg, 0, 0);
+  const normalCanvas = buildSobelNormalCanvas(height, size, 3.0);
+  return {
+    map: wrapTexture(albedoCanvas, { isColor: true, anisotropy }),
+    normalMap: wrapTexture(normalCanvas, { isColor: false, anisotropy }),
+    roughnessMap: wrapTexture(roughCanvas, { isColor: false, anisotropy }),
+  };
+}
+
+/** 512x512 Rough Cream Limestone & White Carrara Marble Quarry Rock PBR (Stage 0) */
+function buildMuseumRawMarbleRockPBR(anisotropy) {
+  const size = 512;
+  const albedoCanvas = makeCanvas(size);
+  const roughCanvas = makeCanvas(size);
+  const ctx = albedoCanvas.getContext('2d');
+  const rCtx = roughCanvas.getContext('2d');
+  const img = ctx.createImageData(size, size);
+  const rImg = rCtx.createImageData(size, size);
+  const height = new Float32Array(size * size);
+
+  for (let y = 0; y < size; y++) {
+    const v = y / size;
+    for (let x = 0; x < size; x++) {
+      const u = x / size;
+      const i = y * size + x;
+      const vor = tileWorley(u, v, 8, 9967);
+      const strata = tileFBM(u * 1.4, v * 2.8, 8, 3, 9973);
+      const micro = hash2i(x, y, 9991);
+
+      const crack = 1.0 - smoothstep(0.02, 0.085, vor.edge);
+      const lum = lerp(186, 236, vor.id * 0.5 + strata * 0.5) - crack * 52 + (micro - 0.5) * 12;
+
+      height[i] = clamp01(0.64 - crack * 0.44 + (strata - 0.5) * 0.24);
+
+      const idx = i * 4;
+      img.data[idx] = Math.min(255, Math.max(0, Math.round(lum * 1.0)));
+      img.data[idx + 1] = Math.min(255, Math.max(0, Math.round(lum * 0.98)));
+      img.data[idx + 2] = Math.min(255, Math.max(0, Math.round(lum * 0.92)));
+      img.data[idx + 3] = 255;
+
+      const rvByte = Math.round(clamp01(0.8 + crack * 0.16) * 255);
+      rImg.data[idx] = rvByte;
+      rImg.data[idx + 1] = rvByte;
+      rImg.data[idx + 2] = rvByte;
+      rImg.data[idx + 3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  rCtx.putImageData(rImg, 0, 0);
+  const normalCanvas = buildSobelNormalCanvas(height, size, 3.8);
   return {
     map: wrapTexture(albedoCanvas, { isColor: true, anisotropy }),
     normalMap: wrapTexture(normalCanvas, { isColor: false, anisotropy }),

@@ -385,8 +385,8 @@ export class Level8Castle extends Level1Pyramid {
 
     const pos = terrainGeo.attributes.position;
     const count = pos.count;
-    const biomeA = new Float32Array(count * 3);
-    const biomeB = new Float32Array(count * 2);
+    const splat = new Float32Array(count * 4);
+    const wet = new Float32Array(count);
 
     for (let i = 0; i < count; i++) {
       const x = pos.getX(i);
@@ -395,15 +395,15 @@ export class Level8Castle extends Level1Pyramid {
       pos.setY(i, h);
 
       const { w0, w1, w2, w3, wetness } = sampleCastleBiomeWeights(x, z, h);
-      biomeA[i * 3] = w0;
-      biomeA[i * 3 + 1] = w1;
-      biomeA[i * 3 + 2] = w2;
-      biomeB[i * 2] = w3;
-      biomeB[i * 2 + 1] = wetness;
+      splat[i * 4] = w0;
+      splat[i * 4 + 1] = w1;
+      splat[i * 4 + 2] = w2;
+      splat[i * 4 + 3] = w3;
+      wet[i] = wetness;
     }
 
-    terrainGeo.setAttribute('aBiomeA', new THREE.BufferAttribute(biomeA, 3));
-    terrainGeo.setAttribute('aBiomeB', new THREE.BufferAttribute(biomeB, 2));
+    terrainGeo.setAttribute('aSplat', new THREE.BufferAttribute(splat, 4));
+    terrainGeo.setAttribute('aWetness', new THREE.BufferAttribute(wet, 1));
     terrainGeo.computeVertexNormals();
 
     this.terrainMesh = new THREE.Mesh(terrainGeo, this.castle.materials.terrainSplat);

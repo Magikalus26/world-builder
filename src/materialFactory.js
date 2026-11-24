@@ -128,6 +128,18 @@ export const THEME_PALETTES = {
     metal: { base: '#4c535c', mortar: '#25292e', roughness: 0.36, metalness: 0.84, pattern: 'metal' },
     accent: { base: '#c99b38', mortar: '#7c5d1b', roughness: 0.34, metalness: 0.82, pattern: 'metal' },
   },
+  museum: {
+    id: 'museum',
+    groundBase: '#699f4f',
+    groundDetail: '#ebe5d8',
+    strataColors: ['#5f9546', '#e6dfd0', '#c9beaa', '#8b8273'],
+    stone: { base: '#f0eadc', mortar: '#c6beae', roughness: 0.62, metalness: 0.04, pattern: 'ashlar' },
+    brick: { base: '#e4dac6', mortar: '#bdb3a0', roughness: 0.68, metalness: 0.04, pattern: 'ashlar' },
+    wood: { base: '#7d5634', mortar: '#4c321c', roughness: 0.76, metalness: 0.04, pattern: 'wood' },
+    roof: { base: '#566d84', mortar: '#324252', roughness: 0.48, metalness: 0.22, pattern: 'slate' },
+    metal: { base: '#2c323a', mortar: '#161a1f', roughness: 0.36, metalness: 0.84, pattern: 'metal' },
+    accent: { base: '#d9b154', mortar: '#886923', roughness: 0.28, metalness: 0.84, pattern: 'metal' },
+  },
   arabian: {
     id: 'arabian',
     groundBase: '#e4b37a',
