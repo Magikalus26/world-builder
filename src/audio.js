@@ -207,6 +207,30 @@ export class SoundEngine {
   }
 
   /**
+   * Gentle elastic rebound tone when a dragged block snaps back to its origin slot.
+   */
+  playSnapBack() {
+    if (!this._ready()) return;
+    const now = this.ctx.currentTime;
+
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(300, now);
+    osc.frequency.exponentialRampToValueAtTime(195, now + 0.07);
+    osc.frequency.exponentialRampToValueAtTime(255, now + 0.14);
+
+    gain.gain.setValueAtTime(0.001, now);
+    gain.gain.linearRampToValueAtTime(0.16, now + 0.015);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.16);
+
+    osc.connect(gain);
+    gain.connect(this.master);
+    osc.start(now);
+    osc.stop(now + 0.17);
+  }
+
+  /**
    * Wooden transport sled creaking + soft sand runner glide.
    */
   playSledCreak(duration = 0.55) {

@@ -157,12 +157,17 @@ export class TouchInteractionEngine {
     this._onTouchPrevent = (e) => {
       if (e.touches && e.touches.length > 1) e.preventDefault();
     };
+    this._onWindowBlur = () => {
+      this.pointers.clear();
+      this.cancelActiveInteraction();
+    };
 
     const el = this.canvas;
     el.addEventListener('pointerdown', this._onPointerDown, { passive: false });
     window.addEventListener('pointermove', this._onPointerMove, { passive: false });
     window.addEventListener('pointerup', this._onPointerUp, { passive: false });
     window.addEventListener('pointercancel', this._onPointerUp, { passive: false });
+    window.addEventListener('blur', this._onWindowBlur);
     el.addEventListener('wheel', this._onWheel, { passive: false });
     el.addEventListener('contextmenu', this._onContextMenu);
     el.addEventListener('touchstart', this._onTouchPrevent, { passive: false });
@@ -560,16 +565,23 @@ export class TouchInteractionEngine {
       }
     } else if (this.mode === 'DRAG_BLOCK' && this.dragBlock && this.level) {
       const block = this.dragBlock;
-      const snap = this.activeSnapZone;
-      this.level.clearDropHighlights();
-      if (snap) {
-        this.level.onBlockDrop(block, snap);
-      } else {
-        this.level.onBlockDragCancel(block);
+      const isCancelled = e.type === 'pointercancel';
+      try {
+        if (!isCancelled) {
+          this._refreshBlockDropZones();
+        }
+        const snap = isCancelled ? null : this.activeSnapZone;
+        this.level.clearDropHighlights();
+        if (snap) {
+          this.level.onBlockDrop(block, snap);
+        } else {
+          this.level.onBlockDragCancel(block);
+        }
+      } finally {
+        this.dragBlock = null;
+        this.activeSnapZone = null;
+        this.dropIndicator.visible = false;
       }
-      this.dragBlock = null;
-      this.activeSnapZone = null;
-      this.dropIndicator.visible = false;
     } else if (this.mode === 'DRAG_SLED' && this.activeSled && this.level) {
       if (this.movedDist < 12) {
         this.level.onSledTap(this.activeSled);
@@ -674,10 +686,15 @@ export class TouchInteractionEngine {
         : liveGroundY;
 
       this.dropIndicator.position.set(indX, indY + 0.03, indZ);
-      const ringPulse = this.activeSnapZone ? 1.08 + Math.sin(elapsed * 10) * 0.05 : 0.92;
+      const ringPulse = this.activeSnapZone ? 1.08 + Math.sin(elapsed * 10) * 0.05 : 0.9;
       this.dropRing.scale.setScalar(ringPulse);
-      this.dropRingMat.color.setHex(this.activeSnapZone ? 0xffd25a : 0xfff3d4);
-      this.dropRingMat.opacity = this.activeSnapZone ? 0.92 : 0.42;
+      const ringHex = !this.activeSnapZone
+        ? 0xfff3d4
+        : this.activeSnapZone.zoneType === 'pyramid'
+          ? 0x8dff9e
+          : 0xffd25a;
+      this.dropRingMat.color.setHex(ringHex);
+      this.dropRingMat.opacity = this.activeSnapZone ? 0.94 : 0.24;
     }
   }
 
@@ -687,6 +704,7 @@ export class TouchInteractionEngine {
     window.removeEventListener('pointermove', this._onPointerMove);
     window.removeEventListener('pointerup', this._onPointerUp);
     window.removeEventListener('pointercancel', this._onPointerUp);
+    window.removeEventListener('blur', this._onWindowBlur);
     el.removeEventListener('wheel', this._onWheel);
     el.removeEventListener('contextmenu', this._onContextMenu);
     el.removeEventListener('touchstart', this._onTouchPrevent);

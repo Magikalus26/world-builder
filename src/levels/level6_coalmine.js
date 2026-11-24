@@ -1200,7 +1200,7 @@ export class Level6CoalMine extends Level1Pyramid {
       const isPulley = cell.pieceType === 'pulley_wheel';
 
       const ghostGroup = new THREE.Group();
-      ghostGroup.position.set(worldX, worldY, worldZ);
+      ghostGroup.position.set(worldX, worldY + 0.02, worldZ);
 
       const gGeo = isRoof
         ? this.geos.ghostZinc
@@ -1214,7 +1214,9 @@ export class Level6CoalMine extends Level1Pyramid {
           : this.geos.ghostBoxEdges;
 
       const ghostMesh = new THREE.Mesh(gGeo, this.mats.ghostNormal);
+      ghostMesh.renderOrder = 5;
       const ghostLines = new THREE.LineSegments(eGeo, this.mats.ghostLineNormal);
+      ghostLines.renderOrder = 5;
       ghostGroup.add(ghostMesh, ghostLines);
       ghostGroup.visible = cell.layer === 0;
       site.add(ghostGroup);

@@ -1096,16 +1096,18 @@ export class Level7Modern extends Level1Pyramid {
       const pos = gridToWorld(gx, gy, gz, slotH);
 
       const ghostGroup = new THREE.Group();
-      ghostGroup.position.copy(pos);
+      ghostGroup.position.set(pos.x, pos.y + 0.02, pos.z);
 
       const ghostMesh = new THREE.Mesh(
         isSlab ? this.geos.slabRoof : this.geos.ghostBox,
         this.mats.ghostNormal
       );
+      ghostMesh.renderOrder = 5;
       const ghostLines = new THREE.LineSegments(
         isSlab ? slabRoofEdges : this.geos.ghostBoxEdges,
         this.mats.ghostLineNormal
       );
+      ghostLines.renderOrder = 5;
       ghostGroup.add(ghostMesh, ghostLines);
       ghostGroup.visible = layer === 0;
       siteGroup.add(ghostGroup);

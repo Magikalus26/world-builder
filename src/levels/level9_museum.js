@@ -1446,12 +1446,14 @@ export class Level9Museum extends Level1Pyramid {
       }
 
       const ghostGroup = new THREE.Group();
-      ghostGroup.position.set(worldX, worldY, worldZ);
+      ghostGroup.position.set(worldX, worldY + 0.02, worldZ);
 
-      const ghostFill = new THREE.Mesh(gGeo, this.mats.ghostFill);
-      const ghostEdges = new THREE.LineSegments(eGeo, this.mats.ghostEdge);
-      ghostGroup.add(ghostFill);
-      ghostGroup.add(ghostEdges);
+      const ghostMesh = new THREE.Mesh(gGeo, this.mats.ghostNormal);
+      ghostMesh.renderOrder = 5;
+      const ghostLines = new THREE.LineSegments(eGeo, this.mats.ghostLineNormal);
+      ghostLines.renderOrder = 5;
+      ghostGroup.add(ghostMesh);
+      ghostGroup.add(ghostLines);
       ghostGroup.visible = cell.layer === 0;
       site.add(ghostGroup);
 
@@ -1463,13 +1465,13 @@ export class Level9Museum extends Level1Pyramid {
         gridY: cell.gy,
         gridZ: cell.gz,
         pieceType: cell.pieceType,
-        accepts: ['carved'],
+        accepts: ['carved', 'capstone'],
         isCapstone: false,
         position: new THREE.Vector3(worldX, worldY, worldZ),
         dropIndicatorY: layerBaseY + 0.04,
         ghostGroup,
-        ghostFill,
-        ghostEdges,
+        ghostMesh,
+        ghostLines,
         block: null,
       };
 

@@ -736,43 +736,48 @@ export class MaterialFactory {
   }
 
   /**
-   * Standardized ultra-crisp frosted ice-blue glass ghost placement materials with
-   * Fresnel rim glow and smooth golden snap highlight for ALL levels & Roguelike runs.
+   * Standardized ultra-crisp translucent cyan/gold blueprint ghost placement materials with
+   * polygonOffset anti-z-fighting and bright gold/green snap highlight for ALL levels & Roguelike runs.
    */
   createFrostedGhostMaterials() {
     if (!this._frostedGhostMap) {
       this._frostedGhostMap = this._trackTex(buildCrispFrostedGhostTexture());
     }
 
-    const createGlassMat = (colorHex, emissiveHex, baseOpacity) => {
+    const createGlassMat = (colorHex, emissiveHex, baseOpacity, emissiveIntensity) => {
       const mat = new THREE.MeshStandardMaterial({
         map: this._frostedGhostMap,
         color: new THREE.Color(colorHex),
         emissive: new THREE.Color(emissiveHex),
-        emissiveIntensity: 0.55,
+        emissiveIntensity,
         roughness: 0.22,
         metalness: 0.08,
         transparent: true,
         opacity: baseOpacity,
         depthWrite: false,
+        polygonOffset: true,
+        polygonOffsetFactor: 2,
+        polygonOffsetUnits: 2,
       });
       mat.userData.baseOpacity = baseOpacity;
-      mat.userData.baseEmissive = 0.55;
+      mat.userData.baseEmissive = emissiveIntensity;
       return mat;
     };
 
-    const ghostNormal = createGlassMat(0x7be8ff, 0x3ec8f8, 0.46);
-    const ghostHighlight = createGlassMat(0xffe788, 0xffc83d, 0.78);
+    const ghostNormal = createGlassMat(0x28dcff, 0x00b4f0, 0.35, 0.6);
+    const ghostHighlight = createGlassMat(0x7eff7a, 0xffd52e, 0.7, 0.95);
 
     const ghostLineNormal = new THREE.LineBasicMaterial({
-      color: 0xe6fbff,
+      color: 0x3ce6ff,
       transparent: true,
-      opacity: 0.94,
+      opacity: 0.95,
+      depthWrite: false,
     });
     const ghostLineHighlight = new THREE.LineBasicMaterial({
-      color: 0xffe472,
+      color: 0xffe44d,
       transparent: true,
       opacity: 1.0,
+      depthWrite: false,
     });
 
     return {
@@ -789,13 +794,13 @@ export class MaterialFactory {
   updateFrostedGhostPulse(mats, elapsed) {
     if (!mats || !mats.ghostNormal) return;
     const pulse = Math.sin(elapsed * 2.8);
-    mats.ghostNormal.opacity = 0.42 + pulse * 0.08;
-    mats.ghostNormal.emissiveIntensity = 0.48 + pulse * 0.16;
+    mats.ghostNormal.opacity = 0.35 + pulse * 0.04;
+    mats.ghostNormal.emissiveIntensity = 0.6 + pulse * 0.12;
     if (mats.ghostLineNormal) {
-      mats.ghostLineNormal.opacity = 0.84 + pulse * 0.14;
+      mats.ghostLineNormal.opacity = 0.86 + pulse * 0.12;
     }
     if (mats.ghostHighlight) {
-      mats.ghostHighlight.emissiveIntensity = 0.72 + Math.sin(elapsed * 5.2) * 0.18;
+      mats.ghostHighlight.emissiveIntensity = 0.92 + Math.sin(elapsed * 5.2) * 0.16;
     }
   }
 

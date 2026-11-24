@@ -516,41 +516,53 @@ export class Level1Pyramid {
       ghostNormal: this._trackMat(
         frosted
           ? frosted.ghostNormal
-          : new THREE.MeshBasicMaterial({
+          : new THREE.MeshStandardMaterial({
               map: this.textures.maps.blueprint,
-              color: 0x72e0ff,
+              color: 0x28dcff,
+              emissive: 0x00b4f0,
+              emissiveIntensity: 0.6,
               transparent: true,
-              opacity: 0.48,
+              opacity: 0.35,
               depthWrite: false,
+              polygonOffset: true,
+              polygonOffsetFactor: 2,
+              polygonOffsetUnits: 2,
             })
       ),
       ghostHighlight: this._trackMat(
         frosted
           ? frosted.ghostHighlight
-          : new THREE.MeshBasicMaterial({
+          : new THREE.MeshStandardMaterial({
               map: this.textures.maps.blueprint,
-              color: 0xffe27a,
+              color: 0x7eff7a,
+              emissive: 0xffd52e,
+              emissiveIntensity: 0.95,
               transparent: true,
-              opacity: 0.84,
+              opacity: 0.7,
               depthWrite: false,
+              polygonOffset: true,
+              polygonOffsetFactor: 2,
+              polygonOffsetUnits: 2,
             })
       ),
       ghostLineNormal: this._trackMat(
         frosted
           ? frosted.ghostLineNormal
           : new THREE.LineBasicMaterial({
-              color: 0xdffaff,
+              color: 0x3ce6ff,
               transparent: true,
-              opacity: 0.9,
+              opacity: 0.95,
+              depthWrite: false,
             })
       ),
       ghostLineHighlight: this._trackMat(
         frosted
           ? frosted.ghostLineHighlight
           : new THREE.LineBasicMaterial({
-              color: 0xffdc66,
+              color: 0xffe44d,
               transparent: true,
               opacity: 1.0,
+              depthWrite: false,
             })
       ),
       slotIdle: this._trackMat(
@@ -1706,16 +1718,18 @@ export class Level1Pyramid {
         const wz = pc.z + dz * PYRAMID_STEP;
 
         const ghostGroup = new THREE.Group();
-        ghostGroup.position.set(wx, centerY, wz);
+        ghostGroup.position.set(wx, centerY + 0.02, wz);
 
         const ghostMesh = new THREE.Mesh(
           isCapstone ? this.geos.ghostCapstone : this.geos.ghostBox,
           this.mats.ghostNormal
         );
+        ghostMesh.renderOrder = 5;
         const ghostLines = new THREE.LineSegments(
           isCapstone ? this.geos.ghostCapstoneEdges : this.geos.ghostBoxEdges,
           this.mats.ghostLineNormal
         );
+        ghostLines.renderOrder = 5;
         ghostGroup.add(ghostMesh);
         ghostGroup.add(ghostLines);
         ghostGroup.visible = layer === 0;
@@ -2147,6 +2161,7 @@ export class Level1Pyramid {
       this.sleds.forEach((s) => {
         if (s.id === 'sledA') {
           s.slots.forEach((slot) => {
+            this._syncSledSlotWorldPos(s, slot);
             if (!slot.occupied && !slot.block) valid.push(slot);
           });
         }
@@ -2160,10 +2175,11 @@ export class Level1Pyramid {
       return valid;
     }
 
-    // Carved Pyramid Block or Golden Capstone
+    // Carved Architectural Block or Capstone
     this.sleds.forEach((s) => {
       if (s.id === 'sledB') {
         s.slots.forEach((slot) => {
+          this._syncSledSlotWorldPos(s, slot);
           if (!slot.occupied && !slot.block) valid.push(slot);
         });
       }
@@ -2175,7 +2191,7 @@ export class Level1Pyramid {
       if (!slot.occupied && !slot.block) valid.push(slot);
     });
 
-    // Active unlocked pyramid layer blueprint slots
+    // Active unlocked construction blueprint ghost slots
     this.pyramidSlots.forEach((slot) => {
       if (slot.layer === this.activeLayer && !slot.occupied && !slot.block) {
         valid.push(slot);
@@ -2183,6 +2199,74 @@ export class Level1Pyramid {
     });
 
     return valid;
+  }
+
+  _isDropTargetStrictlyValid(block, targetSlot) {
+    if (!block || !targetSlot) return false;
+    if (targetSlot.occupied || targetSlot.block) return false;
+    const validSlots = this._getValidSlotsForBlock(block);
+    return validSlots.includes(targetSlot);
+  }
+
+  _findFallbackReturnSlot(block) {
+    const candidates = [];
+    if (block.kind === 'raw') {
+      this.quarrySlots.forEach((s) => {
+        if (!s.occupied && !s.block) candidates.push(s);
+      });
+      this.sleds.forEach((sled) => {
+        if (sled.id === 'sledA') {
+          sled.slots.forEach((s) => {
+            this._syncSledSlotWorldPos(sled, s);
+            if (!s.occupied && !s.block) candidates.push(s);
+          });
+        }
+      });
+      if (this.workbenchSlot && !this.workbenchSlot.occupied && !this.workbenchSlot.block) {
+        candidates.push(this.workbenchSlot);
+      }
+    } else {
+      this.outputSlots.forEach((s) => {
+        if (!s.occupied && !s.block) candidates.push(s);
+      });
+      this.stagingSlots.forEach((s) => {
+        if (!s.occupied && !s.block) candidates.push(s);
+      });
+      this.sleds.forEach((sled) => {
+        if (sled.id === 'sledB') {
+          sled.slots.forEach((s) => {
+            this._syncSledSlotWorldPos(sled, s);
+            if (!s.occupied && !s.block) candidates.push(s);
+          });
+        }
+      });
+      if (this.workbenchSlot && !this.workbenchSlot.occupied && !this.workbenchSlot.block) {
+        candidates.push(this.workbenchSlot);
+      }
+    }
+    if (candidates.length === 0) return null;
+    const pos = block.mesh.position;
+    let best = candidates[0];
+    let bestDistSq = Infinity;
+    for (let i = 0; i < candidates.length; i++) {
+      const c = candidates[i];
+      const dx = pos.x - c.position.x;
+      const dz = pos.z - c.position.z;
+      const dSq = dx * dx + dz * dz;
+      if (dSq < bestDistSq) {
+        bestDistSq = dSq;
+        best = c;
+      }
+    }
+    return best;
+  }
+
+  _cancelBlockTweens(block) {
+    for (let i = this.tweens.length - 1; i >= 0; i--) {
+      if (this.tweens[i].block === block) {
+        this.tweens.splice(i, 1);
+      }
+    }
   }
 
   evaluateDropZones(block, dragPos) {
@@ -2195,8 +2279,8 @@ export class Level1Pyramid {
     for (let i = 0; i < validSlots.length; i++) {
       const slot = validSlots[i];
       if (slot.zoneType === 'pyramid') {
-        slot.ghostMesh.material = this.mats.ghostNormal;
-        slot.ghostLines.material = this.mats.ghostLineNormal;
+        if (slot.ghostMesh) slot.ghostMesh.material = this.mats.ghostNormal;
+        if (slot.ghostLines) slot.ghostLines.material = this.mats.ghostLineNormal;
       } else if (slot.marker) {
         slot.marker.material = this.mats.slotValid;
       }
@@ -2204,7 +2288,12 @@ export class Level1Pyramid {
       const dx = dragPos.x - slot.position.x;
       const dz = dragPos.z - slot.position.z;
       const dSq = dx * dx + dz * dz;
-      const snapRad = slot.zoneType === 'pyramid' ? this.pyramidSnapRadius : 1.48;
+      const snapRad =
+        slot.zoneType === 'pyramid'
+          ? this.pyramidSnapRadius
+          : slot.zoneType === 'sled' || slot.zoneType === 'workbench'
+            ? 1.15
+            : 0.88;
       if (dSq < snapRad * snapRad && dSq < bestDistSq) {
         bestDistSq = dSq;
         bestSlot = slot;
@@ -2213,9 +2302,9 @@ export class Level1Pyramid {
 
     if (bestSlot) {
       if (bestSlot.zoneType === 'pyramid') {
-        bestSlot.ghostMesh.material = this.mats.ghostHighlight;
-        bestSlot.ghostLines.material = this.mats.ghostLineHighlight;
-        bestSlot.ghostGroup.scale.setScalar(1.05);
+        if (bestSlot.ghostMesh) bestSlot.ghostMesh.material = this.mats.ghostHighlight;
+        if (bestSlot.ghostLines) bestSlot.ghostLines.material = this.mats.ghostLineHighlight;
+        if (bestSlot.ghostGroup) bestSlot.ghostGroup.scale.setScalar(1.06);
       } else if (bestSlot.marker) {
         bestSlot.marker.material = this.mats.slotSnap;
         bestSlot.marker.scale.setScalar(1.16);
@@ -2243,14 +2332,26 @@ export class Level1Pyramid {
     });
     this.pyramidSlots.forEach((s) => {
       if (!s.block && s.layer === this.activeLayer) {
-        s.ghostMesh.material = this.mats.ghostNormal;
-        s.ghostLines.material = this.mats.ghostLineNormal;
-        s.ghostGroup.scale.setScalar(1);
+        if (s.ghostMesh) s.ghostMesh.material = this.mats.ghostNormal;
+        if (s.ghostLines) s.ghostLines.material = this.mats.ghostLineNormal;
+        if (s.ghostGroup) s.ghostGroup.scale.setScalar(1);
       }
     });
   }
 
   onBlockDrop(block, targetSlot) {
+    // Strictly validate that targetSlot is an unoccupied, functional drop zone for this block.
+    // Never leave a block on grass, water, tracks, hills, or an already-occupied slot!
+    if (!this._isDropTargetStrictlyValid(block, targetSlot)) {
+      this.onBlockDragCancel(block);
+      return;
+    }
+
+    if (targetSlot.zoneType === 'sled' && targetSlot.sled) {
+      this._syncSledSlotWorldPos(targetSlot.sled, targetSlot);
+    }
+
+    this._cancelBlockTweens(block);
     block.isDragging = false;
     block.originSlot = null;
     block.slot = targetSlot;
@@ -2272,7 +2373,7 @@ export class Level1Pyramid {
       block.mesh.userData.draggable = false;
       block.mesh.userData.state = 'placed';
       delete block.mesh.userData.interact;
-      targetSlot.ghostGroup.visible = false;
+      if (targetSlot.ghostGroup) targetSlot.ghostGroup.visible = false;
       this._rebuildHitTargets();
     } else if (targetSlot === this.workbenchSlot && block.kind === 'raw') {
       block.mesh.userData.draggable = false;
@@ -2316,34 +2417,49 @@ export class Level1Pyramid {
   }
 
   onBlockDragCancel(block) {
+    if (!block) return;
+    this._cancelBlockTweens(block);
     block.isDragging = false;
+
     let home = block.originSlot;
     block.originSlot = null;
-    if (home && (home.occupied || home.block)) {
-      // Fallback to first unoccupied quarry slot if home slot was filled mid-drag
-      home = block.kind === 'raw' ? this._findFreeQuarrySpawnSlot() : home;
+    if (!home || home.occupied || home.block) {
+      home = this._findFallbackReturnSlot(block) || home;
     }
     if (!home) return;
+
+    if (home.zoneType === 'sled' && home.sled) {
+      this._syncSledSlotWorldPos(home.sled, home);
+    }
 
     block.slot = home;
     home.occupied = true;
     home.block = block;
-    block.mesh.userData.draggable = !(home === this.workbenchSlot && block.kind === 'raw');
+    const isRawOnWorkbench = home === this.workbenchSlot && block.kind === 'raw';
+    block.mesh.userData.draggable = !isRawOnWorkbench;
     block.mesh.userData.state = block.kind;
+    block.mesh.userData.interact = isRawOnWorkbench
+      ? { type: 'workbench-carve', block }
+      : { type: 'block', block };
     block.isTweening = true;
     this._rebuildHitTargets();
+
+    // Gentle rebound audio feedback immediately on snap-back release
+    if (this.audio && typeof this.audio.playSnapBack === 'function') {
+      this.audio.playSnapBack();
+    }
 
     this._addTween({
       block,
       from: block.mesh.position.clone(),
       to: home.position.clone(),
-      duration: 0.22,
-      arcHeight: 0.45,
+      duration: 0.24,
+      arcHeight: 0.42,
       onDone: () => {
         block.isTweening = false;
-        block.mesh.rotation.set(0, 0, 0);
+        block.mesh.rotation.set(0, home.rotY || 0, 0);
         block.mesh.updateMatrixWorld(true);
-        this.audio.playHeavyThud();
+        this._triggerSquashBounce(block.mesh, 1.06, 0.94);
         this._updateCarvingPips();
       },
     });
@@ -2703,8 +2819,8 @@ export class Level1Pyramid {
     // 5. Standardized frosted-glass luminous pulse on active ghost slots & optional Pyramidion Aura ring
     if (this.textures && this.textures.materialFactory) {
       this.textures.materialFactory.updateFrostedGhostPulse(this.mats, elapsed);
-    } else {
-      this.mats.ghostNormal.opacity = 0.38 + Math.sin(elapsed * 3.4) * 0.1;
+    } else if (this.mats.ghostNormal) {
+      this.mats.ghostNormal.opacity = 0.35 + Math.sin(elapsed * 2.8) * 0.04;
     }
     if (this.auraRingMesh) {
       const auraS = 1 + Math.sin(elapsed * 2.5) * 0.025;
@@ -2713,7 +2829,7 @@ export class Level1Pyramid {
     }
     for (let i = 0; i < this.pyramidSlots.length; i++) {
       const s = this.pyramidSlots[i];
-      if (s.ghostGroup.visible && s.ghostGroup.scale.x < 0.995) {
+      if (s.ghostGroup && s.ghostGroup.visible && s.ghostGroup.scale.x < 0.995) {
         const nextS = THREE.MathUtils.lerp(s.ghostGroup.scale.x, 1, 1 - Math.exp(-8 * dt));
         s.ghostGroup.scale.setScalar(nextS);
       }

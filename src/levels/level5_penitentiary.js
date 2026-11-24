@@ -1360,7 +1360,7 @@ export class Level5Penitentiary extends Level1Pyramid {
         const centerY = isTower ? FOUNDATION_Y + 1.45 : layerBaseY + BLOCK_H * 0.5;
 
         const ghostGroup = new THREE.Group();
-        ghostGroup.position.set(wx, centerY, wz);
+        ghostGroup.position.set(wx, centerY + 0.02, wz);
         ghostGroup.rotation.y = cell.rotY || 0;
 
         const gGeo = isTower
@@ -1375,7 +1375,9 @@ export class Level5Penitentiary extends Level1Pyramid {
           : this.geos.ghostBoxEdges;
 
         const ghostMesh = new THREE.Mesh(gGeo, this.mats.ghostNormal);
+        ghostMesh.renderOrder = 5;
         const ghostLines = new THREE.LineSegments(gEdges, this.mats.ghostLineNormal);
+        ghostLines.renderOrder = 5;
         ghostGroup.add(ghostMesh);
         ghostGroup.add(ghostLines);
         ghostGroup.visible = layer === 0;
