@@ -2406,6 +2406,171 @@ export function createTextureLibrary(renderer) {
     return modernPack;
   }
 
+  let medievalPack = null;
+  const medievalTextures = [];
+  const medievalMaterials = [];
+
+  function ensureMedievalPack() {
+    if (medievalPack) return medievalPack;
+
+    const meadowGrass = buildMedievalMeadowGrassPBR(anisotropy);
+    const cobbleRoad = buildMedievalCobbleRoadPBR(anisotropy);
+    const limestoneDust = buildMedievalLimestoneDustPBR(anisotropy);
+    const moatMoss = buildMedievalMoatMossPBR(anisotropy);
+
+    const castleAshlar = buildMedievalAshlarStonePBR(anisotropy);
+    const arrowSlit = buildMedievalArrowSlitStonePBR(anisotropy);
+    const portcullisOak = buildMedievalPortcullisOakPBR(anisotropy);
+    const slateShingles = buildMedievalSlateShinglesPBR(anisotropy);
+    const rawLimestone = buildMedievalRawLimestonePBR(anisotropy);
+    const oakTimber = buildMedievalOakTimberPBR(anisotropy);
+
+    [meadowGrass, cobbleRoad, limestoneDust, moatMoss].forEach((b) => {
+      medievalTextures.push(b.albedo, b.normalRough);
+    });
+    [castleAshlar, arrowSlit, portcullisOak, slateShingles, rawLimestone, oakTimber].forEach((pack) => {
+      if (pack.map) medievalTextures.push(pack.map);
+      if (pack.normalMap) medievalTextures.push(pack.normalMap);
+      if (pack.roughnessMap) medievalTextures.push(pack.roughnessMap);
+    });
+
+    const medievalTerrainSplat = createTerrainSplatMaterial({
+      sand: meadowGrass,       // Biome 0: Lush medieval meadow grass, wildflowers & forest moss
+      earthPath: cobbleRoad,   // Biome 1: Compacted cobblestone courtyard & rutted mud wagon road
+      quarryDust: limestoneDust, // Biome 2: Crushed pale-grey limestone quarry dust
+      oasisGrass: moatMoss,    // Biome 3: Wet turquoise moat bank moss & pebbles
+    });
+    medievalTerrainSplat.customProgramCacheKey = () => 'workd-builder-medieval-terrain-splat-v1';
+
+    const moatWaterNormal = waterNormal.clone();
+    moatWaterNormal.wrapS = THREE.RepeatWrapping;
+    moatWaterNormal.wrapT = THREE.RepeatWrapping;
+    moatWaterNormal.repeat.set(3.2, 3.2);
+    moatWaterNormal.needsUpdate = true;
+    medievalTextures.push(moatWaterNormal);
+
+    const cMats = {
+      terrainSplat: medievalTerrainSplat,
+      castleAshlar: new THREE.MeshStandardMaterial({
+        map: castleAshlar.map,
+        normalMap: castleAshlar.normalMap,
+        normalScale: new THREE.Vector2(1.42, 1.42),
+        roughnessMap: castleAshlar.roughnessMap,
+        roughness: 0.84,
+        metalness: 0.04,
+      }),
+      castleBaseStone: new THREE.MeshStandardMaterial({
+        map: castleAshlar.map,
+        normalMap: castleAshlar.normalMap,
+        normalScale: new THREE.Vector2(1.55, 1.55),
+        roughnessMap: castleAshlar.roughnessMap,
+        color: new THREE.Color('#c6c1b8'),
+        roughness: 0.88,
+        metalness: 0.05,
+      }),
+      arrowSlitStone: new THREE.MeshStandardMaterial({
+        map: arrowSlit.map,
+        normalMap: arrowSlit.normalMap,
+        normalScale: new THREE.Vector2(1.5, 1.5),
+        roughnessMap: arrowSlit.roughnessMap,
+        roughness: 0.84,
+        metalness: 0.05,
+      }),
+      portcullisOak: new THREE.MeshStandardMaterial({
+        map: portcullisOak.map,
+        normalMap: portcullisOak.normalMap,
+        normalScale: new THREE.Vector2(1.48, 1.48),
+        roughnessMap: portcullisOak.roughnessMap,
+        roughness: 0.72,
+        metalness: 0.28,
+      }),
+      crenellationStone: new THREE.MeshStandardMaterial({
+        map: castleAshlar.map,
+        normalMap: castleAshlar.normalMap,
+        normalScale: new THREE.Vector2(1.32, 1.32),
+        roughnessMap: castleAshlar.roughnessMap,
+        color: new THREE.Color('#e2ddd4'),
+        roughness: 0.8,
+        metalness: 0.04,
+      }),
+      conicalSlate: new THREE.MeshStandardMaterial({
+        map: slateShingles.map,
+        normalMap: slateShingles.normalMap,
+        normalScale: new THREE.Vector2(1.45, 1.45),
+        roughnessMap: slateShingles.roughnessMap,
+        roughness: 0.54,
+        metalness: 0.16,
+      }),
+      rawQuarryStone: new THREE.MeshStandardMaterial({
+        map: rawLimestone.map,
+        normalMap: rawLimestone.normalMap,
+        normalScale: new THREE.Vector2(1.6, 1.6),
+        roughnessMap: rawLimestone.roughnessMap,
+        roughness: 0.92,
+        metalness: 0.03,
+      }),
+      oakTimber: new THREE.MeshStandardMaterial({
+        map: oakTimber.map,
+        normalMap: oakTimber.normalMap,
+        normalScale: new THREE.Vector2(1.25, 1.25),
+        roughnessMap: oakTimber.roughnessMap,
+        roughness: 0.84,
+        metalness: 0.04,
+      }),
+      darkOak: new THREE.MeshStandardMaterial({
+        map: oakTimber.map,
+        normalMap: oakTimber.normalMap,
+        normalScale: new THREE.Vector2(1.2, 1.2),
+        color: new THREE.Color('#8f755d'),
+        roughness: 0.86,
+        metalness: 0.04,
+      }),
+      wroughtIron: new THREE.MeshStandardMaterial({
+        color: new THREE.Color('#2f353d'),
+        roughness: 0.38,
+        metalness: 0.86,
+      }),
+      cobbleCourt: new THREE.MeshStandardMaterial({
+        map: cobbleRoad.albedo,
+        normalMap: castleAshlar.normalMap,
+        normalScale: new THREE.Vector2(0.85, 0.85),
+        roughness: 0.88,
+        metalness: 0.04,
+      }),
+      moatWater: new THREE.MeshStandardMaterial({
+        color: new THREE.Color('#279bb0'),
+        normalMap: moatWaterNormal,
+        normalScale: new THREE.Vector2(0.42, 0.42),
+        roughness: 0.14,
+        metalness: 0.12,
+        envMapIntensity: 1.35,
+        transparent: true,
+        opacity: 0.9,
+      }),
+      royalCrimson: new THREE.MeshStandardMaterial({
+        color: new THREE.Color('#b52328'),
+        roughness: 0.72,
+        metalness: 0.06,
+        side: THREE.DoubleSide,
+      }),
+      royalGold: new THREE.MeshStandardMaterial({
+        color: new THREE.Color('#e6b83e'),
+        roughness: 0.3,
+        metalness: 0.82,
+      }),
+      torchGlow: new THREE.MeshStandardMaterial({
+        color: new THREE.Color('#fff2c4'),
+        emissive: new THREE.Color('#ff9d2b'),
+        emissiveIntensity: 1.6,
+        roughness: 0.3,
+      }),
+    };
+
+    Object.values(cMats).forEach((m) => medievalMaterials.push(m));
+    medievalPack = { materials: cMats };
+    return medievalPack;
+  }
+
   return {
     maps: {
       blueprint: blueprintMap,
@@ -2421,6 +2586,7 @@ export function createTextureLibrary(renderer) {
     ensurePenitentiaryPack,
     ensureCoalMinePack,
     ensureModernPack,
+    ensureMedievalPack,
     dispose() {
       textures.forEach((t) => t.dispose());
       Object.values(materials).forEach((m) => m.dispose());
@@ -2436,6 +2602,8 @@ export function createTextureLibrary(renderer) {
       coalMineMaterials.forEach((m) => m.dispose());
       modernTextures.forEach((t) => t.dispose());
       modernMaterials.forEach((m) => m.dispose());
+      medievalTextures.forEach((t) => t.dispose());
+      medievalMaterials.forEach((m) => m.dispose());
       materialFactory.dispose();
     },
   };
@@ -5431,6 +5599,640 @@ function buildModernDarkAluminumPBR(anisotropy) {
   ctx.putImageData(img, 0, 0);
   rCtx.putImageData(rImg, 0, 0);
   const normalCanvas = buildSobelNormalCanvas(height, size, 1.8);
+  return {
+    map: wrapTexture(albedoCanvas, { isColor: true, anisotropy }),
+    normalMap: wrapTexture(normalCanvas, { isColor: false, anisotropy }),
+    roughnessMap: wrapTexture(roughCanvas, { isColor: false, anisotropy }),
+  };
+}
+
+/* ============================================================================
+ * LEVEL 8 (MEDIEVAL CASTLE — LE CHÂTEAU FORT MÉDIÉVAL) — 512x512 PBR PACK
+ * ========================================================================== */
+
+/** Medieval Biome 0: Lush Medieval Meadow Grass, Wildflowers & Forest Moss (512x512) */
+function buildMedievalMeadowGrassPBR(anisotropy) {
+  const size = 512;
+  const albedoCanvas = makeCanvas(size);
+  const ctx = albedoCanvas.getContext('2d');
+  const img = ctx.createImageData(size, size);
+  const data = img.data;
+  const height = new Float32Array(size * size);
+  const rough = new Float32Array(size * size);
+
+  for (let y = 0; y < size; y++) {
+    const v = y / size;
+    for (let x = 0; x < size; x++) {
+      const u = x / size;
+      const i = y * size + x;
+      const macro = tileFBM(u, v, 5, 3, 8101);
+      const moss = tileFBM(u, v, 10, 3, 8117);
+      const blades = tileFBM(u * 2.2, v * 2.2, 24, 2, 8147);
+      const micro = hash2i(x, y, 8161);
+
+      // Subtle meadow grass variation (prairie green, deep forest moss, sunlit clover)
+      let r = lerp(74, 118, macro) + (moss - 0.5) * 20 + (blades - 0.5) * 16;
+      let g = lerp(116, 162, macro) + (moss - 0.5) * 18 + (blades - 0.5) * 20;
+      let b = lerp(48, 76, macro) + (blades - 0.5) * 10;
+
+      // Tiny scattered medieval meadow wildflowers (cream & buttercup flecks)
+      const flCell = tileWorley(u, v, 20, 8179);
+      if (flCell.f1 < 0.085 && flCell.id > 0.84) {
+        const bloom = 1.0 - smoothstep(0.03, 0.085, flCell.f1);
+        const isGold = flCell.id > 0.92;
+        r = lerp(r, isGold ? 236 : 246, bloom * 0.78);
+        g = lerp(g, isGold ? 206 : 242, bloom * 0.78);
+        b = lerp(b, isGold ? 78 : 224, bloom * 0.78);
+      }
+
+      height[i] = clamp01(0.45 + (blades - 0.5) * 0.34 + (macro - 0.5) * 0.14);
+      rough[i] = clamp01(0.88 + (0.5 - blades) * 0.08 + (micro - 0.5) * 0.04);
+
+      const idx = i * 4;
+      data[idx] = Math.min(255, Math.max(0, Math.round(r + (micro - 0.5) * 8)));
+      data[idx + 1] = Math.min(255, Math.max(0, Math.round(g + (micro - 0.5) * 8)));
+      data[idx + 2] = Math.min(255, Math.max(0, Math.round(b + (micro - 0.5) * 6)));
+      data[idx + 3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  const normalRoughCanvas = buildSobelNormalCanvas(height, size, 2.3, rough);
+  return {
+    albedo: wrapTexture(albedoCanvas, { isColor: true, anisotropy }),
+    normalRough: wrapTexture(normalRoughCanvas, { isColor: false, anisotropy }),
+  };
+}
+
+/** Medieval Biome 1: Compacted Cobblestone Courtyard & Rutted Mud Wagon Road (512x512) */
+function buildMedievalCobbleRoadPBR(anisotropy) {
+  const size = 512;
+  const albedoCanvas = makeCanvas(size);
+  const ctx = albedoCanvas.getContext('2d');
+  const img = ctx.createImageData(size, size);
+  const data = img.data;
+  const height = new Float32Array(size * size);
+  const rough = new Float32Array(size * size);
+
+  for (let y = 0; y < size; y++) {
+    const v = y / size;
+    for (let x = 0; x < size; x++) {
+      const u = x / size;
+      const i = y * size + x;
+      const cobble = tileWorley(u, v, 14, 8209);
+      const mudNoise = tileFBM(u, v, 6, 3, 8221);
+      const grain = hash2i(x, y, 8237);
+
+      const isJoint = 1.0 - smoothstep(0.03, 0.11, cobble.edge);
+      const tone = cobble.id;
+      const mudPatch = smoothstep(0.56, 0.84, mudNoise);
+
+      // Rounded medieval cobblestone pavers set into compacted ochre-brown wagon earth
+      let r = lerp(136, 174, tone) + (grain - 0.5) * 14;
+      let g = lerp(128, 164, tone) + (grain - 0.5) * 14;
+      let b = lerp(116, 148, tone) + (grain - 0.5) * 12;
+
+      // Earthy mud rutting between stones
+      r = lerp(r, 114, Math.max(isJoint * 0.78, mudPatch * 0.45));
+      g = lerp(g, 96, Math.max(isJoint * 0.78, mudPatch * 0.45));
+      b = lerp(b, 74, Math.max(isJoint * 0.78, mudPatch * 0.45));
+
+      height[i] = clamp01(0.72 - isJoint * 0.48 - mudPatch * 0.16 + (grain - 0.5) * 0.08);
+      rough[i] = clamp01(0.84 + isJoint * 0.12 - (1 - mudPatch) * 0.08);
+
+      const idx = i * 4;
+      data[idx] = Math.min(255, Math.max(0, Math.round(r)));
+      data[idx + 1] = Math.min(255, Math.max(0, Math.round(g)));
+      data[idx + 2] = Math.min(255, Math.max(0, Math.round(b)));
+      data[idx + 3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  const normalRoughCanvas = buildSobelNormalCanvas(height, size, 3.1, rough);
+  return {
+    albedo: wrapTexture(albedoCanvas, { isColor: true, anisotropy }),
+    normalRough: wrapTexture(normalRoughCanvas, { isColor: false, anisotropy }),
+  };
+}
+
+/** Medieval Biome 2: Crushed Pale-Grey Limestone Quarry Dust & Chippings (512x512) */
+function buildMedievalLimestoneDustPBR(anisotropy) {
+  const size = 512;
+  const albedoCanvas = makeCanvas(size);
+  const ctx = albedoCanvas.getContext('2d');
+  const img = ctx.createImageData(size, size);
+  const data = img.data;
+  const height = new Float32Array(size * size);
+  const rough = new Float32Array(size * size);
+
+  for (let y = 0; y < size; y++) {
+    const v = y / size;
+    for (let x = 0; x < size; x++) {
+      const u = x / size;
+      const i = y * size + x;
+      const dust = tileFBM(u, v, 7, 3, 8311);
+      const chips = tileWorley(u, v, 22, 8329);
+      const micro = hash2i(x, y, 8353);
+
+      const chipBump = smoothstep(0.05, 0.18, chips.edge);
+      const lum = lerp(164, 206, dust) + (chipBump - 0.5) * 20 + (micro - 0.5) * 14;
+
+      height[i] = clamp01(0.46 + chipBump * 0.24 + (dust - 0.5) * 0.18);
+      rough[i] = clamp01(0.9 + (0.5 - dust) * 0.08);
+
+      const idx = i * 4;
+      data[idx] = Math.min(255, Math.max(0, Math.round(lum * 1.0)));
+      data[idx + 1] = Math.min(255, Math.max(0, Math.round(lum * 0.99)));
+      data[idx + 2] = Math.min(255, Math.max(0, Math.round(lum * 0.95)));
+      data[idx + 3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  const normalRoughCanvas = buildSobelNormalCanvas(height, size, 2.6, rough);
+  return {
+    albedo: wrapTexture(albedoCanvas, { isColor: true, anisotropy }),
+    normalRough: wrapTexture(normalRoughCanvas, { isColor: false, anisotropy }),
+  };
+}
+
+/** Medieval Biome 3: Wet Turquoise Moat Bank Moss, Sedge & River Pebbles (512x512) */
+function buildMedievalMoatMossPBR(anisotropy) {
+  const size = 512;
+  const albedoCanvas = makeCanvas(size);
+  const ctx = albedoCanvas.getContext('2d');
+  const img = ctx.createImageData(size, size);
+  const data = img.data;
+  const height = new Float32Array(size * size);
+  const rough = new Float32Array(size * size);
+
+  for (let y = 0; y < size; y++) {
+    const v = y / size;
+    for (let x = 0; x < size; x++) {
+      const u = x / size;
+      const i = y * size + x;
+      const moss = tileFBM(u, v, 8, 3, 8419);
+      const peb = tileWorley(u, v, 18, 8429);
+      const grain = hash2i(x, y, 8443);
+
+      const isPebble = smoothstep(0.08, 0.22, peb.edge) * smoothstep(0.55, 0.8, tileFBM(u, v, 5, 2, 8461));
+      let r = lerp(56, 94, moss);
+      let g = lerp(96, 134, moss);
+      let b = lerp(52, 76, moss);
+
+      r = lerp(r, 128, isPebble * 0.65);
+      g = lerp(g, 124, isPebble * 0.65);
+      b = lerp(b, 114, isPebble * 0.65);
+
+      height[i] = clamp01(0.44 + isPebble * 0.28 + (moss - 0.5) * 0.2);
+      rough[i] = clamp01(0.74 - isPebble * 0.14 + (grain - 0.5) * 0.08);
+
+      const idx = i * 4;
+      data[idx] = Math.min(255, Math.max(0, Math.round(r + (grain - 0.5) * 8)));
+      data[idx + 1] = Math.min(255, Math.max(0, Math.round(g + (grain - 0.5) * 8)));
+      data[idx + 2] = Math.min(255, Math.max(0, Math.round(b + (grain - 0.5) * 8)));
+      data[idx + 3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  const normalRoughCanvas = buildSobelNormalCanvas(height, size, 2.5, rough);
+  return {
+    albedo: wrapTexture(albedoCanvas, { isColor: true, anisotropy }),
+    normalRough: wrapTexture(normalRoughCanvas, { isColor: false, anisotropy }),
+  };
+}
+
+/** 512x512 Weathered Medieval Ashlar Castle Stone PBR (Albedo + Normal + Roughness) */
+function buildMedievalAshlarStonePBR(anisotropy) {
+  const size = 512;
+  const albedoCanvas = makeCanvas(size);
+  const roughCanvas = makeCanvas(size);
+  const ctx = albedoCanvas.getContext('2d');
+  const rCtx = roughCanvas.getContext('2d');
+  const img = ctx.createImageData(size, size);
+  const rImg = rCtx.createImageData(size, size);
+  const height = new Float32Array(size * size);
+
+  const rows = 4;
+  const cols = 3;
+
+  for (let y = 0; y < size; y++) {
+    const v = y / size;
+    const row = Math.floor(v * rows);
+    const rv = (v * rows) % 1;
+    const stagger = (row % 2) * 0.5;
+    for (let x = 0; x < size; x++) {
+      const u = x / size;
+      const i = y * size + x;
+      const uStag = (u * cols + stagger) % cols;
+      const col = Math.floor(uStag);
+      const cu = uStag % 1;
+
+      const blockTone = hash2i(col + 17, row + 31, 8501);
+      const stoneGrain = tileFBM(u, v, 14, 3, 8521);
+      const lichen = smoothstep(0.66, 0.88, tileFBM(u, v, 8, 3, 8539));
+      const micro = hash2i(x, y, 8563);
+
+      // Deep recessed medieval lime mortar joints with hand-chiseled block edge chamfer
+      const jointV = Math.min(rv, 1 - rv);
+      const jointU = Math.min(cu, 1 - cu) * (rows / cols);
+      const minJ = Math.min(jointV, jointU);
+      const isMortar = 1.0 - smoothstep(0.032, 0.068, minJ);
+      const bevel = smoothstep(0.06, 0.14, minJ);
+
+      // Warm weathered French/European fortress limestone grey-beige
+      let r = lerp(152, 188, blockTone) + (stoneGrain - 0.5) * 24 + (micro - 0.5) * 10;
+      let g = lerp(148, 182, blockTone) + (stoneGrain - 0.5) * 22 + (micro - 0.5) * 10;
+      let b = lerp(138, 170, blockTone) + (stoneGrain - 0.5) * 20 + (micro - 0.5) * 10;
+
+      // Subtle weathered moss/lichen patina clinging near mortar joints
+      const mossMix = lichen * (0.28 + isMortar * 0.45);
+      r = lerp(r, 98, mossMix);
+      g = lerp(g, 118, mossMix);
+      b = lerp(b, 74, mossMix);
+
+      // Dark shadowed mortar groove
+      r = lerp(r, 92, isMortar * 0.78);
+      g = lerp(g, 88, isMortar * 0.78);
+      b = lerp(b, 80, isMortar * 0.78);
+
+      height[i] = clamp01(0.24 + bevel * 0.52 + (stoneGrain - 0.5) * 0.18 - isMortar * 0.22);
+
+      const idx = i * 4;
+      img.data[idx] = Math.min(255, Math.max(0, Math.round(r)));
+      img.data[idx + 1] = Math.min(255, Math.max(0, Math.round(g)));
+      img.data[idx + 2] = Math.min(255, Math.max(0, Math.round(b)));
+      img.data[idx + 3] = 255;
+
+      const rvByte = Math.round(clamp01(0.8 + isMortar * 0.15 + (0.5 - stoneGrain) * 0.1) * 255);
+      rImg.data[idx] = rvByte;
+      rImg.data[idx + 1] = rvByte;
+      rImg.data[idx + 2] = rvByte;
+      rImg.data[idx + 3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  rCtx.putImageData(rImg, 0, 0);
+  const normalCanvas = buildSobelNormalCanvas(height, size, 3.2);
+  return {
+    map: wrapTexture(albedoCanvas, { isColor: true, anisotropy }),
+    normalMap: wrapTexture(normalCanvas, { isColor: false, anisotropy }),
+    roughnessMap: wrapTexture(roughCanvas, { isColor: false, anisotropy }),
+  };
+}
+
+/** 512x512 Medieval Ashlar Curtain Wall with Recessed Arrow-Slit Embrasure (Meurtrière) PBR */
+function buildMedievalArrowSlitStonePBR(anisotropy) {
+  const size = 512;
+  const albedoCanvas = makeCanvas(size);
+  const roughCanvas = makeCanvas(size);
+  const ctx = albedoCanvas.getContext('2d');
+  const rCtx = roughCanvas.getContext('2d');
+  const img = ctx.createImageData(size, size);
+  const rImg = rCtx.createImageData(size, size);
+  const height = new Float32Array(size * size);
+
+  const rows = 4;
+  const cols = 3;
+
+  for (let y = 0; y < size; y++) {
+    const v = y / size;
+    const row = Math.floor(v * rows);
+    const rv = (v * rows) % 1;
+    const stagger = (row % 2) * 0.5;
+    for (let x = 0; x < size; x++) {
+      const u = x / size;
+      const i = y * size + x;
+      const uStag = (u * cols + stagger) % cols;
+      const col = Math.floor(uStag);
+      const cu = uStag % 1;
+
+      const blockTone = hash2i(col + 19, row + 37, 8609);
+      const stoneGrain = tileFBM(u, v, 14, 3, 8627);
+      const micro = hash2i(x, y, 8641);
+
+      const minJ = Math.min(Math.min(rv, 1 - rv), Math.min(cu, 1 - cu) * (rows / cols));
+      const isMortar = 1.0 - smoothstep(0.032, 0.068, minJ);
+      const bevel = smoothstep(0.06, 0.14, minJ);
+
+      let r = lerp(150, 186, blockTone) + (stoneGrain - 0.5) * 24 + (micro - 0.5) * 9;
+      let g = lerp(146, 180, blockTone) + (stoneGrain - 0.5) * 22 + (micro - 0.5) * 9;
+      let b = lerp(136, 168, blockTone) + (stoneGrain - 0.5) * 20 + (micro - 0.5) * 9;
+
+      r = lerp(r, 90, isMortar * 0.78);
+      g = lerp(g, 86, isMortar * 0.78);
+      b = lerp(b, 78, isMortar * 0.78);
+
+      let h = clamp01(0.26 + bevel * 0.5 + (stoneGrain - 0.5) * 0.16 - isMortar * 0.22);
+      let roughVal = 0.84;
+
+      // Cruciform medieval arrow-slit embrasure (meurtrière) centered in the stone face
+      const dx = Math.abs(u - 0.5);
+      const dy = Math.abs(v - 0.5);
+      const inVertSlit = dx < 0.036 && dy < 0.30;
+      const inCrossSlit = dx < 0.115 && Math.abs(v - 0.44) < 0.032;
+      const inSlit = inVertSlit || inCrossSlit;
+      const inBevelFrame = !inSlit && ((dx < 0.088 && dy < 0.35) || (dx < 0.155 && Math.abs(v - 0.44) < 0.068));
+
+      if (inSlit) {
+        r = 22;
+        g = 24;
+        b = 28;
+        h = 0.04;
+        roughVal = 0.96;
+      } else if (inBevelFrame) {
+        r *= 0.86;
+        g *= 0.85;
+        b *= 0.83;
+        h = clamp01(h + 0.14);
+        roughVal = 0.78;
+      }
+
+      height[i] = h;
+      const idx = i * 4;
+      img.data[idx] = Math.min(255, Math.max(0, Math.round(r)));
+      img.data[idx + 1] = Math.min(255, Math.max(0, Math.round(g)));
+      img.data[idx + 2] = Math.min(255, Math.max(0, Math.round(b)));
+      img.data[idx + 3] = 255;
+
+      const rvByte = Math.round(roughVal * 255);
+      rImg.data[idx] = rvByte;
+      rImg.data[idx + 1] = rvByte;
+      rImg.data[idx + 2] = rvByte;
+      rImg.data[idx + 3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  rCtx.putImageData(rImg, 0, 0);
+  const normalCanvas = buildSobelNormalCanvas(height, size, 3.6);
+  return {
+    map: wrapTexture(albedoCanvas, { isColor: true, anisotropy }),
+    normalMap: wrapTexture(normalCanvas, { isColor: false, anisotropy }),
+    roughnessMap: wrapTexture(roughCanvas, { isColor: false, anisotropy }),
+  };
+}
+
+/** 512x512 Reinforced Oak & Wrought-Iron Portcullis / Castle Gate PBR */
+function buildMedievalPortcullisOakPBR(anisotropy) {
+  const size = 512;
+  const albedoCanvas = makeCanvas(size);
+  const roughCanvas = makeCanvas(size);
+  const ctx = albedoCanvas.getContext('2d');
+  const rCtx = roughCanvas.getContext('2d');
+  const img = ctx.createImageData(size, size);
+  const rImg = rCtx.createImageData(size, size);
+  const height = new Float32Array(size * size);
+
+  for (let y = 0; y < size; y++) {
+    const v = y / size;
+    for (let x = 0; x < size; x++) {
+      const u = x / size;
+      const i = y * size + x;
+      const grain = tileFBM(u * 2.5, v * 14, 10, 3, 8707);
+      const stoneNoise = tileFBM(u, v, 12, 3, 8719);
+      const micro = hash2i(x, y, 8737);
+
+      // Arched stone gate surround framing the recessed oak door & iron portcullis grate
+      const archDx = (u - 0.5) / 0.37;
+      const archTopY = 0.34;
+      const insideArch =
+        Math.abs(u - 0.5) < 0.37 &&
+        (v > archTopY || Math.hypot(archDx, (v - archTopY) / 0.24) < 1.0);
+      const onVoussoirRing =
+        !insideArch &&
+        Math.abs(u - 0.5) < 0.45 &&
+        (v > archTopY || Math.hypot((u - 0.5) / 0.45, (v - archTopY) / 0.31) < 1.0);
+
+      let r, g, b, h, roughVal;
+
+      if (!insideArch) {
+        // Dressed limestone gatehouse stone surround & radial arch voussoirs
+        const lum = (onVoussoirRing ? 176 : 158) + (stoneNoise - 0.5) * 26 + (micro - 0.5) * 10;
+        r = lum * 1.0;
+        g = lum * 0.97;
+        b = lum * 0.91;
+        h = onVoussoirRing ? 0.84 : 0.72;
+        roughVal = 0.84;
+      } else {
+        // Heavy vertical oak planks behind dark wrought-iron portcullis grille
+        const plank = (u * 8) % 1;
+        const plankSeam = plank < 0.06 || plank > 0.94;
+        r = lerp(84, 118, grain) * (plankSeam ? 0.55 : 1.0);
+        g = lerp(54, 78, grain) * (plankSeam ? 0.55 : 1.0);
+        b = lerp(32, 48, grain) * (plankSeam ? 0.55 : 1.0);
+        h = plankSeam ? 0.24 : 0.42;
+        roughVal = 0.82;
+
+        // Forged iron vertical & horizontal portcullis lattice bars
+        const barU = Math.abs(((u * 6) % 1) - 0.5) < 0.095;
+        const barV = Math.abs(((v * 5) % 1) - 0.5) < 0.085;
+        if (barU || barV) {
+          const isRivet = barU && barV;
+          r = isRivet ? 88 : 48;
+          g = isRivet ? 92 : 52;
+          b = isRivet ? 98 : 58;
+          h = isRivet ? 0.92 : 0.76;
+          roughVal = 0.38;
+        }
+      }
+
+      height[i] = clamp01(h);
+      const idx = i * 4;
+      img.data[idx] = Math.min(255, Math.max(0, Math.round(r)));
+      img.data[idx + 1] = Math.min(255, Math.max(0, Math.round(g)));
+      img.data[idx + 2] = Math.min(255, Math.max(0, Math.round(b)));
+      img.data[idx + 3] = 255;
+
+      const rvByte = Math.round(roughVal * 255);
+      rImg.data[idx] = rvByte;
+      rImg.data[idx + 1] = rvByte;
+      rImg.data[idx + 2] = rvByte;
+      rImg.data[idx + 3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  rCtx.putImageData(rImg, 0, 0);
+  const normalCanvas = buildSobelNormalCanvas(height, size, 3.8);
+  return {
+    map: wrapTexture(albedoCanvas, { isColor: true, anisotropy }),
+    normalMap: wrapTexture(normalCanvas, { isColor: false, anisotropy }),
+    roughnessMap: wrapTexture(roughCanvas, { isColor: false, anisotropy }),
+  };
+}
+
+/** 512x512 Conical Dark-Blue Slate Turret Shingles PBR (Albedo + Normal + Roughness) */
+function buildMedievalSlateShinglesPBR(anisotropy) {
+  const size = 512;
+  const albedoCanvas = makeCanvas(size);
+  const roughCanvas = makeCanvas(size);
+  const ctx = albedoCanvas.getContext('2d');
+  const rCtx = roughCanvas.getContext('2d');
+  const img = ctx.createImageData(size, size);
+  const rImg = rCtx.createImageData(size, size);
+  const height = new Float32Array(size * size);
+
+  const rows = 10;
+  const cols = 8;
+
+  for (let y = 0; y < size; y++) {
+    const v = y / size;
+    const row = Math.floor(v * rows);
+    const rv = (v * rows) % 1;
+    const stagger = (row % 2) * 0.5;
+    for (let x = 0; x < size; x++) {
+      const u = x / size;
+      const i = y * size + x;
+      const uS = (u * cols + stagger) % cols;
+      const col = Math.floor(uS);
+      const cu = uS % 1;
+
+      const tileTone = hash2i(col + 13, row + 29, 8803);
+      const slateGrain = tileFBM(u, v, 16, 2, 8819);
+      const micro = hash2i(x, y, 8837);
+
+      // Scalloped royal French slate shingle overlap lip
+      const scallopEdge = 0.86 + Math.sin(cu * Math.PI) * 0.1;
+      const lipShadow = smoothstep(scallopEdge - 0.12, scallopEdge, rv);
+      const sideSeam = cu < 0.045 || cu > 0.955 ? 1.0 : 0.0;
+
+      // Deep noble medieval blue-slate palette
+      let r = lerp(44, 68, tileTone) + (slateGrain - 0.5) * 14;
+      let g = lerp(62, 92, tileTone) + (slateGrain - 0.5) * 16;
+      let b = lerp(88, 128, tileTone) + (slateGrain - 0.5) * 18;
+
+      const darkEdge = Math.max(lipShadow * 0.52, sideSeam * 0.42);
+      r *= 1.0 - darkEdge;
+      g *= 1.0 - darkEdge;
+      b *= 1.0 - darkEdge;
+
+      // Subtle crisp blue-silver highlight right above the shingle overlap
+      const catchLight = smoothstep(0.66, 0.82, rv) * (1.0 - lipShadow);
+      r += catchLight * 14;
+      g += catchLight * 18;
+      b += catchLight * 24;
+
+      height[i] = clamp01(0.28 + rv * 0.58 - lipShadow * 0.45 - sideSeam * 0.25 + (slateGrain - 0.5) * 0.08);
+
+      const idx = i * 4;
+      img.data[idx] = Math.min(255, Math.max(0, Math.round(r + (micro - 0.5) * 6)));
+      img.data[idx + 1] = Math.min(255, Math.max(0, Math.round(g + (micro - 0.5) * 6)));
+      img.data[idx + 2] = Math.min(255, Math.max(0, Math.round(b + (micro - 0.5) * 6)));
+      img.data[idx + 3] = 255;
+
+      const rvByte = Math.round(clamp01(0.46 + darkEdge * 0.32 + (0.5 - slateGrain) * 0.12) * 255);
+      rImg.data[idx] = rvByte;
+      rImg.data[idx + 1] = rvByte;
+      rImg.data[idx + 2] = rvByte;
+      rImg.data[idx + 3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  rCtx.putImageData(rImg, 0, 0);
+  const normalCanvas = buildSobelNormalCanvas(height, size, 3.4);
+  return {
+    map: wrapTexture(albedoCanvas, { isColor: true, anisotropy }),
+    normalMap: wrapTexture(normalCanvas, { isColor: false, anisotropy }),
+    roughnessMap: wrapTexture(roughCanvas, { isColor: false, anisotropy }),
+  };
+}
+
+/** 512x512 Rough Grey Quarry Limestone Rock PBR (Stage 0 Raw Quarry Block) */
+function buildMedievalRawLimestonePBR(anisotropy) {
+  const size = 512;
+  const albedoCanvas = makeCanvas(size);
+  const roughCanvas = makeCanvas(size);
+  const ctx = albedoCanvas.getContext('2d');
+  const rCtx = roughCanvas.getContext('2d');
+  const img = ctx.createImageData(size, size);
+  const rImg = rCtx.createImageData(size, size);
+  const height = new Float32Array(size * size);
+
+  for (let y = 0; y < size; y++) {
+    const v = y / size;
+    for (let x = 0; x < size; x++) {
+      const u = x / size;
+      const i = y * size + x;
+      const vor = tileWorley(u, v, 8, 8923);
+      const strata = tileFBM(u * 1.4, v * 3.0, 8, 3, 8933);
+      const micro = hash2i(x, y, 8951);
+
+      const crack = 1.0 - smoothstep(0.02, 0.085, vor.edge);
+      const facet = vor.id;
+      const lum = lerp(126, 174, facet * 0.55 + strata * 0.45) - crack * 54 + (micro - 0.5) * 14;
+
+      height[i] = clamp01(0.62 - crack * 0.46 + (strata - 0.5) * 0.28);
+
+      const idx = i * 4;
+      img.data[idx] = Math.min(255, Math.max(0, Math.round(lum * 1.0)));
+      img.data[idx + 1] = Math.min(255, Math.max(0, Math.round(lum * 0.99)));
+      img.data[idx + 2] = Math.min(255, Math.max(0, Math.round(lum * 0.96)));
+      img.data[idx + 3] = 255;
+
+      const rvByte = Math.round(clamp01(0.86 + crack * 0.12) * 255);
+      rImg.data[idx] = rvByte;
+      rImg.data[idx + 1] = rvByte;
+      rImg.data[idx + 2] = rvByte;
+      rImg.data[idx + 3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  rCtx.putImageData(rImg, 0, 0);
+  const normalCanvas = buildSobelNormalCanvas(height, size, 4.0);
+  return {
+    map: wrapTexture(albedoCanvas, { isColor: true, anisotropy }),
+    normalMap: wrapTexture(normalCanvas, { isColor: false, anisotropy }),
+    roughnessMap: wrapTexture(roughCanvas, { isColor: false, anisotropy }),
+  };
+}
+
+/** 512x512 Hewn Medieval Oak Timber Beams & Drawbridge Planks PBR */
+function buildMedievalOakTimberPBR(anisotropy) {
+  const size = 512;
+  const albedoCanvas = makeCanvas(size);
+  const roughCanvas = makeCanvas(size);
+  const ctx = albedoCanvas.getContext('2d');
+  const rCtx = roughCanvas.getContext('2d');
+  const img = ctx.createImageData(size, size);
+  const rImg = rCtx.createImageData(size, size);
+  const height = new Float32Array(size * size);
+
+  for (let y = 0; y < size; y++) {
+    const v = y / size;
+    const plank = (v * 6) % 1;
+    const plankId = Math.floor(v * 6);
+    const isSeam = plank < 0.045 || plank > 0.955;
+    for (let x = 0; x < size; x++) {
+      const u = x / size;
+      const i = y * size + x;
+      const grain = tileFBM(u * 1.5, v * 16, 8, 3, 9011);
+      const tone = hash2i(plankId, 23, 9029);
+      const micro = hash2i(x, y, 9041);
+
+      let r = lerp(104, 138, tone * 0.4 + grain * 0.6);
+      let g = lerp(70, 96, tone * 0.4 + grain * 0.6);
+      let b = lerp(42, 60, tone * 0.4 + grain * 0.6);
+      if (isSeam) {
+        r *= 0.54;
+        g *= 0.54;
+        b *= 0.54;
+      }
+
+      height[i] = clamp01((isSeam ? 0.16 : 0.58) + (grain - 0.5) * 0.22);
+
+      const idx = i * 4;
+      img.data[idx] = Math.min(255, Math.max(0, Math.round(r + (micro - 0.5) * 8)));
+      img.data[idx + 1] = Math.min(255, Math.max(0, Math.round(g + (micro - 0.5) * 8)));
+      img.data[idx + 2] = Math.min(255, Math.max(0, Math.round(b + (micro - 0.5) * 6)));
+      img.data[idx + 3] = 255;
+
+      const rvByte = Math.round(clamp01(0.82 + (isSeam ? 0.14 : 0) + (0.5 - grain) * 0.1) * 255);
+      rImg.data[idx] = rvByte;
+      rImg.data[idx + 1] = rvByte;
+      rImg.data[idx + 2] = rvByte;
+      rImg.data[idx + 3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  rCtx.putImageData(rImg, 0, 0);
+  const normalCanvas = buildSobelNormalCanvas(height, size, 2.8);
   return {
     map: wrapTexture(albedoCanvas, { isColor: true, anisotropy }),
     normalMap: wrapTexture(normalCanvas, { isColor: false, anisotropy }),

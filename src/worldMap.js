@@ -203,10 +203,10 @@ function computeAll100LevelCoords() {
     [-4.2, 79.4], // 3: Japon (Playable)
     [3.2, 76.6],  // 4: Maya (Playable)
     [-4.0, 73.2], // 5: Pénitencier 1800 (Playable)
-    [3.2, 70.6],  // 6
-    [-2.2, 69.0], // 7
-    [-7.0, 67.6], // 8
-    [-4.6, 64.6], // 9
+    [3.2, 70.6],  // 6: Mine de Charbon (Playable)
+    [-2.0, 68.8], // 7: Villa Moderne (Playable)
+    [-7.1, 67.2], // 8: Château Fort Médiéval (Playable)
+    [-4.2, 64.0], // 9
     [0.6, 63.6],  // 10: Milestone City (Cité de Thèbes)
   ];
   for (let i = 0; i < 10; i++) {
@@ -727,7 +727,7 @@ export class WorldMapScene {
    *    - Levels 10, 20, ..., 100: Grand 2.2x Village / City Milestone Islands
    * ========================================================================== */
   _buildAll100Nodes() {
-    // 1. Build the 7 full 3D Playable Hero Islands (Levels 1–7)
+    // 1. Build the 8 full 3D Playable Hero Islands (Levels 1–8)
     this._buildHeroEgyptIsland(this.levelCoords[0]);
     this._buildHeroRomeIsland(this.levelCoords[1]);
     this._buildHeroJapanIsland(this.levelCoords[2]);
@@ -735,12 +735,13 @@ export class WorldMapScene {
     this._buildHeroPenitentiaryIsland(this.levelCoords[4]);
     this._buildHeroCoalMineIsland(this.levelCoords[5]);
     this._buildHeroModernVillaIsland(this.levelCoords[6]);
+    this._buildHeroMedievalCastleIsland(this.levelCoords[7]);
 
-    // 2. Collect regular "Bientôt" nodes (83) and Milestone Village/City nodes (10)
+    // 2. Collect regular "Bientôt" nodes (82) and Milestone Village/City nodes (10)
     const regularEntries = [];
     const milestoneEntries = [];
 
-    for (let i = 7; i < 100; i++) {
+    for (let i = 8; i < 100; i++) {
       const levelNum = i + 1;
       const chapterIdx = Math.floor(i / 10);
       const chapter = WORLD_CHAPTERS[chapterIdx];
@@ -1842,6 +1843,223 @@ export class WorldMapScene {
       focusDistance: 17.5,
       focusElevation: 42,
       focusAzimuth: -0.14,
+      group,
+      hitbox,
+      bounceTime: 0,
+    };
+
+    hitbox.userData.interact = { type: 'map-node', node };
+    this.nodes.push(node);
+  }
+
+  /**
+   * Level 8 — Medieval Era: "Le Château Fort Médiéval"
+   * Miniature 3D lush medieval motte island ringed by a turquoise moat & wooden drawbridge,
+   * fortified limestone curtain walls, 4 corner towers crowned with conical dark-blue slate spires,
+   * towering central Keep (Donjon) with pitched slate roof & crimson royal banners, and medieval pines.
+   */
+  _buildHeroMedievalCastleIsland(coord) {
+    const pos = new THREE.Vector3(coord.x, 0, coord.z);
+    const group = new THREE.Group();
+    group.position.copy(pos);
+    this.root.add(group);
+
+    this._addShoreFoamRing(group, 2.38, 2.18, 9.6);
+    this._addUnlockedGoldRing(group, 'level8_castle', 2.48, 2.28, 9.6);
+
+    const meadowMat = this._trackMat(
+      new THREE.MeshStandardMaterial({ color: '#5b8f42', roughness: 0.9, metalness: 0.0 })
+    );
+    const stoneMat = this._trackMat(
+      new THREE.MeshStandardMaterial({ color: '#bfb9ae', roughness: 0.84, metalness: 0.05 })
+    );
+    const darkStoneMat = this._trackMat(
+      new THREE.MeshStandardMaterial({ color: '#9c968b', roughness: 0.88, metalness: 0.05 })
+    );
+    const slateMat = this._trackMat(
+      new THREE.MeshStandardMaterial({ color: '#39557a', roughness: 0.52, metalness: 0.18 })
+    );
+    const oakMat = this._trackMat(
+      new THREE.MeshStandardMaterial({ color: '#785131', roughness: 0.84, metalness: 0.04 })
+    );
+    const moatMat = this._trackMat(
+      new THREE.MeshStandardMaterial({ color: '#289fb4', roughness: 0.14, metalness: 0.12 })
+    );
+    const bannerMat = this._trackMat(
+      new THREE.MeshStandardMaterial({ color: '#bd242a', roughness: 0.72, side: THREE.DoubleSide })
+    );
+    const goldMat = this._trackMat(
+      new THREE.MeshStandardMaterial({ color: '#e6b83e', roughness: 0.3, metalness: 0.82 })
+    );
+
+    const island = new THREE.Mesh(
+      this._trackGeo(createIslandMoundGeometry(2.3, 2.1, 0.74, 13.7)),
+      meadowMat
+    );
+    island.castShadow = true;
+    island.receiveShadow = true;
+    group.add(island);
+
+    // Turquoise castle moat ring sitting cleanly on the meadow hilltop terrace
+    const moatRing = new THREE.Mesh(
+      this._trackGeo(new THREE.RingGeometry(0.92, 1.38, 24)),
+      moatMat
+    );
+    moatRing.rotation.x = -Math.PI / 2;
+    moatRing.position.set(0, 0.75, 0.02);
+    group.add(moatRing);
+
+    // Miniature wooden drawbridge spanning the southern moat into the gatehouse
+    const drawbridge = new THREE.Mesh(
+      this._trackGeo(new THREE.BoxGeometry(0.36, 0.06, 0.56)),
+      oakMat
+    );
+    drawbridge.position.set(0, 0.79, 1.06);
+    drawbridge.castShadow = true;
+    group.add(drawbridge);
+
+    // Miniature 4-Turret Medieval Castle & Central Donjon
+    const castle = new THREE.Group();
+    castle.position.set(0, 0.72, 0.02);
+    castle.rotation.y = 0.16;
+
+    // Battered stone motte foundation & inner curtain walls
+    const motte = new THREE.Mesh(
+      this._trackGeo(new THREE.BoxGeometry(1.56, 0.24, 1.48)),
+      darkStoneMat
+    );
+    motte.position.y = 0.12;
+    motte.castShadow = true;
+    motte.receiveShadow = true;
+    castle.add(motte);
+
+    const curtain = new THREE.Mesh(
+      this._trackGeo(new THREE.BoxGeometry(1.38, 0.42, 1.3)),
+      stoneMat
+    );
+    curtain.position.y = 0.44;
+    curtain.castShadow = true;
+    castle.add(curtain);
+
+    // Dark iron-grated front gatehouse archway
+    const gate = new THREE.Mesh(
+      this._trackGeo(new THREE.BoxGeometry(0.32, 0.34, 0.12)),
+      oakMat
+    );
+    gate.position.set(0, 0.38, 0.64);
+    castle.add(gate);
+
+    // 4 Corner Towers with Conical Dark-Blue Slate Poivrière Spires & Gold Finials
+    const towerGeo = this._trackGeo(new THREE.CylinderGeometry(0.18, 0.21, 0.72, 10));
+    const spireGeo = this._trackGeo(new THREE.ConeGeometry(0.24, 0.48, 10));
+    const finialGeo = this._trackGeo(new THREE.SphereGeometry(0.035, 6, 6));
+    [
+      [-0.64, -0.58],
+      [0.64, -0.58],
+      [-0.64, 0.58],
+      [0.64, 0.58],
+    ].forEach(([tx, tz]) => {
+      const tower = new THREE.Mesh(towerGeo, stoneMat);
+      tower.position.set(tx, 0.56, tz);
+      tower.castShadow = true;
+      castle.add(tower);
+
+      const spire = new THREE.Mesh(spireGeo, slateMat);
+      spire.position.set(tx, 1.15, tz);
+      spire.castShadow = true;
+      castle.add(spire);
+
+      const finial = new THREE.Mesh(finialGeo, goldMat);
+      finial.position.set(tx, 1.4, tz);
+      castle.add(finial);
+    });
+
+    // Towering Central Keep (Donjon) with Steep Pitched Slate Roof & Crimson Royal Standard
+    const keep = new THREE.Mesh(
+      this._trackGeo(new THREE.BoxGeometry(0.64, 0.96, 0.64)),
+      stoneMat
+    );
+    keep.position.set(0, 0.86, -0.06);
+    keep.castShadow = true;
+    castle.add(keep);
+
+    const keepRoof = new THREE.Mesh(
+      this._trackGeo(new THREE.ConeGeometry(0.48, 0.52, 4)),
+      slateMat
+    );
+    keepRoof.rotation.y = Math.PI / 4;
+    keepRoof.position.set(0, 1.58, -0.06);
+    keepRoof.castShadow = true;
+    castle.add(keepRoof);
+
+    const mast = new THREE.Mesh(
+      this._trackGeo(new THREE.CylinderGeometry(0.014, 0.018, 0.42, 5)),
+      goldMat
+    );
+    mast.position.set(0, 1.96, -0.06);
+    castle.add(mast);
+
+    const pennant = new THREE.Mesh(
+      this._trackGeo(new THREE.PlaneGeometry(0.28, 0.12)),
+      bannerMat
+    );
+    pennant.position.set(0.14, 2.08, -0.06);
+    castle.add(pennant);
+
+    group.add(castle);
+
+    // Sculpted Medieval Forest Pines flanking the hilltop moat
+    const medievalFoliageMat = this._trackMat(createMatteFoliageMaterial());
+    const pineGeo = this._trackGeo(
+      createIrregularConiferTierGeo({
+        radiusBottom: 0.22,
+        radiusTop: 0.03,
+        height: 0.72,
+        radialSegments: 7,
+        heightSegments: 3,
+        jaggedness: 0.2,
+        droop: 0.04,
+        seed: 88,
+        baseColor: '#1e3e24',
+        midColor: '#346638',
+        topColor: '#66a24c',
+      })
+    );
+    [
+      [-1.46, 0.82, -0.45],
+      [-1.25, 0.8, 0.72],
+      [1.46, 0.82, -0.52],
+      [1.28, 0.8, 0.74],
+    ].forEach(([px, py, pz], idx) => {
+      const p = new THREE.Mesh(pineGeo, medievalFoliageMat);
+      p.position.set(px, py, pz);
+      p.rotation.y = idx * 1.15;
+      p.castShadow = true;
+      group.add(p);
+    });
+
+    const hitbox = new THREE.Mesh(
+      this._trackGeo(new THREE.CylinderGeometry(2.45, 2.55, 2.5, 10)),
+      this.mats.hitbox
+    );
+    hitbox.position.y = 1.15;
+    group.add(hitbox);
+
+    const node = {
+      id: 'level8_castle',
+      levelIndex: 7,
+      levelNum: 8,
+      chapter: WORLD_CHAPTERS[0],
+      unlocked: true,
+      isMilestone: false,
+      title: 'Niveau 8 : Le Château Fort Médiéval (56 blocs)',
+      shortLabel: 'Château Fort',
+      labelText: 'Niveau 8 • Jouable',
+      position: pos,
+      labelAnchor: new THREE.Vector3(pos.x, 2.75, pos.z),
+      focusDistance: 17.8,
+      focusElevation: 42,
+      focusAzimuth: 0.16,
       group,
       hitbox,
       bounceTime: 0,

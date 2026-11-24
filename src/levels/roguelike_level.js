@@ -703,6 +703,115 @@ export const ROGUELIKE_THEMES = [
       },
     ],
   },
+  {
+    id: 'medieval',
+    levelNum: 8,
+    shortName: 'Moyen Âge',
+    title: 'Niveau 8 : Moyen Âge — Château Fort',
+    biomeLabel: 'Pierre de Taille, Remparts Crénelés & Ardoise',
+    skyColor: '#d7e5ec',
+    terrainTint: '#a6c48a',
+    stoneTint: '#cfc9be',
+    accentColor: '#3f5f8a',
+    rewardRangeLabel: '+35 à +60 Éclats',
+    structures: [
+      {
+        id: 'medieval_royal_keep',
+        name: 'Le Donjon Royal & Courtine',
+        subtitle: 'Remparts crénelés, 4 tours d’angle & haut donjon central',
+        // 16 + 10 + 6 + 4 = 36 blocks
+        layers: [
+          { cells: makeRectCells(4, 4) },
+          {
+            cells: [
+              [-1.5, -1.5], [1.5, -1.5], [-1.5, 1.5], [1.5, 1.5],
+              [-0.5, -1.5], [0.5, -1.5], [-1.5, 0.5], [1.5, 0.5],
+              [-0.5, 0], [0.5, 0],
+            ],
+          },
+          {
+            cells: [
+              [-1.5, -1.5], [1.5, -1.5], [-1.5, 1.5], [1.5, 1.5],
+              [-0.5, 0], [0.5, 0],
+            ],
+          },
+          { cells: makeRectCells(2, 2) },
+        ],
+      },
+      {
+        id: 'medieval_barbican_bridge',
+        name: 'La Barbacane & Pont Fortifié',
+        subtitle: 'Tours jumelles de porte à herse & pont de pierre fortifié',
+        // 14 + 8 + 6 + 2 = 30 blocks
+        layers: [
+          { cells: makeRectCells(5, 3).filter(([x, z]) => !(x === 0 && z === 1)) },
+          {
+            cells: [
+              [-2, -1], [-1, -1], [1, -1], [2, -1],
+              [-2, 1], [-1, 1], [1, 1], [2, 1],
+            ],
+          },
+          {
+            cells: [
+              [-1.5, -0.5], [-1.5, 0.5], [0, -0.5], [0, 0.5], [1.5, -0.5], [1.5, 0.5],
+            ],
+          },
+          { cells: [[-1.5, 0], [1.5, 0]] },
+        ],
+      },
+      {
+        id: 'medieval_watchtower',
+        name: 'La Tour de Guet & Échauguettes',
+        subtitle: 'Haute tour de pierre à flèche d’ardoise & palissade fortifiée',
+        // 12 + 6 + 4 + 4 = 26 blocks
+        layers: [
+          { cells: makeRectCells(4, 3) },
+          { cells: makeRectCells(3, 2) },
+          { cells: makeRectCells(2, 2) },
+          { cells: makeRectCells(2, 2) },
+        ],
+      },
+      {
+        id: 'medieval_knights_hall',
+        name: 'La Grande Salle des Chevaliers',
+        subtitle: 'Salle de banquet en pierre, toit pentu en ardoise & cheminée',
+        // 15 + 9 + 6 + 2 = 32 blocks
+        layers: [
+          { cells: makeRectCells(5, 3) },
+          {
+            cells: [
+              [-2, -1], [-1, -1], [0, -1], [1, -1], [2, -1],
+              [-2, 1], [0, 1], [2, 1], [-2, 0],
+            ],
+          },
+          { cells: makeRectCells(3, 2) },
+          { cells: [[-0.5, 0], [0.5, 0]] },
+        ],
+      },
+      {
+        id: 'medieval_artillery_bastion',
+        name: "Le Bastion d'Artillerie Médiéval",
+        subtitle: 'Épais bastion octogonal en pierre de taille & parapet crénelé',
+        // 12 + 8 + 6 + 2 = 28 blocks
+        layers: [
+          {
+            cells: makeRectCells(4, 4).filter(
+              ([x, z]) => !(Math.abs(x) === 1.5 && Math.abs(z) === 1.5)
+            ),
+          },
+          {
+            cells: [
+              [-1, -1], [0, -1], [1, -1],
+              [-1, 0], [1, 0],
+              [-1, 1], [0, 1], [1, 1],
+            ],
+          },
+          { cells: makeRectCells(3, 2) },
+          { cells: [[-0.5, 0], [0.5, 0]] },
+        ],
+      },
+    ],
+  },
 ];
 
 /** 4 randomized gameplay run modifiers */
